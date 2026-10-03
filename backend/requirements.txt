@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg[binary]
+alembic
+boto3
+python-dotenv
+pytz
+pytest
+passlib
+bcrypt==4.0.1
