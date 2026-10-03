@@ -18,7 +18,7 @@ const TOAST_CFG: Record<ToastType, { icon: any; color: string; bg: string; borde
   success: { icon: CheckCircle2, color: '#059669', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.25)' },
   warning: { icon: AlertTriangle,color: '#f97316', bg: 'rgba(249,115,22,0.1)',  border: 'rgba(249,115,22,0.25)' },
   error:   { icon: AlertTriangle,color: '#EF4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)'  },
-  info:    { icon: Info,         color: '#003F8A', bg: 'rgba(0,63,138,0.08)',   border: 'rgba(0,63,138,0.2)'   },
+  info:    { icon: Info,         color: '#18181b', bg: 'rgba(24,24,27,0.08)',   border: 'rgba(24,24,27,0.2)'   },
 };
 
 function ToastItem({ toast, onRemove }: ToastItemProps) {

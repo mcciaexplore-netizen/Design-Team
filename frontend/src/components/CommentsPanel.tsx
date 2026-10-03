@@ -25,7 +25,7 @@ function MentionText({ text, names }: { text: string; names: string[] }) {
   return (
     <>
       {parts.map((p, i) => (p.startsWith('@') && names.includes(p.slice(1))
-        ? <strong key={i} style={{ color: '#003F8A', background: 'rgba(0,63,138,0.08)', borderRadius: 4, padding: '0 3px' }}>{p}</strong>
+        ? <strong key={i} style={{ color: '#18181b', background: 'rgba(24,24,27,0.08)', borderRadius: 4, padding: '0 3px' }}>{p}</strong>
         : <React.Fragment key={i}>{p}</React.Fragment>))}
     </>
   );
@@ -173,7 +173,7 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
         {comments.map(c => (
           <div key={c.id} style={{ background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 8, padding: '0.625rem 0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#003F8A' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#18181b' }}>
                 {c.author.full_name}{c.author.role === 'Requester' && <span style={{ color: '#94a3b8', fontWeight: 600 }}> · client</span>}
               </span>
               {c.created_at && <time dateTime={c.created_at} style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{new Date(c.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</time>}

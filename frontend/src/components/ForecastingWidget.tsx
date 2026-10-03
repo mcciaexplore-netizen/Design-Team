@@ -32,7 +32,7 @@ const ForecastingWidget = () => {
           <TrendingUp size={18} />
         </div>
         <div>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: '#0F172A', letterSpacing: '-0.02em' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0F172A', letterSpacing: '-0.02em' }}>
             7-Day Capacity Forecast
           </h3>
           <p style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 2 }}>Planned effort vs. capacity, next 7 days</p>
@@ -54,7 +54,7 @@ const ForecastingWidget = () => {
                 padding:      '1rem 1.1rem',
                 borderRadius: 'var(--radius-md)',
                 border:       `1px solid ${overloaded ? 'rgba(239,68,68,0.15)' : 'rgba(226,232,240,0.85)'}`,
-                background:   overloaded ? 'rgba(239,68,68,0.04)' : 'rgba(0,63,138,0.02)',
+                background:   overloaded ? 'rgba(239,68,68,0.04)' : 'rgba(24,24,27,0.02)',
                 transition:   'all 0.2s',
               }}
             >
@@ -63,16 +63,16 @@ const ForecastingWidget = () => {
                 <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-body)' }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: 'var(--radius-btn)', flexShrink: 0,
-                    background: overloaded ? 'rgba(239,68,68,0.08)' : 'rgba(0,63,138,0.06)',
-                    border:     `1px solid ${overloaded ? 'rgba(239,68,68,0.15)' : 'rgba(0,63,138,0.12)'}`,
+                    background: overloaded ? 'rgba(239,68,68,0.08)' : 'rgba(24,24,27,0.06)',
+                    border:     `1px solid ${overloaded ? 'rgba(239,68,68,0.15)' : 'rgba(24,24,27,0.12)'}`,
                     display:    'flex', alignItems: 'center', justifyContent: 'center',
-                    color:      overloaded ? '#EF4444' : '#003F8A',
+                    color:      overloaded ? '#EF4444' : '#18181b',
                   }}>
                     <Users size={13} />
                   </div>
                   {f.designer_name}
                 </span>
-                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: overloaded ? '#EF4444' : '#059669', fontFamily: 'var(--font-heading)' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: overloaded ? '#EF4444' : '#059669', fontFamily: 'var(--font-body)' }}>
                   {f.projected_capacity_percentage}% Booked
                 </span>
               </div>

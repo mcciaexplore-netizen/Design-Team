@@ -48,7 +48,7 @@ const TicketDetailPage: React.FC = () => {
     return (
       <div style={{ padding: '3rem', textAlign: 'center' }} role={loading ? 'status' : undefined}>
         <p style={{ fontSize: '1rem', color: '#64748B' }}>
-          {loading ? 'Loading ticket…' : <>Ticket not found. <Link to={isClient ? '/client-portal' : '/'} style={{ color: '#003F8A', fontWeight: 700 }}>← Back</Link></>}
+          {loading ? 'Loading ticket…' : <>Ticket not found. <Link to={isClient ? '/client-portal' : '/'} style={{ color: '#18181b', fontWeight: 700 }}>← Back</Link></>}
         </p>
       </div>
     );
@@ -111,7 +111,7 @@ const TicketDetailPage: React.FC = () => {
             <p style={{ fontSize: '0.68rem', fontFamily: 'monospace', color: '#64748b', fontWeight: 700, marginBottom: 4 }}>
               {ticket.number}{ticket.client_org ? ` · ${ticket.client_org}` : ''}{ticket.design_type ? ` · ${ticket.design_type}` : ''}
             </p>
-            <h1 style={{ fontSize: 'clamp(1.3rem,3vw,1.8rem)', fontFamily: 'var(--font-heading)', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{ticket.title}</h1>
+            <h1 style={{ fontSize: 'clamp(1.3rem,3vw,1.8rem)', fontFamily: 'var(--font-body)', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{ticket.title}</h1>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <span className="badge-blue" style={ps}>{ticket.priority}</span>
@@ -129,7 +129,7 @@ const TicketDetailPage: React.FC = () => {
               <button key={tab.key} type="button" role="tab" aria-selected={activeTab === tab.key} onClick={() => setActiveTab(tab.key)}
                 style={{ flex: 1, whiteSpace: 'nowrap', padding: '0.45rem 0.75rem', borderRadius: 8, border: 'none', cursor: 'pointer',
                          background: activeTab === tab.key ? 'white' : 'transparent', boxShadow: activeTab === tab.key ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-                         color: activeTab === tab.key ? '#003F8A' : '#64748B', fontSize: '0.78rem', fontWeight: 700 }}>
+                         color: activeTab === tab.key ? '#18181b' : '#64748B', fontSize: '0.78rem', fontWeight: 700 }}>
                 {tab.label}
               </button>
             ))}
@@ -258,7 +258,7 @@ const TicketDetailPage: React.FC = () => {
           {related.length > 1 && (
             <div className="glass-card" style={{ padding: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
-                <GitBranch size={13} style={{ color: '#003F8A' }} />
+                <GitBranch size={13} style={{ color: '#18181b' }} />
                 <h3 className="section-label">Revision history</h3>
                 <span style={{ marginLeft: 'auto', fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8' }}>{related.length} versions</span>
               </div>
@@ -266,11 +266,11 @@ const TicketDetailPage: React.FC = () => {
                 {related.map(t => {
                   const current = t.id === ticket.id;
                   return (
-                    <Link key={t.id} to={`/tickets/${t.id}`} aria-current={current ? 'page' : undefined} style={{ display: 'block', textDecoration: 'none', padding: '0.5rem 0.625rem', borderRadius: 8, background: current ? 'rgba(0,63,138,0.06)' : 'transparent', border: `1px solid ${current ? 'rgba(0,63,138,0.15)' : 'rgba(226,232,240,0.7)'}` }}>
+                    <Link key={t.id} to={`/tickets/${t.id}`} aria-current={current ? 'page' : undefined} style={{ display: 'block', textDecoration: 'none', padding: '0.5rem 0.625rem', borderRadius: 8, background: current ? 'rgba(24,24,27,0.06)' : 'transparent', border: `1px solid ${current ? 'rgba(24,24,27,0.15)' : 'rgba(226,232,240,0.7)'}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: current ? '#003F8A' : '#0F172A' }}>V{t.version_number ?? 1}</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: current ? '#18181b' : '#0F172A' }}>V{t.version_number ?? 1}</span>
                         <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{t.status}</span>
-                        {current && <span style={{ marginLeft: 'auto', fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', color: '#003F8A' }}>current</span>}
+                        {current && <span style={{ marginLeft: 'auto', fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', color: '#18181b' }}>current</span>}
                       </div>
                       {t.reason_for_change && (
                         <p style={{ fontSize: '0.68rem', color: '#64748B', lineHeight: 1.5, fontStyle: 'italic', marginTop: 3, display: 'flex', gap: 4 }}>

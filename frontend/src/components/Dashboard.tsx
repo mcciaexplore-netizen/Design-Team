@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
@@ -20,7 +19,7 @@ const tooltipStyle = { borderRadius: 10, border: '1px solid rgba(226,232,240,0.9
 const fmtHours = (h: number | null) => (h === null ? '—' : h >= 48 ? `${(h / 24).toFixed(1)} d` : `${h} h`);
 const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short' });
 
-function Stat({ label, value, sub, icon: Icon, tone = '#003F8A' }: { label: string; value: string; sub: string; icon: typeof Clock; tone?: string }) {
+function Stat({ label, value, sub, icon: Icon, tone = '#18181b' }: { label: string; value: string; sub: string; icon: typeof Clock; tone?: string }) {
   return (
     <div className="glass-card dashboard-stat-card" style={{ padding: '1.25rem' }}>
       <div className="dashboard-stat-icon"><div className="icon-tile" style={{ color: tone }}><Icon size={18} /></div></div>
@@ -70,7 +69,7 @@ const Dashboard = () => {
     <div className="dashboard-page">
       <div className="dashboard-intro">
         <h1>Performance at a glance</h1>
-        <p>The last 30 days of delivery, plus what's on the team's plate this week. <Link to="/reports" style={{ color: 'var(--brand)', fontWeight: 700 }}>Open full reports →</Link></p>
+        <p>The last 30 days of delivery, plus what's on the team's plate this week.</p>
       </div>
 
       {error && <p role="alert" style={{ color: '#b91c1c', marginBottom: 12 }}>{error} <button type="button" className="chip" onClick={load}>Retry</button></p>}
@@ -119,7 +118,7 @@ const Dashboard = () => {
                       <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="stage" width={120} tick={{ fontSize: 11 }} />
                       <Tooltip contentStyle={tooltipStyle} />
-                      <Bar dataKey="tickets" fill="#003F8A" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="tickets" fill="#18181b" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

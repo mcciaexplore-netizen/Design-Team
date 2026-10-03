@@ -17,13 +17,13 @@ interface ActivityTimelineProps {
 /* Maps each event type to MCCIA design tokens */
 const TYPE_MAP: Record<string, { icon: any; color: string; bg: string; border: string }> = {
   created:       { icon: CheckCircle,   color: '#059669', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.15)'  },
-  status_change: { icon: ArrowRight,    color: '#003F8A', bg: 'rgba(0,63,138,0.07)',    border: 'rgba(0,63,138,0.14)'    },
-  timer_start:   { icon: Play,          color: '#8B5CF6', bg: 'rgba(139,92,246,0.08)',  border: 'rgba(139,92,246,0.15)'  },
+  status_change: { icon: ArrowRight,    color: '#18181b', bg: 'rgba(24,24,27,0.07)',    border: 'rgba(24,24,27,0.14)'    },
+  timer_start:   { icon: Play,          color: '#8B5CF6', bg: 'rgba(24,24,27,0.08)',  border: 'rgba(24,24,27,0.15)'  },
   timer_stop:    { icon: Clock,         color: '#64748B', bg: 'rgba(100,116,139,0.08)', border: 'rgba(100,116,139,0.14)' },
   comment:       { icon: MessageSquare, color: '#f97316', bg: 'rgba(249,115,22,0.08)',  border: 'rgba(249,115,22,0.14)'  },
   attachment:    { icon: Paperclip,     color: '#0ea5e9', bg: 'rgba(14,165,233,0.08)',  border: 'rgba(14,165,233,0.15)' },
   approval:      { icon: ShieldCheck,   color: '#059669', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.15)' },
-  proof:         { icon: FileImage,     color: '#8B5CF6', bg: 'rgba(139,92,246,0.08)',  border: 'rgba(139,92,246,0.15)' },
+  proof:         { icon: FileImage,     color: '#8B5CF6', bg: 'rgba(24,24,27,0.08)',  border: 'rgba(24,24,27,0.15)' },
   alert:         { icon: AlertCircle,   color: '#EF4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.14)'   },
 };
 

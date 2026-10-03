@@ -61,12 +61,12 @@ export default function WorkloadPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
             <div className="glass-card" style={{ padding: '1rem' }}>
               <p className="section-label">Overloaded people</p>
-              <p style={{ fontSize: '1.7rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: data.overloaded_count ? '#dc2626' : '#047857' }}>{data.overloaded_count}</p>
+              <p style={{ fontSize: '1.7rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: data.overloaded_count ? '#dc2626' : '#047857' }}>{data.overloaded_count}</p>
               <p style={{ fontSize: '0.72rem', color: '#64748b' }}>{data.overloaded_count ? 'Work due exceeds available hours' : 'Everyone can meet their deadlines'}</p>
             </div>
             <div className="glass-card" style={{ padding: '1rem' }}>
               <p className="section-label">Unassigned work</p>
-              <p style={{ fontSize: '1.7rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: '#0F172A' }}>{data.unassigned_hours}h</p>
+              <p style={{ fontSize: '1.7rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0F172A' }}>{data.unassigned_hours}h</p>
               <p style={{ fontSize: '0.72rem', color: '#64748b' }}>{data.unassigned_tickets} ticket{data.unassigned_tickets === 1 ? '' : 's'} without an owner</p>
             </div>
           </div>
@@ -79,7 +79,7 @@ export default function WorkloadPage() {
               <section key={d.designer_id} className="glass-card" style={{ padding: '1.1rem 1.25rem' }} aria-label={`${d.designer_name} workload`}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                   <div className="icon-tile" style={{ width: 32, height: 32 }}><Users size={14} /></div>
-                  <h3 style={{ fontSize: '0.92rem', fontWeight: 800, fontFamily: 'var(--font-heading)' }}>{d.designer_name}</h3>
+                  <h3 style={{ fontSize: '0.92rem', fontWeight: 800, fontFamily: 'var(--font-body)' }}>{d.designer_name}</h3>
                   <span style={{ fontSize: '0.74rem', color: '#64748b' }}>{d.open_tickets} open · {d.logged_hours_prev_7_days}h logged last week</span>
                   <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', fontWeight: 800, color: d.is_overloaded ? '#dc2626' : '#047857' }}>
                     {d.is_overloaded ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}

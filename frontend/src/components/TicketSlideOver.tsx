@@ -51,7 +51,7 @@ const TicketSlideOver: React.FC<Props> = ({ ticket, onClose }) => {
         style={{
           position: 'fixed', top: 0, right: 0, bottom: 0, width: 440, maxWidth: '92vw',
           background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)',
-          borderLeft: '1px solid rgba(226,232,240,0.85)', boxShadow: '-16px 0 48px rgba(0,63,138,0.1)',
+          borderLeft: '1px solid rgba(226,232,240,0.85)', boxShadow: '-16px 0 48px rgba(24,24,27,0.1)',
           zIndex: 45, display: 'flex', flexDirection: 'column',
           animation: 'slideInRight 0.28s cubic-bezier(0.4,0,0.2,1) both',
         }}
@@ -61,7 +61,7 @@ const TicketSlideOver: React.FC<Props> = ({ ticket, onClose }) => {
             <p style={{ fontSize: '0.68rem', fontFamily: 'monospace', color: '#64748b', fontWeight: 700, marginBottom: 3 }}>
               {ticket.number}{ticket.client_org ? ` · ${ticket.client_org}` : ''}
             </p>
-            <h2 style={{ fontSize: '0.95rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: '#0F172A', lineHeight: 1.35, letterSpacing: '-0.01em' }}>{ticket.title}</h2>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0F172A', lineHeight: 1.35, letterSpacing: '-0.01em' }}>{ticket.title}</h2>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
             <Link to={`/tickets/${ticket.id}`} title="Open full page" aria-label="Open full page" onClick={onClose}

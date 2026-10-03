@@ -141,8 +141,8 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
 
       {/* Client decision (signed-in portal) */}
       {isClient && pending && latest && (
-        <div className="glass-card" style={{ padding: '1.1rem', borderColor: 'rgba(0,63,138,0.25)' }}>
-          <p style={{ fontWeight: 800, fontFamily: 'var(--font-heading)', color: '#0F172A', marginBottom: 4 }}>Your review is needed</p>
+        <div className="glass-card" style={{ padding: '1.1rem', borderColor: 'rgba(24,24,27,0.25)' }}>
+          <p style={{ fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0F172A', marginBottom: 4 }}>Your review is needed</p>
           <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 10 }}>Please review version {pending.proof_version ?? latest.version} below, then approve it or tell us what to change.</p>
           {!deciding ? (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -239,7 +239,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
             {requests.map(r => {
               const st = STATUS_LABEL[r.status];
               return (
-                <li key={r.id} style={{ fontSize: '0.78rem', color: '#475569', borderLeft: '2px solid rgba(0,63,138,0.2)', paddingLeft: 10 }}>
+                <li key={r.id} style={{ fontSize: '0.78rem', color: '#475569', borderLeft: '2px solid rgba(24,24,27,0.2)', paddingLeft: 10 }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                     <span className={st.cls}>{st.text}</span>
                     <strong>Version {r.proof_version ?? '?'}</strong>

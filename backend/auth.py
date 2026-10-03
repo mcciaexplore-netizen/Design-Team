@@ -5,6 +5,8 @@ import logging
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import func
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
@@ -147,3 +149,36 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 @router.get("/me")
 def me(user: models.User = Depends(get_current_user)):
     return user_payload(user)
+
+
+class RegisterRequest(BaseModel):
+    full_name: str = Field(min_length=2, max_length=80)
+    email: EmailStr
+    company: str = Field(min_length=2, max_length=80)
+    password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+def register(body: RegisterRequest, db: Session = Depends(get_db)):
+    """Self-service sign-up. Only ever creates a Client (requester) account.
+
+    Clients are scoped to their company's tickets, so the company must be new:
+    joining an existing company would expose its tickets, and staff must add those users.
+    """
+    email = body.email.strip().lower()
+    company = " ".join(body.company.split())
+    if db.query(models.User).filter(func.lower(models.User.email) == email).first():
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+    if db.query(models.User).filter(func.lower(models.User.client_org) == company.lower()).first():
+        raise HTTPException(status_code=409, detail="That company already has an account. Ask your design team to add you.")
+    user = models.User(
+        email=email,
+        full_name=" ".join(body.full_name.split()),
+        role=models.RoleEnum.REQUESTER,
+        client_org=company,
+        hashed_password=hash_password(body.password),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {"access_token": create_access_token(user), "token_type": "bearer", "user": user_payload(user)}

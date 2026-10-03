@@ -7,6 +7,15 @@ import CommentsPanel from '../components/CommentsPanel';
 
 const DONE = ['Delivered', 'Closed', 'Closed without approval'];
 
+const CLIENT_STATUS: Record<string, string> = {
+  'New': 'Received',
+  'Assigned': 'Queued with a designer',
+  'In Progress': 'Design in progress',
+  'Waiting on Requester': 'We need your input',
+  'In Review': 'Needs your review',
+  'Delivered': 'Delivered',
+};
+
 function when(due: string, status: string): string {
   if (DONE.includes(status)) return status === 'Delivered' ? 'Delivered' : status;
   if (!due) return 'Date to be confirmed';
@@ -27,14 +36,14 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
       <div style={{ maxWidth: 800, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: '1.25rem' }}>
           <div>
-            <h1 style={{ fontSize: 'clamp(1.4rem,3vw,2rem)', fontFamily: 'var(--font-heading)', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>My requests</h1>
+            <h1 style={{ fontSize: 'clamp(1.4rem,3vw,2rem)', fontFamily: 'var(--font-body)', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>My requests</h1>
             <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: 4 }}>Track progress, review designs and talk to the team.</p>
           </div>
           <button type="button" className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={onNewRequest}>+ New request</button>
         </div>
 
         {needsYou > 0 && (
-          <p role="status" style={{ background: 'rgba(0,63,138,0.06)', border: '1px solid rgba(0,63,138,0.18)', color: '#003F8A', borderRadius: 10, padding: '0.6rem 0.9rem', fontSize: '0.84rem', fontWeight: 600, marginBottom: '1rem' }}>
+          <p role="status" style={{ background: 'rgba(24,24,27,0.06)', border: '1px solid rgba(24,24,27,0.18)', color: '#18181b', borderRadius: 10, padding: '0.6rem 0.9rem', fontSize: '0.84rem', fontWeight: 600, marginBottom: '1rem' }}>
             {needsYou} design{needsYou > 1 ? 's are' : ' is'} waiting for your review.
           </p>
         )}
@@ -55,17 +64,17 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
             const open = openId === ticket.id;
             const reviewing = ticket.status === 'In Review';
             return (
-              <div key={ticket.id} className="glass-card animate-fade-in-up" style={{ overflow: 'hidden', animationDelay: `${i * 60}ms`, animationFillMode: 'both', padding: 0, borderColor: reviewing ? 'rgba(0,63,138,0.3)' : undefined }}>
+              <div key={ticket.id} className="glass-card animate-fade-in-up" style={{ overflow: 'hidden', animationDelay: `${i * 60}ms`, animationFillMode: 'both', padding: 0, borderColor: reviewing ? 'rgba(24,24,27,0.3)' : undefined }}>
                 <div style={{ padding: '1.1rem 1.4rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-btn)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                                  background: done ? 'rgba(16,185,129,0.08)' : 'rgba(0,63,138,0.06)', border: done ? '1px solid rgba(16,185,129,0.15)' : '1px solid rgba(0,63,138,0.12)', color: done ? '#059669' : '#003F8A' }}>
+                                  background: done ? 'rgba(16,185,129,0.08)' : 'rgba(24,24,27,0.06)', border: done ? '1px solid rgba(16,185,129,0.15)' : '1px solid rgba(24,24,27,0.12)', color: done ? '#059669' : '#18181b' }}>
                       {done ? <CheckCircle size={18} /> : <Clock size={18} />}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.7rem', fontFamily: 'monospace', color: '#64748b', fontWeight: 600 }}>{ticket.number}</span>
-                        <h3 style={{ fontSize: '0.92rem', fontWeight: 700, fontFamily: 'var(--font-heading)', color: '#0F172A', overflowWrap: 'anywhere' }}>
+                        <h3 style={{ fontSize: '0.92rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A', overflowWrap: 'anywhere' }}>
                           <Link to={`/tickets/${ticket.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>{ticket.title}</Link>
                         </h3>
                       </div>
@@ -73,7 +82,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className={done ? 'badge-green' : reviewing ? 'badge-red' : 'badge-blue'}>{reviewing ? 'Needs your review' : ticket.status}</span>
+                    <span className={done ? 'badge-green' : reviewing || ticket.status === 'Waiting on Requester' ? 'badge-red' : 'badge-blue'}>{CLIENT_STATUS[ticket.status] ?? ticket.status}</span>
                     <button type="button" className="chip" aria-expanded={open} onClick={() => setOpenId(open ? null : ticket.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       {open ? <>Hide <ChevronUp size={12} /></> : <>{reviewing ? 'Review' : 'Details'} <ChevronDown size={12} /></>}
                       {(ticket.comment_count ?? 0) > 0 && !open && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: '#64748b' }}><MessageSquare size={10} />{ticket.comment_count}</span>}
@@ -93,10 +102,10 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
 
           {!loading && shown.length === 0 && (
             <div className="glass-card" style={{ textAlign: 'center', padding: '4rem 2rem', border: '2px dashed rgba(226,232,240,0.85)' }}>
-              <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-btn)', background: 'rgba(0,63,138,0.06)', border: '1px solid rgba(0,63,138,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: '#003F8A' }}>
+              <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-btn)', background: 'rgba(24,24,27,0.06)', border: '1px solid rgba(24,24,27,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: '#18181b' }}>
                 <TicketIcon size={24} />
               </div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'var(--font-heading)', color: '#0F172A' }}>{filter === 'done' ? 'Nothing completed yet' : 'No active requests'}</h3>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A' }}>{filter === 'done' ? 'Nothing completed yet' : 'No active requests'}</h3>
               <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: 6 }}>{filter === 'done' ? 'Finished designs will appear here.' : 'Start a new request and the design team will pick it up.'}</p>
             </div>
           )}

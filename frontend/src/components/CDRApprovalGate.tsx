@@ -26,7 +26,7 @@ const CDRApprovalGate: React.FC<CDRApprovalGateProps> = ({ status, previewImageU
         background:   '#F8FAFC',
         display:      'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
-        <h3 style={{ fontSize: '0.88rem', fontWeight: 700, fontFamily: 'var(--font-heading)', color: '#0F172A' }}>
+        <h3 style={{ fontSize: '0.88rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A' }}>
           Final Deliverable Review
         </h3>
         <span className={isApproved ? 'badge-green' : 'badge-blue'}>
@@ -47,7 +47,7 @@ const CDRApprovalGate: React.FC<CDRApprovalGateProps> = ({ status, previewImageU
             </div>
 
             <div style={{
-              background:   'rgba(0,63,138,0.03)',
+              background:   'rgba(24,24,27,0.03)',
               borderRadius: 'var(--radius-md)',
               border:       '1px solid rgba(226,232,240,0.85)',
               height:       240,
@@ -109,7 +109,7 @@ const CDRApprovalGate: React.FC<CDRApprovalGateProps> = ({ status, previewImageU
                 }}>
                   <CheckCircle size={22} />
                 </div>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, fontFamily: 'var(--font-heading)', color: '#0F172A', marginBottom: 4 }}>Design Approved</h4>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A', marginBottom: 4 }}>Design Approved</h4>
                 <p style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: '1.25rem' }}>Source files are now unlocked.</p>
                 <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.7rem' }}>
                   <Download size={15} /> Download CDR File
@@ -128,7 +128,7 @@ const CDRApprovalGate: React.FC<CDRApprovalGateProps> = ({ status, previewImageU
                 }}>
                   <Lock size={22} />
                 </div>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, fontFamily: 'var(--font-heading)', color: '#0F172A', marginBottom: 4 }}>Source File Locked</h4>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A', marginBottom: 4 }}>Source File Locked</h4>
                 <p style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: '1.25rem' }}>The CDR file is secured behind the approval gate.</p>
 
                 <button

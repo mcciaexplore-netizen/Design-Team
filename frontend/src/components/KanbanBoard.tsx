@@ -85,9 +85,9 @@ function TicketCard({
       onClick={onSingleClick}
       style={{
         background:     isDragging ? 'rgba(255, 255, 255, 1)' : undefined,
-        border:         isSelected ? '1px solid #3b82f6' : isDragging ? '1px solid rgba(59,130,246,0.4)' : undefined,
+        border:         isSelected ? '1px solid #52525b' : isDragging ? '1px solid rgba(24,24,27,0.4)' : undefined,
         padding:        '1rem',
-        boxShadow:      isDragging ? '0 24px 48px rgba(0,63,138,0.1)' : isSelected ? '0 0 0 2px rgba(59,130,246,0.3)' : undefined,
+        boxShadow:      isDragging ? '0 24px 48px rgba(24,24,27,0.1)' : isSelected ? '0 0 0 2px rgba(24,24,27,0.3)' : undefined,
         transform:      isDragging ? 'rotate(2deg) scale(1.03)' : 'none',
         cursor:         isDragging ? 'grabbing' : 'grab',
         transition:     isDragging ? 'none' : 'box-shadow 0.2s, border-color 0.2s, transform 0.15s',
@@ -120,11 +120,12 @@ function TicketCard({
             onClick={e => { e.stopPropagation(); onDuplicate(); }}
             title="Duplicate Ticket"
             style={{ color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 2, marginRight: 2 }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#003F8A'}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#18181b'}
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#94a3b8'}
           >
             <Copy size={13} />
           </button>
+          {ticket.status === 'Waiting on Requester' && <span className="badge-red" title="Waiting on the requester">Blocked</span>}
           <SLABadge dueAt={ticket.due_at} />
           <span className="badge-blue" style={ps}>{ticket.priority}</span>
         </div>
@@ -147,7 +148,7 @@ function TicketCard({
         <h4
           onDoubleClick={e => { e.stopPropagation(); onDoubleClickTitle(); }}
           title="Double-click to edit"
-          style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-heading)', color: '#0f172a', lineHeight: 1.35, marginBottom: '0.5rem', letterSpacing: '-0.01em' }}
+          style={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0f172a', lineHeight: 1.35, marginBottom: '0.5rem', letterSpacing: '-0.01em' }}
         >
           {ticket.title}
         </h4>
@@ -157,7 +158,7 @@ function TicketCard({
       {ticket.tags?.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: '0.5rem' }}>
           {ticket.tags.map(tag => (
-            <span key={tag} style={{ fontSize: '0.62rem', fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.18)', color: '#7c3aed', fontFamily: 'var(--font-body)' }}>
+            <span key={tag} style={{ fontSize: '0.62rem', fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(24,24,27,0.07)', border: '1px solid rgba(24,24,27,0.18)', color: '#7c3aed', fontFamily: 'var(--font-body)' }}>
               {tag}
             </span>
           ))}
@@ -195,7 +196,7 @@ function TicketCard({
               {fmtElapsed(elapsed, null)}
             </span>
           ) : elapsed > 0 ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(0,63,138,0.04)', border: '1px solid rgba(0,63,138,0.08)', borderRadius: 6, padding: '2px 8px', fontSize: '0.65rem', fontWeight: 600, color: '#64748B' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(24,24,27,0.04)', border: '1px solid rgba(24,24,27,0.08)', borderRadius: 6, padding: '2px 8px', fontSize: '0.65rem', fontWeight: 600, color: '#64748B' }}>
               {fmtElapsed(elapsed, null)}
             </span>
           ) : null}
@@ -239,7 +240,7 @@ function DraggableTicket({ ticket, isSelected, showSelect, onToggleSelect, now, 
 /* Status color map for column header dots */
 const STATUS_COLORS: Record<string, string> = {
   'New':                  '#94a3b8',
-  'Assigned':             '#3b82f6',
+  'Assigned':             '#52525b',
   'In Progress':          '#8b5cf6',
   'Waiting on Requester': '#f59e0b',
   'In Review':            '#06b6d4',
@@ -258,8 +259,8 @@ function DroppableColumn({ id, label, count, wipLimit, isOver, children }: {
     <div ref={setNodeRef} className="glass-card" style={{
       flexShrink: 0, width: 276,
       display: 'flex', flexDirection: 'column',
-      background: isOver ? 'rgba(59,130,246,0.015)' : undefined,
-      border: isOver ? '1px solid rgba(59,130,246,0.18)' : undefined,
+      background: isOver ? 'rgba(24,24,27,0.015)' : undefined,
+      border: isOver ? '1px solid rgba(24,24,27,0.18)' : undefined,
       maxHeight: '100%', transition: 'border-color 0.2s, background 0.2s',
     }}>
       {/* Column header */}
@@ -279,7 +280,7 @@ function DroppableColumn({ id, label, count, wipLimit, isOver, children }: {
               <AlertTriangle size={9} /> {count}/{wipLimit}
             </span>
           )}
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 6, background: isOver ? 'rgba(59,130,246,0.12)' : '#f1f5f9', border: `1px solid ${isOver ? 'rgba(59,130,246,0.2)' : '#e2e8f0'}`, fontSize: '0.65rem', fontWeight: 800, color: isOver ? '#2563eb' : '#64748B', padding: '0 5px' }}>{count}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 6, background: isOver ? 'rgba(24,24,27,0.12)' : '#f1f5f9', border: `1px solid ${isOver ? 'rgba(24,24,27,0.2)' : '#e2e8f0'}`, fontSize: '0.65rem', fontWeight: 800, color: isOver ? '#2563eb' : '#64748B', padding: '0 5px' }}>{count}</span>
         </div>
       </div>
       <div style={{ padding: '0.625rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -496,6 +497,7 @@ const KanbanBoard = () => {
     const targetCol = String(over.id);
     const ticket    = tickets.find(t => t.id === ticketId);
     if (!ticket || getGroupKey(ticket) === targetCol) return;
+    if (groupBy === 'assignee' && !isLead) { addToast('Only a Design Lead can reassign tickets.', 'warning'); return; }
 
     const patch: Partial<Ticket> = groupBy === 'status' ? { status: targetCol } : { assignee: targetCol === 'Unassigned' ? '' : targetCol };
     updateTicket(ticketId, patch)

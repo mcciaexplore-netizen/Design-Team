@@ -98,12 +98,12 @@ export default function TimeTracker({ ticket, showEntries = true }: { ticket: Ti
     <div style={{ background: running ? 'rgba(16,185,129,0.05)' : '#F8FAFC', border: `1px solid ${running ? 'rgba(16,185,129,0.2)' : 'rgba(226,232,240,0.85)'}`, borderRadius: 'var(--radius-md)', padding: '0.875rem 1rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: running ? 'rgba(16,185,129,0.12)' : 'rgba(0,63,138,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: running ? '#059669' : '#003F8A' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: running ? 'rgba(16,185,129,0.12)' : 'rgba(24,24,27,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: running ? '#059669' : '#18181b' }}>
             <Clock size={15} />
           </div>
           <div>
             <p className="section-label">Time logged</p>
-            <p style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: running ? '#059669' : '#0F172A', lineHeight: 1 }}>{fmtClock(elapsed)}</p>
+            <p style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: running ? '#059669' : '#0F172A', lineHeight: 1 }}>{fmtClock(elapsed)}</p>
           </div>
         </div>
         <button type="button" onClick={() => void toggle()} disabled={busy}

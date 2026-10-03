@@ -1,17 +1,14 @@
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import KanbanBoard from './components/KanbanBoard';
-import CalendarPage from './pages/CalendarPage';
 import NotificationBell from './components/NotificationBell';
 import Dashboard from './components/Dashboard';
-import LibraryPage from './pages/LibraryPage';
 import ClientPortalPage from './pages/ClientPortalPage';
 import TicketDetailPage from './pages/TicketDetailPage';
 import TicketCreateModal from './components/TicketCreateModal';
 import CommandPalette from './components/CommandPalette';
 import LoginPage from './pages/LoginPage';
 import SettingsPage from './pages/SettingsPage';
-import ReportsPage from './pages/ReportsPage';
-import TemplatesPage from './pages/TemplatesPage';
+import MyTasksPage from './pages/MyTasksPage';
 import WorkloadPage from './pages/WorkloadPage';
 import ReviewPage from './pages/ReviewPage';
 import { AuthProvider, useAuth, type UserRole } from './contexts/AuthContext';
@@ -20,8 +17,8 @@ import { ToastContainer, useToast } from './components/Toast';
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useTicketSocket } from './hooks/useTicketSocket';
 import {
-  LayoutDashboard, Calendar as CalendarIcon, BarChart3, Image as ImageIcon, Plus, Users, Zap, LogOut, Search,
-  ChevronRight, Settings, FileText, Repeat, Gauge, type LucideIcon,
+  LayoutDashboard, BarChart3, Plus, Users, Zap, LogOut, Search,
+  ChevronRight, Settings, Gauge, ListChecks, type LucideIcon,
 } from 'lucide-react';
 
 interface NavItem { to: string; label: string; icon: LucideIcon; roles: UserRole[] }
@@ -30,20 +27,15 @@ interface NavGroup { title: string; items: NavItem[] }
 const STAFF: UserRole[] = ['Design Lead', 'Designer'];
 const NAV_GROUPS: NavGroup[] = [
   { title: 'Workspace', items: [
+    { to: '/my-tasks', label: 'My Tasks',     icon: ListChecks,      roles: STAFF },
     { to: '/',         label: 'Kanban Board', icon: LayoutDashboard, roles: STAFF },
-    { to: '/calendar', label: 'SLA Calendar', icon: CalendarIcon,    roles: STAFF },
     { to: '/workload', label: 'Workload',     icon: Gauge,           roles: STAFF },
-    { to: '/library',  label: 'Asset Library', icon: ImageIcon,      roles: STAFF },
   ] },
   { title: 'Insights', items: [
     { to: '/dashboard', label: 'Performance', icon: BarChart3, roles: ['Design Lead'] },
-    { to: '/reports',   label: 'Reports',     icon: FileText,  roles: ['Design Lead'] },
   ] },
   { title: 'Portals', items: [
     { to: '/client-portal', label: 'Client Portal', icon: Users, roles: ['Design Lead', 'Designer', 'Client'] },
-  ] },
-  { title: 'Admin', items: [
-    { to: '/templates', label: 'Templates & schedules', icon: Repeat, roles: ['Design Lead'] },
   ] },
   { title: 'Account', items: [
     { to: '/settings', label: 'Settings', icon: Settings, roles: ['Design Lead', 'Designer', 'Client'] },
@@ -52,12 +44,9 @@ const NAV_GROUPS: NavGroup[] = [
 
 const PAGE_TITLES: [string, string][] = [
   ['/client-portal', 'My requests'],
-  ['/calendar',      'SLA Calendar'],
+  ['/my-tasks',      'My tasks'],
   ['/dashboard',     'Performance'],
-  ['/reports',       'Reports'],
   ['/workload',      'Team workload'],
-  ['/templates',     'Templates & schedules'],
-  ['/library',       'Asset Library'],
   ['/tickets',       'Ticket'],
   ['/settings',      'Settings'],
   ['/',              'Board'],
@@ -131,7 +120,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
 
       <div className="app-user-area">
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--brand-soft)', border: '1px solid rgba(0,63,138,0.1)', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--brand-soft)', border: '1px solid rgba(24,24,27,0.1)', marginBottom: 8 }}>
             <div style={{ width: 32, height: 32, borderRadius: '99px', background: user.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800, color: 'white', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
               {user.initials}
             </div>
@@ -150,7 +139,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
         </button>
       </div>
 
-      <div className="app-brand-footer mt-3 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(0,63,138,0.03)', border: '1px solid rgba(0,63,138,0.07)' }}>
+      <div className="app-brand-footer mt-3 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(24,24,27,0.03)', border: '1px solid rgba(24,24,27,0.07)' }}>
         <div className="flex items-center gap-2">
           <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Zap size={13} color="white" />
@@ -213,7 +202,7 @@ function AppShell() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const home = user?.role === 'Client' ? '/client-portal' : '/';
+  const home = user?.role === 'Client' ? '/client-portal' : user?.role === 'Designer' ? '/my-tasks' : '/';
 
   return (
     <div className="app-shell flex h-screen font-body">
@@ -260,12 +249,9 @@ function AppShell() {
           <div className="h-full animate-fade-in-up">
             <Routes>
               <Route path="/" element={<RequireRole roles={STAFF}><KanbanBoard /></RequireRole>} />
-              <Route path="/calendar" element={<RequireRole roles={STAFF}><CalendarPage /></RequireRole>} />
+              <Route path="/my-tasks" element={<RequireRole roles={STAFF}><MyTasksPage /></RequireRole>} />
               <Route path="/workload" element={<RequireRole roles={STAFF}><WorkloadPage /></RequireRole>} />
-              <Route path="/library" element={<RequireRole roles={STAFF}><LibraryPage /></RequireRole>} />
               <Route path="/dashboard" element={<RequireRole roles={['Design Lead']}><Dashboard /></RequireRole>} />
-              <Route path="/reports" element={<RequireRole roles={['Design Lead']}><ReportsPage /></RequireRole>} />
-              <Route path="/templates" element={<RequireRole roles={['Design Lead']}><TemplatesPage /></RequireRole>} />
               <Route path="/client-portal" element={<ClientPortalPage onNewRequest={() => setIsCreateModalOpen(true)} />} />
               <Route path="/tickets/:id" element={<TicketDetailPage />} />
               <Route path="/settings" element={<SettingsPage />} />
@@ -307,7 +293,7 @@ function AppContent() {
 
   if (isLoading) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(140deg,#001f5c,#003F8A)' }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#18181b' }}>
         <div style={{ textAlign: 'center', color: 'white' }}>
           <div className="app-spinner" role="status" aria-label="Loading" />
           <p style={{ fontSize: '0.9rem', fontFamily: 'var(--font-body)', opacity: 0.7, marginTop: 14 }}>Loading MCCIA Studio…</p>

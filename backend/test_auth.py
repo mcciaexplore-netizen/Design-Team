@@ -163,3 +163,16 @@ def test_live_feed_delivers_events_only_to_people_who_may_see_them(client):
         # The ACME client must not hear about TATA's ticket: send ACME's own, and it should be the first thing they get.
         make_ticket(client, "b@acme.com", "Acme flyer")
         assert ws_acme.receive_json()["title"] == "Acme flyer"
+
+
+def test_register_creates_scoped_client_only(client):
+    c = client
+    body = {"full_name": "New Client", "email": "NewClient@Example.com", "company": "Zeta Corp Test", "password": "longenough1"}
+    r = c.post("/api/auth/register", json=body)
+    assert r.status_code == 201
+    assert r.json()["user"]["role"] == "Client" and r.json()["user"]["client_org"] == "Zeta Corp Test"
+    assert c.post("/api/auth/register", json=body).status_code == 409
+    assert c.post("/api/auth/register", json={**body, "email": "other@example.com", "company": "zeta corp test"}).status_code == 409
+    assert c.post("/api/auth/register", json={**body, "email": "q@example.com", "company": "tata"}).status_code == 409
+    assert c.post("/api/auth/register", json={**body, "email": "x@example.com", "company": "Y Co", "password": "short"}).status_code == 422
+    assert c.post("/api/auth/register", json={**body, "email": "z@example.com", "company": "Z Co", "role": "ADMIN"}).json()["user"]["role"] == "Client"

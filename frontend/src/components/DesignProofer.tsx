@@ -119,7 +119,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
         display:      'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <h3 style={{ fontSize: '0.88rem', fontWeight: 700, fontFamily: 'var(--font-heading)', color: '#0F172A' }}>Visual Proofing</h3>
+          <h3 style={{ fontSize: '0.88rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A' }}>Visual Proofing</h3>
           <select
             value={activeVersionIdx}
             onChange={(e) => {
@@ -138,7 +138,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
         </div>
         <span style={{
           fontSize: '0.68rem', fontWeight: 600, color: '#64748B',
-          background: 'rgba(0,63,138,0.04)', border: '1px solid rgba(226,232,240,0.85)',
+          background: 'rgba(24,24,27,0.04)', border: '1px solid rgba(226,232,240,0.85)',
           borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.6rem',
           fontFamily: 'var(--font-body)',
         }}>
@@ -150,7 +150,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
         {/* Canvas area */}
         <div style={{
           flex:       1, overflow: 'auto',
-          background: 'rgba(0,63,138,0.03)',
+          background: 'rgba(24,24,27,0.03)',
           display:    'flex', alignItems: 'center', justifyContent: 'center',
           padding:    '2rem',
         }}>
@@ -177,13 +177,13 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
                     transform:     'translate(-50%, -50%)',
                     width:         26, height: 26,
                     borderRadius:  '99px',
-                    background:    active ? '#003F8A' : 'white',
-                    border:        `2px solid ${active ? '#003F8A' : '#003F8A'}`,
-                    color:         active ? 'white' : '#003F8A',
+                    background:    active ? '#18181b' : 'white',
+                    border:        `2px solid ${active ? '#18181b' : '#18181b'}`,
+                    color:         active ? 'white' : '#18181b',
                     fontSize:      '0.7rem', fontWeight: 800,
                     display:       'flex', alignItems: 'center', justifyContent: 'center',
                     cursor:        'pointer', zIndex: active ? 20 : 10,
-                    boxShadow:     active ? '0 0 0 3px rgba(0,63,138,0.2)' : '0 2px 8px rgba(0,63,138,0.15)',
+                    boxShadow:     active ? '0 0 0 3px rgba(24,24,27,0.2)' : '0 2px 8px rgba(24,24,27,0.15)',
                     transition:    'all 0.2s',
                     fontFamily:    'var(--font-body)',
                   }}
@@ -227,8 +227,8 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
             background:   '#F8FAFC',
             display:      'flex', alignItems: 'center', gap: '0.5rem',
           }}>
-            <MessageCircle size={14} style={{ color: '#003F8A' }} />
-            <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', fontFamily: 'var(--font-heading)' }}>
+            <MessageCircle size={14} style={{ color: '#18181b' }} />
+            <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', fontFamily: 'var(--font-body)' }}>
               Feedback ({pins.length})
             </h4>
           </div>
@@ -236,7 +236,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
           <div style={{ flex: 1, overflowY: 'auto', padding: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {pins.length === 0 && !activePinDraft && (
               <div style={{ textAlign: 'center', padding: '2rem 1rem', color: '#94a3b8' }}>
-                <MessageCircle size={28} style={{ margin: '0 auto 0.5rem', color: 'rgba(0,63,138,0.15)' }} />
+                <MessageCircle size={28} style={{ margin: '0 auto 0.5rem', color: 'rgba(24,24,27,0.15)' }} />
                 <p style={{ fontSize: '0.8rem', fontFamily: 'var(--font-body)' }}>No feedback yet.<br />Click the image to start.</p>
               </div>
             )}
@@ -250,17 +250,17 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
                   style={{
                     padding:      '0.75rem',
                     borderRadius: 'var(--radius-sm)',
-                    border:       `1px solid ${active ? 'rgba(0,63,138,0.25)' : 'rgba(226,232,240,0.85)'}`,
-                    background:   active ? 'rgba(0,63,138,0.04)' : 'white',
+                    border:       `1px solid ${active ? 'rgba(24,24,27,0.25)' : 'rgba(226,232,240,0.85)'}`,
+                    background:   active ? 'rgba(24,24,27,0.04)' : 'white',
                     cursor:       'pointer', transition: 'all 0.15s',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                     <span style={{
                       width: 20, height: 20, borderRadius: '99px',
-                      background: active ? '#003F8A' : 'rgba(0,63,138,0.06)',
-                      border:     `1px solid ${active ? '#003F8A' : 'rgba(0,63,138,0.15)'}`,
-                      color:      active ? 'white' : '#003F8A',
+                      background: active ? '#18181b' : 'rgba(24,24,27,0.06)',
+                      border:     `1px solid ${active ? '#18181b' : 'rgba(24,24,27,0.15)'}`,
+                      color:      active ? 'white' : '#18181b',
                       fontSize:   '0.65rem', fontWeight: 800,
                       display:    'flex', alignItems: 'center', justifyContent: 'center',
                       fontFamily: 'var(--font-body)',

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Ticket as TicketIcon, Image as ImageIcon, LayoutDashboard, Calendar, ArrowRight, BarChart3, FileText, Gauge, Repeat, Settings, Users, type LucideIcon } from 'lucide-react';
+import { Search, Ticket as TicketIcon, LayoutDashboard, ArrowRight, BarChart3, Gauge, Settings, Users, type LucideIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
 
@@ -9,12 +9,8 @@ interface Entry { key: string; icon: LucideIcon; label: string; sub?: string; to
 
 const PAGES: (Omit<Entry, 'key' | 'group'> & { roles: string[] })[] = [
   { icon: LayoutDashboard, label: 'Kanban board',          sub: 'Move work between stages',        to: '/',              roles: ['Design Lead', 'Designer'] },
-  { icon: Calendar,        label: 'SLA calendar',          sub: 'Upcoming deadlines',              to: '/calendar',      roles: ['Design Lead', 'Designer'] },
   { icon: Gauge,           label: 'Team workload',         sub: 'Capacity versus planned effort',  to: '/workload',      roles: ['Design Lead', 'Designer'] },
-  { icon: ImageIcon,       label: 'Asset library',         sub: 'Brand assets',                    to: '/library',       roles: ['Design Lead', 'Designer'] },
   { icon: BarChart3,       label: 'Performance dashboard', sub: 'Last 30 days',                    to: '/dashboard',     roles: ['Design Lead'] },
-  { icon: FileText,        label: 'Reports',               sub: 'SLA trends and exports',          to: '/reports',       roles: ['Design Lead'] },
-  { icon: Repeat,          label: 'Templates & schedules', sub: 'Recurring tickets',               to: '/templates',     roles: ['Design Lead'] },
   { icon: Users,           label: 'Client portal',         sub: 'Requests and reviews',            to: '/client-portal', roles: ['Design Lead', 'Designer', 'Client'] },
   { icon: Settings,        label: 'Settings',              sub: 'Notifications and integrations',  to: '/settings',      roles: ['Design Lead', 'Designer', 'Client'] },
 ];
@@ -58,7 +54,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {
   return (
     <div className="animate-fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 50, padding: '15vh 1rem 1rem' }} onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-label="Search" className="animate-fade-in-up" onClick={e => e.stopPropagation()} onKeyDown={onKeyDown}
-        style={{ background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(16px)', borderRadius: 'var(--radius-lg)', boxShadow: '0 30px 80px rgba(0,63,138,0.14)', border: '1px solid rgba(226,232,240,0.85)', width: '100%', maxWidth: 520, overflow: 'hidden' }}>
+        style={{ background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(16px)', borderRadius: 'var(--radius-lg)', boxShadow: '0 30px 80px rgba(24,24,27,0.14)', border: '1px solid rgba(226,232,240,0.85)', width: '100%', maxWidth: 520, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem 1rem', borderBottom: '1px solid rgba(226,232,240,0.85)' }}>
           <div className="icon-tile" style={{ width: 36, height: 36, flexShrink: 0 }}><Search size={16} /></div>
           <input type="text" autoFocus value={search} onChange={e => setSearch(e.target.value)} aria-label="Search tickets and pages" role="combobox" aria-expanded="true" aria-controls="cmd-list"
@@ -73,12 +69,12 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {
             const header = e.group !== lastGroup ? e.group : null;
             lastGroup = e.group;
             const Icon = e.icon;
-            const color = e.color ?? '#003F8A';
+            const color = e.color ?? '#18181b';
             return (
               <React.Fragment key={e.key}>
                 {header && <p className="section-label" style={{ padding: '0.5rem 0.875rem 0.2rem' }}>{header}</p>}
                 <button type="button" role="option" aria-selected={i === active} data-active={i === active} onClick={() => go(e)} onMouseMove={() => setActive(i)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.55rem 0.875rem', border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-sm)', textAlign: 'left', background: i === active ? 'rgba(0,63,138,0.06)' : 'none' }}>
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.55rem 0.875rem', border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-sm)', textAlign: 'left', background: i === active ? 'rgba(24,24,27,0.06)' : 'none' }}>
                   <div style={{ width: 32, height: 32, borderRadius: 8, background: `${color}10`, border: `1px solid ${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color }}><Icon size={15} /></div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.label}</p>

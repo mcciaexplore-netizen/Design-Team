@@ -10,8 +10,8 @@ const FigmaEmbed: React.FC<FigmaEmbedProps> = ({ url }) => {
     return (
       <div style={{
         padding:      '1.25rem',
-        background:   'rgba(0,63,138,0.03)',
-        border:       '1px dashed rgba(0,63,138,0.15)',
+        background:   'rgba(24,24,27,0.03)',
+        border:       '1px dashed rgba(24,24,27,0.15)',
         borderRadius: 'var(--radius-md)',
         textAlign:    'center',
         color:        '#94a3b8',
@@ -19,7 +19,7 @@ const FigmaEmbed: React.FC<FigmaEmbedProps> = ({ url }) => {
         fontFamily:   'var(--font-body)',
         display:      'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
       }}>
-        <Link2 size={16} style={{ color: 'rgba(0,63,138,0.3)' }} />
+        <Link2 size={16} style={{ color: 'rgba(24,24,27,0.3)' }} />
         No Figma link provided.
       </div>
     );

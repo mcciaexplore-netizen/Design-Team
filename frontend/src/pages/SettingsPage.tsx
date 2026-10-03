@@ -22,7 +22,7 @@ type Result = { ok: boolean; text: string } | null;
 function Toggle({ id, checked, onChange, label, hint }: { id: string; checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
   return (
     <label htmlFor={id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', padding: '2px 0' }}>
-      <input id={id} type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2, accentColor: '#003F8A' }} />
+      <input id={id} type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2, accentColor: '#18181b' }} />
       <span style={{ fontSize: '0.84rem', color: '#0f172a' }}>{label}{hint && <span style={{ display: 'block', ...HINT, marginTop: 1 }}>{hint}</span>}</span>
     </label>
   );
@@ -284,7 +284,7 @@ const SettingsPage: React.FC = () => {
         <div role="tablist" aria-label="Settings sections" style={{ display: 'inline-flex', background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 'var(--radius-md)', padding: 4, marginBottom: '1.25rem' }}>
           {([['me', 'My notifications'], ['integrations', 'Integrations & alerts']] as const).map(([key, label]) => (
             <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
-              style={{ padding: '0.45rem 1rem', borderRadius: 8, border: 'none', cursor: 'pointer', background: tab === key ? 'white' : 'transparent', boxShadow: tab === key ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', color: tab === key ? '#003F8A' : '#64748B', fontSize: '0.8rem', fontWeight: 700 }}>
+              style={{ padding: '0.45rem 1rem', borderRadius: 8, border: 'none', cursor: 'pointer', background: tab === key ? 'white' : 'transparent', boxShadow: tab === key ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', color: tab === key ? '#18181b' : '#64748B', fontSize: '0.8rem', fontWeight: 700 }}>
               {label}
             </button>
           ))}

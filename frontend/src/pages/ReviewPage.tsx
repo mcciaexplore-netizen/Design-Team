@@ -14,7 +14,7 @@ interface Review {
   proof: { version: number; file_name: string; content_type: string | null; note: string | null } | null;
 }
 
-const BLUE = '#003F8A';
+const BLUE = '#18181b';
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '';
 const MAX = 2000;
@@ -50,7 +50,7 @@ function Notice({ icon, color, title, children, action }: { icon: ReactNode; col
   return (
     <div style={{ ...cardStyle, textAlign: 'center' }}>
       <div style={{ color, display: 'flex', justifyContent: 'center', marginBottom: 12 }} aria-hidden="true">{icon}</div>
-      <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 22, margin: '0 0 8px', color: '#0f172a' }}>{title}</h1>
+      <h1 style={{ fontFamily: 'var(--font-body)', fontSize: 22, margin: '0 0 8px', color: '#0f172a' }}>{title}</h1>
       <div style={{ color: '#475569', fontSize: 16, lineHeight: 1.5, overflowWrap: 'anywhere' }}>{children}</div>
       {action && <div style={{ marginTop: 20, maxWidth: 240, marginInline: 'auto' }}>{action}</div>}
     </div>
@@ -144,7 +144,7 @@ export default function ReviewPage() {
   const header = (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: BLUE, letterSpacing: 0.3 }}>{ticket.ticket_number}</div>
-      <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(20px, 6vw, 26px)', margin: '4px 0 0', color: '#0f172a', overflowWrap: 'anywhere' }}>{ticket.title}</h1>
+      <h1 style={{ fontFamily: 'var(--font-body)', fontSize: 'clamp(20px, 6vw, 26px)', margin: '4px 0 0', color: '#0f172a', overflowWrap: 'anywhere' }}>{ticket.title}</h1>
     </div>
   );
 
@@ -154,7 +154,7 @@ export default function ReviewPage() {
       return (
         <div role="status" style={{ textAlign: 'center', padding: '8px 0' }}>
           <div style={{ color: ok ? '#10B981' : '#f59e0b' }} aria-hidden="true">{ok ? <CheckCircle2 size={44} /> : <MessageSquare size={44} />}</div>
-          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 20, margin: '8px 0' }}>{ok ? 'Thanks — approved' : "Thanks — we've sent your feedback to the design team"}</h2>
+          <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>{ok ? 'Thanks — approved' : "Thanks — we've sent your feedback to the design team"}</h2>
           <p style={{ color: '#475569', margin: 0 }}>You can now close this page.</p>
         </div>
       );
@@ -164,22 +164,22 @@ export default function ReviewPage() {
     );
     if (effective === 'approved') return (
       <div style={{ textAlign: 'center' }}><div style={{ color: '#10B981' }} aria-hidden="true"><CheckCircle2 size={40} /></div>
-        <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 20, margin: '8px 0' }}>Approved</h2>
+        <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>Approved</h2>
         <p style={{ color: '#475569', margin: 0 }}>This design was approved on {fmt(data.decided_at)}.</p>{quote}</div>
     );
     if (effective === 'changes_requested') return (
       <div style={{ textAlign: 'center' }}><div style={{ color: '#f59e0b' }} aria-hidden="true"><MessageSquare size={40} /></div>
-        <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 20, margin: '8px 0' }}>Changes requested</h2>
+        <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>Changes requested</h2>
         <p style={{ color: '#475569', margin: 0 }}>Changes were requested on {fmt(data.decided_at)}.</p>{quote}</div>
     );
     if (effective === 'expired') return (
       <div style={{ textAlign: 'center' }}><div style={{ color: '#f59e0b' }} aria-hidden="true"><Clock size={40} /></div>
-        <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 20, margin: '8px 0' }}>This link has expired</h2>
+        <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>This link has expired</h2>
         <p style={{ color: '#475569', margin: 0 }}>Please ask the design team for a new one.</p></div>
     );
     return (
       <div style={{ textAlign: 'center' }}><div style={{ color: '#EF4444' }} aria-hidden="true"><Ban size={40} /></div>
-        <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 20, margin: '8px 0' }}>This link was withdrawn</h2>
+        <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>This link was withdrawn</h2>
         <p style={{ color: '#475569', margin: 0 }}>Please use the latest link from the design team.</p></div>
     );
   };

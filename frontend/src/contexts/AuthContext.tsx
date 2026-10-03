@@ -18,6 +18,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading:       boolean;
   login:           (email: string, password: string) => Promise<void>;
+  register:        (input: { fullName: string; email: string; company: string; password: string }) => Promise<void>;
   logout:          () => void;
   error:           string | null;
 }
@@ -41,6 +42,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
+  const startSession = (data: { access_token: string; user: { id: number; full_name: string; email: string; role: string } }) => {
+    const u = data.user;
+    const role: UserRole = u.role === 'Design Lead' || u.role === 'Client' ? u.role : 'Designer';
+    const authUser: AuthUser = {
+      id:       String(u.id),
+      name:     u.full_name,
+      email:    u.email,
+      role,
+      initials: u.full_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
+      color:    role === 'Design Lead' ? '#18181b' : role === 'Client' ? '#f97316' : '#8B5CF6',
+    };
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
+    setUser(authUser);
+  };
+
+  const register = async (input: { fullName: string; email: string; company: string; password: string }) => {
+    setError(null);
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: input.fullName, email: input.email, company: input.company, password: input.password }),
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch {
+      throw new Error('Cannot reach the server. Check that the backend is running.');
+    }
+    if (!res.ok) {
+      let detail = '';
+      try { detail = (await res.json()).detail; } catch { /* non-JSON error body */ }
+      throw new Error(res.status === 409 && typeof detail === 'string' ? detail
+        : res.status === 422 ? 'Please check your details. The password needs at least 8 characters.'
+        : 'Could not create the account. Please try again.');
+    }
+    startSession(await res.json());
+  };
+
   const login = async (email: string, password: string) => {
     setError(null);
     try {
@@ -63,20 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.status === 401) throw new Error('Invalid email or password.');
       if (!res.ok) throw new Error('Sign-in failed. Please try again.');
 
-      const data = await res.json();
-      const u = data.user;
-      const role: UserRole = u.role === 'Design Lead' || u.role === 'Client' ? u.role : 'Designer';
-      const authUser: AuthUser = {
-        id:       String(u.id),
-        name:     u.full_name,
-        email:    u.email,
-        role,
-        initials: u.full_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
-        color:    role === 'Design Lead' ? '#003F8A' : role === 'Client' ? '#f97316' : '#8B5CF6',
-      };
-      localStorage.setItem(TOKEN_KEY, data.access_token);
-      localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
-      setUser(authUser);
+      startSession(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Sign-in failed.');
       throw e;
@@ -96,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [logout]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, error }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, logout, error }}>
       {children}
     </AuthContext.Provider>
   );

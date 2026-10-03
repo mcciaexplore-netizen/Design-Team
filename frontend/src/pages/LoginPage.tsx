@@ -3,13 +3,17 @@ import { Eye, EyeOff, Zap, LogIn, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const DEMO_ACCOUNTS = [
-  { label: 'Design Lead',  email: 'lead@mccia.in',    password: 'mccia123', color: '#003F8A', desc: 'Full admin + analytics access'  },
+  { label: 'Design Lead',  email: 'lead@mccia.in',    password: 'mccia123', color: '#18181b', desc: 'Full admin + analytics access'  },
   { label: 'Designer',     email: 'alice@mccia.in',   password: 'mccia123', color: '#8B5CF6', desc: 'Ticket management + timers'      },
   { label: 'Client View',  email: 'client@tata.com',  password: 'client123',color: '#f97316', desc: 'View-only + approval workflow'   },
 ];
 
 const LoginPage: React.FC = () => {
-  const { login }   = useAuth();
+  const { login, register } = useAuth();
+  const [mode,      setMode]     = useState<'login' | 'register'>('login');
+  const [fullName,  setFullName] = useState('');
+  const [company,   setCompany]  = useState('');
+  const signup = mode === 'register';
   const [email,     setEmail]    = useState('');
   const [password,  setPassword] = useState('');
   const [showPass,  setShowPass] = useState(false);
@@ -21,7 +25,8 @@ const LoginPage: React.FC = () => {
     setErrorMsg('');
     setLoading(true);
     try {
-      await login(email.trim(), password);
+      if (signup) await register({ fullName: fullName.trim(), email: email.trim(), company: company.trim(), password });
+      else await login(email.trim(), password);
     } catch (err: any) {
       setErrorMsg(err.message ?? 'Login failed. Please try again.');
     } finally {
@@ -45,7 +50,7 @@ const LoginPage: React.FC = () => {
 
       {/* ── Left Panel: Brand ── */}
       <div style={{
-        background:  'linear-gradient(140deg,#001f5c 0%,#003F8A 45%,#0056B3 100%)',
+        background:  '#18181b',
         display:     'flex', flexDirection: 'column',
         justifyContent: 'center', alignItems: 'center',
         padding:     '3rem',
@@ -53,7 +58,7 @@ const LoginPage: React.FC = () => {
       }}>
         {/* Decorative blobs */}
         <div style={{ position: 'absolute', top: '-10%',  left: '-10%', width: 400, height: 400, borderRadius: '50%', background: 'rgba(16,185,129,0.08)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-8%', right: '-8%', width: 350, height: 350, borderRadius: '50%', background: 'rgba(139,92,246,0.08)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '-8%', right: '-8%', width: 350, height: 350, borderRadius: '50%', background: 'rgba(24,24,27,0.08)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: '40%', right: '5%',   width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
 
         {/* Content */}
@@ -70,7 +75,7 @@ const LoginPage: React.FC = () => {
 
           <h1 style={{
             fontSize:    'clamp(2rem, 4vw, 2.8rem)',
-            fontFamily:  'var(--font-heading)',
+            fontFamily:  'var(--font-body)',
             fontWeight:  800, color: 'white',
             lineHeight:  1.15, letterSpacing: '-0.03em', marginBottom: '1.25rem',
           }}>
@@ -95,7 +100,7 @@ const LoginPage: React.FC = () => {
           <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', marginTop: '2.5rem' }}>
             {[['98%', 'SLA Met'], ['2.4h', 'Avg. Turnaround'], ['∞', 'Scalable']].map(([val, label]) => (
               <div key={label} style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '1.4rem', fontWeight: 800, color: 'white', fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}>{val}</p>
+                <p style={{ fontSize: '1.4rem', fontWeight: 800, color: 'white', fontFamily: 'var(--font-body)', letterSpacing: '-0.02em' }}>{val}</p>
                 <p style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</p>
               </div>
             ))}
@@ -115,14 +120,14 @@ const LoginPage: React.FC = () => {
 
           {/* Header */}
           <div style={{ marginBottom: '2rem' }}>
-            <h2 style={{ fontSize: '1.75rem', fontFamily: 'var(--font-heading)', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.03em', marginBottom: 6 }}>
-              Welcome back
+            <h2 style={{ fontSize: '1.75rem', fontFamily: 'var(--font-body)', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.03em', marginBottom: 6 }}>
+              {signup ? 'Create your account' : 'Welcome back'}
             </h2>
-            <p style={{ fontSize: '0.88rem', color: '#64748B', lineHeight: 1.5 }}>Sign in to your MCCIA DesignDesk workspace</p>
+            <p style={{ fontSize: '0.88rem', color: '#64748B', lineHeight: 1.5 }}>{signup ? 'Request designs and track them in one place.' : 'Sign in to your MCCIA DesignDesk workspace'}</p>
           </div>
 
           {/* Demo accounts (dev builds only) */}
-          {import.meta.env.DEV && <div style={{ marginBottom: '1.5rem' }}>
+          {import.meta.env.DEV && !signup && <div style={{ marginBottom: '1.5rem' }}>
             <p style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>Try a demo account</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {DEMO_ACCOUNTS.map(acc => (
@@ -168,14 +173,28 @@ const LoginPage: React.FC = () => {
           </div>}
 
           {/* Divider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.25rem' }}>
+          {!signup && <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.25rem' }}>
             <div style={{ flex: 1, height: 1, background: 'rgba(226,232,240,0.85)' }} />
             <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>or sign in with email</span>
             <div style={{ flex: 1, height: 1, background: 'rgba(226,232,240,0.85)' }} />
-          </div>
+          </div>}
 
           {/* Form */}
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {signup && (
+              <>
+                <div>
+                  <label htmlFor="su-name" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0F172A', display: 'block', marginBottom: 6 }}>Full name</label>
+                  <input id="su-name" type="text" required minLength={2} maxLength={80} autoComplete="name" value={fullName}
+                    onChange={e => setFullName(e.target.value)} className="input-field" style={{ width: '100%' }} autoFocus />
+                </div>
+                <div>
+                  <label htmlFor="su-company" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0F172A', display: 'block', marginBottom: 6 }}>Company</label>
+                  <input id="su-company" type="text" required minLength={2} maxLength={80} autoComplete="organization" value={company}
+                    onChange={e => setCompany(e.target.value)} className="input-field" style={{ width: '100%' }} />
+                </div>
+              </>
+            )}
             <div>
               <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0F172A', display: 'block', marginBottom: 6 }}>Email address</label>
               <input
@@ -186,21 +205,23 @@ const LoginPage: React.FC = () => {
                 placeholder="you@mccia.in"
                 className="input-field"
                 style={{ width: '100%' }}
-                autoFocus
+                autoFocus={!signup}
               />
             </div>
 
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0F172A' }}>Password</label>
-                <button type="button" style={{ fontSize: '0.72rem', color: '#003F8A', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>
-                  Forgot password?
-                </button>
+                {signup
+                  ? <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>At least 8 characters</span>
+                  : <button type="button" style={{ fontSize: '0.72rem', color: '#18181b', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>Forgot password?</button>}
               </div>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showPass ? 'text' : 'password'}
                   required
+                  minLength={signup ? 8 : undefined}
+                  autoComplete={signup ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -230,12 +251,20 @@ const LoginPage: React.FC = () => {
               style={{ justifyContent: 'center', padding: '0.8rem', fontSize: '0.88rem', opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }}
             >
               {loading ? (
-                <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>◌</span> Signing in…</>
+                <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>◌</span> {signup ? 'Creating account…' : 'Signing in…'}</>
               ) : (
-                <><LogIn size={16} /> Sign In</>
+                <><LogIn size={16} /> {signup ? 'Create account' : 'Sign In'}</>
               )}
             </button>
           </form>
+
+          <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#64748B', marginTop: '1.25rem' }}>
+            {signup ? 'Already have an account?' : 'New client?'}{' '}
+            <button type="button" onClick={() => { setMode(signup ? 'login' : 'register'); setErrorMsg(''); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#18181b', fontWeight: 700, fontSize: 'inherit', padding: 0 }}>
+              {signup ? 'Sign in' : 'Create an account'}
+            </button>
+          </p>
 
           {/* Footer note */}
           <p style={{ textAlign: 'center', fontSize: '0.72rem', color: '#94a3b8', marginTop: '1.5rem', lineHeight: 1.6 }}>
@@ -246,7 +275,7 @@ const LoginPage: React.FC = () => {
           {import.meta.env.DEV && (
           <div style={{ background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 10, padding: '0.75rem 1rem', marginTop: '1.25rem' }}>
             <p style={{ fontSize: '0.7rem', color: '#64748B', lineHeight: 1.6 }}>
-              <strong style={{ color: '#003F8A' }}>Demo credentials:</strong>{' '}
+              <strong style={{ color: '#18181b' }}>Demo credentials:</strong>{' '}
               Use the quick-login buttons above or: <code style={{ background: 'white', padding: '1px 5px', borderRadius: 4, fontSize: '0.68rem' }}>lead@mccia.in</code> / <code style={{ background: 'white', padding: '1px 5px', borderRadius: 4, fontSize: '0.68rem' }}>mccia123</code>
             </p>
           </div>
