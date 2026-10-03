@@ -5,14 +5,19 @@ import re
 import uuid
 from urllib.parse import quote
 import logging
-from typing import Optional
+from typing import Annotated, Optional
 
 import pytz
+from pydantic import StringConstraints
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 import models
 from sla_engine import calculate_due_date
+
+# Plain-string email address: trimmed, lower-cased, basic shape check (no email-validator dependency).
+Email = Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=3, max_length=254,
+                                         pattern=r"^[^@\s]+@[^@\s]+$")]
 
 logger = logging.getLogger(__name__)
 

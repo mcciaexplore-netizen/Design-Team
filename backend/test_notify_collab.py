@@ -9,7 +9,6 @@ import pytz
 
 import common
 import delivery
-import digest
 import models
 from test_auth import TestingSessionLocal, auth, client, login, make_ticket  # noqa: F401
 
@@ -61,45 +60,10 @@ def test_integration_settings_mask_secret_and_keep_it_on_partial_update(client):
     assert r.status_code == 200
     body = r.json()
     assert body["slack_configured"] is True and SLACK_URL not in str(body)
-    r = client.put("/api/settings/integrations", json={"email_on_breach": False}, headers=lead)
-    assert r.json()["slack_configured"] is True and r.json()["email_on_breach"] is False
+    r = client.put("/api/settings/integrations", json={"slack_channel": "#ops"}, headers=lead)
+    assert r.json()["slack_configured"] is True and r.json()["slack_channel"] == "#ops"
     assert client.put("/api/settings/integrations", json={"slack_webhook": "https://x.com/y"}, headers=lead).status_code == 422
     assert client.get("/api/settings/integrations", headers=auth(client, "des@x.com")).status_code == 403
-
-
-def test_email_test_without_smtp_explains_why(client):
-    r = client.post("/api/integrations/email/test", json={}, headers=auth(client, "lead@x.com"))
-    assert r.status_code == 200 and r.json()["ok"] is False and "SMTP" in r.json()["detail"]
-
-
-def test_email_test_sends_via_smtp(client, monkeypatch):
-    sent = []
-
-    class FakeSMTP:
-        def __init__(self, host, port, timeout=None): sent.append(("connect", host, port))
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def starttls(self): sent.append("tls")
-        def login(self, u, p): sent.append(("login", u))
-        def send_message(self, msg): sent.append(("msg", msg["To"], msg["Subject"]))
-
-    monkeypatch.setenv("SMTP_HOST", "smtp.test")
-    monkeypatch.setenv("SMTP_USER", "me")
-    monkeypatch.setattr(delivery.smtplib, "SMTP", FakeSMTP)
-    r = client.post("/api/integrations/email/test", json={"to": "someone@x.com"}, headers=auth(client, "lead@x.com"))
-    assert r.json()["ok"] is True
-    assert ("msg", "someone@x.com", "DesignDesk test email") in sent and "tls" in sent
-
-
-def test_email_header_injection_is_refused():
-    ok, detail = delivery.send_email("a@b.com\nBcc: evil@x.com", "s", "b") if False else (False, "")
-    import os
-    os.environ["SMTP_HOST"] = "smtp.test"
-    try:
-        ok, detail = delivery.send_email("a@b.com\nBcc: evil@x.com", "s", "b")
-    finally:
-        del os.environ["SMTP_HOST"]
-    assert ok is False and "Invalid recipient" in detail
 
 
 # ── Events, preferences, notifications ───────────────────────────────────────
@@ -136,12 +100,10 @@ def test_slack_event_toggle_is_respected(client, monkeypatch):
 def test_preferences_roundtrip_and_validation(client):
     h = auth(client, "des@x.com")
     r = client.get("/api/me/preferences", headers=h).json()
-    assert r["in_app_enabled"] is True and r["digest_enabled"] is False and "mention" in r["available_events"]
-    r = client.put("/api/me/preferences", json={"digest_enabled": True, "quiet_hours_start": 22, "quiet_hours_end": 7,
-                                                "muted_events": ["ticket_assigned"]}, headers=h)
-    assert r.status_code == 200 and r.json()["digest_enabled"] is True and r.json()["muted_events"] == ["ticket_assigned"]
+    assert r["in_app_enabled"] is True and "mention" in r["available_events"]
+    r = client.put("/api/me/preferences", json={"muted_events": ["ticket_assigned"]}, headers=h)
+    assert r.status_code == 200 and r.json()["muted_events"] == ["ticket_assigned"]
     assert client.put("/api/me/preferences", json={"muted_events": ["nope"]}, headers=h).status_code == 422
-    assert client.put("/api/me/preferences", json={"quiet_hours_start": 25}, headers=h).status_code == 422
 
 
 def test_muted_event_and_disabled_in_app_suppress_notifications(client):
@@ -170,51 +132,6 @@ def test_notifications_api_list_and_mark_read(client):
     assert client.post(f"/api/notifications/{nid}/read", headers=auth(client, "des@x.com")).status_code == 404  # not theirs
     client.post("/api/notifications/read-all", headers=lead)
     assert client.get("/api/notifications", params={"unread_only": True}, headers=lead).json()["unread"] == 0
-
-
-def test_daily_digest_content_and_once_per_day(client, monkeypatch):
-    t = make_ticket(client, "a@tata.com", "Late one")
-    db = TestingSessionLocal()
-    db.query(models.Ticket).filter_by(id=t["id"]).update(
-        {"assignee_id": 2, "due_at": datetime.datetime.now(pytz.utc) - datetime.timedelta(hours=3), "status": models.TicketStatus.IN_PROGRESS})
-    db.add(models.UserPreference(user_id=2, digest_enabled=True, muted_events=[]))
-    db.commit()
-    des = db.query(models.User).filter_by(id=2).first()
-    d = digest.build_digest(db, des)
-    assert [r["title"] for r in d["overdue"]] == ["Late one"]
-    subject, text, html = digest.render_digest(d)
-    assert "1 overdue" in subject and "Late one" in text
-
-    sent = []
-    monkeypatch.setenv("SMTP_HOST", "smtp.test")
-    monkeypatch.setattr(delivery, "send_email", lambda to, s, b, h=None: (sent.append(to) or (True, "ok")))
-    nine_am = IST9()
-    assert digest.send_daily_digests(db, nine_am)["sent"] == 1
-    assert digest.send_daily_digests(db, nine_am)["skipped"] == "not due"  # already sent today
-    assert sent == ["des@x.com"]
-    db.close()
-
-
-def IST9():
-    ist = pytz.timezone("Asia/Kolkata")
-    return ist.localize(datetime.datetime(2026, 1, 14, 9, 30)).astimezone(pytz.utc)
-
-
-def test_digest_not_sent_before_9am_ist_or_without_smtp(client, monkeypatch):
-    db = TestingSessionLocal()
-    early = pytz.timezone("Asia/Kolkata").localize(datetime.datetime(2026, 1, 14, 7, 0)).astimezone(pytz.utc)
-    monkeypatch.setenv("SMTP_HOST", "smtp.test")
-    assert digest.send_daily_digests(db, early)["skipped"] == "not due"
-    monkeypatch.delenv("SMTP_HOST")
-    assert digest.send_daily_digests(db, IST9())["skipped"] == "smtp not configured"
-    db.close()
-
-
-def test_digest_html_escapes_ticket_titles():
-    d = {"user": "<b>x</b>", "date": "d", "overdue": [{"number": "DF-1", "title": "<script>alert(1)</script>", "status": "New", "due_at": None}],
-         "due_soon": [], "in_review": [], "other_open": [], "total_open": 1}
-    _, _, html = digest.render_digest(d)
-    assert "<script>" not in html and "&lt;script&gt;" in html
 
 
 # ── Comments & mentions ──────────────────────────────────────────────────────

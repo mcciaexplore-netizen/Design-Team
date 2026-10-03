@@ -1,9 +1,7 @@
-"""Outbound delivery: email (SMTP) and Slack (incoming webhook). Never raises; returns (ok, detail)."""
+"""Outbound delivery: Slack (incoming webhook). Never raises; returns (ok, detail)."""
 import logging
 import os
-import smtplib
 import threading
-from email.message import EmailMessage
 from typing import Callable, Optional
 from urllib.parse import urlparse
 
@@ -20,8 +18,6 @@ DEFAULT_INTEGRATIONS = {
     "slack_webhook": "",
     "slack_channel": "",
     "slack_events": {"breach": True, "escalate": True, "new": True},
-    "email_recipients": [],
-    "email_on_breach": True,
 }
 
 
@@ -74,46 +70,6 @@ def send_slack(webhook_url: str, text: str, channel: str = "") -> tuple[bool, st
     if res.status_code == 200:
         return True, "Delivered to Slack"
     return False, f"Slack rejected the message (HTTP {res.status_code}: {res.text[:80]})"
-
-
-# ── Email ────────────────────────────────────────────────────────────────────
-
-def smtp_configured() -> bool:
-    return bool(os.getenv("SMTP_HOST"))
-
-
-def send_email(to: str, subject: str, body: str, html: Optional[str] = None) -> tuple[bool, str]:
-    host = os.getenv("SMTP_HOST")
-    if not host:
-        return False, "SMTP is not configured on the server (set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM)"
-    if not to or "@" not in to or any(c in to for c in "\r\n"):
-        return False, "Invalid recipient address"
-    sender = os.getenv("SMTP_FROM") or os.getenv("SMTP_USER") or "designdesk@localhost"
-    msg = EmailMessage()
-    msg["From"] = sender
-    msg["To"] = to
-    msg["Subject"] = subject.replace("\r", " ").replace("\n", " ")[:200]
-    msg.set_content(body)
-    if html:
-        msg.add_alternative(html, subtype="html")
-    port = int(os.getenv("SMTP_PORT", "587"))
-    try:
-        if os.getenv("SMTP_SSL", "").lower() in ("1", "true", "yes"):
-            smtp = smtplib.SMTP_SSL(host, port, timeout=10)
-        else:
-            smtp = smtplib.SMTP(host, port, timeout=10)
-            if os.getenv("SMTP_TLS", "true").lower() not in ("0", "false", "no"):
-                smtp.starttls()
-        with smtp:
-            if os.getenv("SMTP_USER"):
-                smtp.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASSWORD", ""))
-            smtp.send_message(msg)
-    except smtplib.SMTPAuthenticationError:
-        return False, "SMTP login was rejected (check SMTP_USER / SMTP_PASSWORD)"
-    except (smtplib.SMTPException, OSError) as exc:
-        logger.warning("Email delivery failed: %s", exc)
-        return False, f"Could not send email: {exc.__class__.__name__}: {exc}"
-    return True, f"Email sent to {to}"
 
 
 # ── Fire-and-forget ──────────────────────────────────────────────────────────

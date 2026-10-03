@@ -8,9 +8,9 @@ import type { Ticket } from '../types';
 interface Proof { id: number; version: number; file_name: string; content_type: string | null; size_bytes: number; note: string | null; created_at: string | null }
 interface ApprovalReq {
   id: number; proof_version: number | null; status: 'pending' | 'approved' | 'changes_requested' | 'expired' | 'revoked';
-  recipient_email: string | null; expires_at: string; decided_at: string | null; decided_by_name: string | null; decision_comment: string | null;
+  expires_at: string; decided_at: string | null; decided_by_name: string | null; decision_comment: string | null;
 }
-interface Created extends ApprovalReq { review_url: string; email: { ok: boolean; detail: string } | null }
+interface Created extends ApprovalReq { review_url: string }
 
 const STATUS_LABEL: Record<ApprovalReq['status'], { text: string; cls: string }> = {
   pending: { text: 'Awaiting client', cls: 'badge-blue' },
@@ -49,7 +49,6 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [sendFor, setSendFor] = useState<number | null>(null);
-  const [email, setEmail] = useState('');
   const [days, setDays] = useState('7');
   const [created, setCreated] = useState<Created | null>(null);
   const [copied, setCopied] = useState(false);
@@ -98,9 +97,9 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
     setBusy(true); setError(null); setInfo(null);
     try {
       const res = await apiJson<Created>(`/api/tickets/${ticket.id}/approval-requests`, {
-        method: 'POST', json: { proof_version_id: proof.id, ttl_hours: Number(days) * 24, recipient_email: email.trim() || null },
+        method: 'POST', json: { proof_version_id: proof.id, ttl_hours: Number(days) * 24 },
       });
-      setCreated(res); setSendFor(null); setEmail('');
+      setCreated(res); setSendFor(null);
       await load(); void refresh();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not create the review link.'); }
     finally { setBusy(false); }
@@ -184,7 +183,6 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
             <input className="input-field" readOnly aria-label="Review link" value={created.review_url} onFocus={e => e.currentTarget.select()} style={{ fontSize: '0.76rem' }} />
             <button type="button" className="btn-ghost" onClick={() => void copyLink()}><Clipboard size={13} /> {copied ? 'Copied' : 'Copy'}</button>
           </div>
-          {created.email && <p style={{ fontSize: '0.74rem', marginTop: 6, color: created.email.ok ? '#047857' : '#92400e' }}>{created.email.ok ? `Emailed to ${created.recipient_email}.` : `Email not sent: ${created.email.detail}`}</p>}
           <button type="button" className="chip" style={{ marginTop: 8 }} onClick={() => setCreated(null)}>Dismiss</button>
         </div>
       )}
@@ -211,10 +209,6 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
           </div>
           {sendFor === p.id && (
             <form onSubmit={e => { e.preventDefault(); void sendForApproval(p); }} style={{ padding: '0.75rem 1rem', background: '#F8FAFC', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <label htmlFor={`rcp-${p.id}`} className="section-label" style={{ display: 'block', marginBottom: 4 }}>Email the link to (optional)</label>
-                <input id={`rcp-${p.id}`} type="email" className="input-field" value={email} onChange={e => setEmail(e.target.value)} placeholder="client@company.com" />
-              </div>
               <div>
                 <label htmlFor={`ttl-${p.id}`} className="section-label" style={{ display: 'block', marginBottom: 4 }}>Link valid for</label>
                 <select id={`ttl-${p.id}`} className="input-field" value={days} onChange={e => setDays(e.target.value)}>
@@ -248,7 +242,6 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
                     {!isClient && r.status === 'pending' && <button type="button" className="chip" style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, alignItems: 'center' }} onClick={() => void revoke(r.id)}><XCircle size={11} /> Withdraw link</button>}
                   </div>
                   {r.decision_comment && <p style={{ marginTop: 4, fontStyle: 'italic', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>“{r.decision_comment}”</p>}
-                  {!isClient && r.recipient_email && <p style={{ marginTop: 2, color: '#94a3b8', fontSize: '0.7rem' }}>Sent to {r.recipient_email}</p>}
                 </li>
               );
             })}

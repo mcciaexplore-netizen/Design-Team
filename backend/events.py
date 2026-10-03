@@ -1,9 +1,7 @@
-"""Turns application events into in-app notifications, emails and Slack posts, honouring each user's preferences."""
-import datetime
+"""Turns application events into in-app notifications and Slack posts, honouring each user's preferences."""
 import logging
 from typing import Optional
 
-import pytz
 from sqlalchemy.orm import Session
 
 import models
@@ -29,14 +27,6 @@ def slack_escape(text: str) -> str:
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _is_quiet(prefs: Optional[models.UserPreference]) -> bool:
-    if not prefs or prefs.quiet_hours_start is None or prefs.quiet_hours_end is None:
-        return False
-    hour = datetime.datetime.now(pytz.timezone("Asia/Kolkata")).hour
-    start, end = prefs.quiet_hours_start, prefs.quiet_hours_end
-    return start <= hour < end if start <= end else (hour >= start or hour < end)
-
-
 def notify(db: Session, user: models.User, content: str, event: str) -> None:
     """Deliver one notification to one user according to their preferences. Caller commits."""
     prefs = db.query(models.UserPreference).filter(models.UserPreference.user_id == user.id).first()
@@ -44,9 +34,6 @@ def notify(db: Session, user: models.User, content: str, event: str) -> None:
         return
     if prefs is None or prefs.in_app_enabled:
         db.add(models.Notification(user_id=user.id, content=content, type=event))
-    email_on = prefs is None or prefs.email_enabled
-    if email_on and not _is_quiet(prefs) and delivery.smtp_configured() and user.email:
-        delivery.run_in_background(delivery.send_email, user.email, f"[DesignDesk] {content}", content)
 
 
 def post_slack_event(db: Session, kind: str, text: str) -> None:

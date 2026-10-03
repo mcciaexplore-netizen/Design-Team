@@ -68,16 +68,10 @@ def run_all_cron_jobs(db: Session):
             
     db.commit()
 
-    # 3. Recurring tickets and the daily digest (each is idempotent per tick)
+    # 3. Recurring tickets (idempotent per tick)
     from templates_recurring import run_due_rules
-    from digest import send_daily_digests
     try:
         run_due_rules(db, now)
     except Exception:
         import logging
         logging.getLogger(__name__).exception("Recurring rules failed")
-    try:
-        send_daily_digests(db, now)
-    except Exception:
-        import logging
-        logging.getLogger(__name__).exception("Daily digest failed")

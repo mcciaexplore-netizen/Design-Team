@@ -1,10 +1,10 @@
 from datetime import timezone
 from typing import Annotated
-from pydantic import AfterValidator, BaseModel, EmailStr, field_validator
+from pydantic import AfterValidator, BaseModel, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from models import RoleEnum, TicketPriority, TicketStatus
-from common import parse_figma_url
+from common import Email, parse_figma_url
 
 
 UTCDateTime = Annotated[datetime, AfterValidator(lambda v: v.replace(tzinfo=timezone.utc) if v.tzinfo is None else v)]
@@ -17,7 +17,7 @@ def _check_figma(v):
 
 # User Schemas
 class UserBase(BaseModel):
-    email: EmailStr
+    email: Email
     full_name: str
     role: RoleEnum
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Bell, CheckCircle2, Mail, MessageSquare, Save, Send } from 'lucide-react';
+import { AlertTriangle, Bell, CheckCircle2, MessageSquare, Save, Send } from 'lucide-react';
 import { apiJson } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -10,12 +10,10 @@ const HINT: React.CSSProperties = { fontSize: '0.72rem', color: '#64748b', margi
 interface IntegrationSettings {
   slack_configured: boolean; slack_webhook_masked: string; slack_channel: string;
   slack_events: { breach: boolean; escalate: boolean; new: boolean };
-  email_recipients: string[]; email_on_breach: boolean; smtp_configured: boolean;
 }
 interface Prefs {
-  in_app_enabled: boolean; email_enabled: boolean; digest_enabled: boolean;
-  quiet_hours_start: number | null; quiet_hours_end: number | null;
-  muted_events: string[]; available_events: Record<string, string>; smtp_configured: boolean;
+  in_app_enabled: boolean;
+  muted_events: string[]; available_events: Record<string, string>;
 }
 type Result = { ok: boolean; text: string } | null;
 
@@ -41,16 +39,13 @@ function IntegrationsTab() {
   const [webhook, setWebhook] = useState('');
   const [channel, setChannel] = useState('');
   const [events, setEvents] = useState({ breach: true, escalate: true, new: true });
-  const [recipients, setRecipients] = useState('');
-  const [onBreach, setOnBreach] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<Result>(null);
   const [slackResult, setSlackResult] = useState<Result>(null);
-  const [emailResult, setEmailResult] = useState<Result>(null);
-  const [testing, setTesting] = useState<'slack' | 'email' | null>(null);
+  const [testing, setTesting] = useState<'slack' | null>(null);
 
   const apply = (c: IntegrationSettings) => {
-    setCfg(c); setChannel(c.slack_channel); setEvents(c.slack_events); setRecipients(c.email_recipients.join(', ')); setOnBreach(c.email_on_breach); setWebhook('');
+    setCfg(c); setChannel(c.slack_channel); setEvents(c.slack_events); setWebhook('');
   };
 
   const load = useCallback(async () => {
@@ -61,9 +56,8 @@ function IntegrationsTab() {
 
   const save = async () => {
     setSaving(true); setSaveResult(null);
-    const list = recipients.split(/[,\s;]+/).map(s => s.trim()).filter(Boolean);
     try {
-      const body: Record<string, unknown> = { slack_channel: channel.trim(), slack_events: events, email_recipients: list, email_on_breach: onBreach };
+      const body: Record<string, unknown> = { slack_channel: channel.trim(), slack_events: events };
       if (webhook.trim()) body.slack_webhook = webhook.trim();
       apply(await apiJson<IntegrationSettings>('/api/settings/integrations', { method: 'PUT', json: body }));
       setSaveResult({ ok: true, text: 'Settings saved.' });
@@ -84,15 +78,6 @@ function IntegrationsTab() {
       const r = await apiJson<{ ok: boolean; detail: string }>('/api/integrations/slack/test', { method: 'POST', json: { webhook_url: webhook.trim() || null, channel: channel.trim() } });
       setSlackResult({ ok: r.ok, text: r.detail });
     } catch (e) { setSlackResult({ ok: false, text: e instanceof Error ? e.message : 'Test failed.' }); }
-    finally { setTesting(null); }
-  };
-
-  const testEmail = async () => {
-    setTesting('email'); setEmailResult(null);
-    try {
-      const r = await apiJson<{ ok: boolean; detail: string }>('/api/integrations/email/test', { method: 'POST', json: {} });
-      setEmailResult({ ok: r.ok, text: r.detail });
-    } catch (e) { setEmailResult({ ok: false, text: e instanceof Error ? e.message : 'Test failed.' }); }
     finally { setTesting(null); }
   };
 
@@ -141,38 +126,6 @@ function IntegrationsTab() {
         </div>
       </section>
 
-      <section className="glass-card" style={{ padding: '1.5rem' }} aria-labelledby="email-h">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <div className="icon-tile"><Mail size={16} /></div>
-          <div>
-            <h2 id="email-h" style={SECTION_LABEL}>Email</h2>
-            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Notifications, daily digests and client review links are sent by email.</p>
-          </div>
-          <span className={cfg.smtp_configured ? 'badge-green' : 'badge-red'} style={{ marginLeft: 'auto' }}>{cfg.smtp_configured ? 'Server ready' : 'Not configured'}</span>
-        </div>
-
-        {!cfg.smtp_configured && (
-          <p role="note" style={{ fontSize: '0.8rem', color: '#92400e', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '0.6rem 0.8rem', marginBottom: 14 }}>
-            Email isn't set up on the server yet, so nothing is sent. Ask whoever hosts DesignDesk to set <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>, <code>SMTP_PASSWORD</code> and <code>SMTP_FROM</code>. In-app notifications work regardless.
-          </p>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div>
-            <label htmlFor="email-rcp" style={FIELD_LABEL}>Escalation recipients</label>
-            <input id="email-rcp" className="input-field" value={recipients} onChange={e => setRecipients(e.target.value)} placeholder="lead@mccia.in, ops@mccia.in" />
-            <p style={HINT}>Separate addresses with commas.</p>
-          </div>
-          <Toggle id="email-breach" checked={onBreach} onChange={setOnBreach} label="Email these people when an SLA is breached" />
-          <div>
-            <button type="button" className="btn-ghost" onClick={() => void testEmail()} disabled={testing !== null}>
-              <Mail size={14} /> {testing === 'email' ? 'Sending…' : 'Send test email to me'}
-            </button>
-            <ResultLine r={emailResult} />
-          </div>
-        </div>
-      </section>
-
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button type="button" className="btn-primary" onClick={() => void save()} disabled={saving}><Save size={14} /> {saving ? 'Saving…' : 'Save settings'}</button>
         <ResultLine r={saveResult} />
@@ -187,8 +140,6 @@ function MyNotificationsTab() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<Result>(null);
-  const [digestResult, setDigestResult] = useState<Result>(null);
-  const [digestBusy, setDigestBusy] = useState(false);
 
   const load = useCallback(async () => {
     try { setPrefs(await apiJson<Prefs>('/api/me/preferences')); setLoadError(null); }
@@ -200,25 +151,15 @@ function MyNotificationsTab() {
   if (!prefs) return <p role="status" style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Loading…</p>;
 
   const set = (patch: Partial<Prefs>) => { setPrefs({ ...prefs, ...patch }); setResult(null); };
-  const quietOn = prefs.quiet_hours_start !== null && prefs.quiet_hours_end !== null;
-  const hours = Array.from({ length: 24 }, (_, h) => h);
-  const hourLabel = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
   const save = async () => {
     setSaving(true); setResult(null);
     try {
-      const { in_app_enabled, email_enabled, digest_enabled, quiet_hours_start, quiet_hours_end, muted_events } = prefs;
-      setPrefs(await apiJson<Prefs>('/api/me/preferences', { method: 'PUT', json: { in_app_enabled, email_enabled, digest_enabled, quiet_hours_start, quiet_hours_end, muted_events } }));
+      const { in_app_enabled, muted_events } = prefs;
+      setPrefs(await apiJson<Prefs>('/api/me/preferences', { method: 'PUT', json: { in_app_enabled, muted_events } }));
       setResult({ ok: true, text: 'Preferences saved.' });
     } catch (e) { setResult({ ok: false, text: e instanceof Error ? e.message : 'Could not save.' }); }
     finally { setSaving(false); }
-  };
-
-  const sendDigest = async () => {
-    setDigestBusy(true); setDigestResult(null);
-    try { const r = await apiJson<{ ok: boolean; detail: string }>('/api/me/digest/send', { method: 'POST' }); setDigestResult({ ok: r.ok, text: r.detail }); }
-    catch (e) { setDigestResult({ ok: false, text: e instanceof Error ? e.message : 'Could not send.' }); }
-    finally { setDigestBusy(false); }
   };
 
   return (
@@ -226,22 +167,10 @@ function MyNotificationsTab() {
       <section className="glass-card" style={{ padding: '1.5rem' }} aria-labelledby="chan-h">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <div className="icon-tile"><Bell size={16} /></div>
-          <div><h2 id="chan-h" style={SECTION_LABEL}>How you're notified</h2><p style={{ fontSize: '0.75rem', color: '#64748b' }}>Choose where DesignDesk reaches you.</p></div>
+          <div><h2 id="chan-h" style={SECTION_LABEL}>How you're notified</h2><p style={{ fontSize: '0.75rem', color: '#64748b' }}>Notifications appear in the bell at the top of the page.</p></div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Toggle id="p-inapp" checked={prefs.in_app_enabled} onChange={v => set({ in_app_enabled: v })} label="In-app notifications (the bell)" />
-          <Toggle id="p-email" checked={prefs.email_enabled} onChange={v => set({ email_enabled: v })} label="Email notifications"
-            hint={prefs.smtp_configured ? undefined : 'Email isn’t configured on the server yet, so no emails are sent for now.'} />
-          <Toggle id="p-quiet" checked={quietOn} onChange={v => set(v ? { quiet_hours_start: 20, quiet_hours_end: 8 } : { quiet_hours_start: null, quiet_hours_end: null })}
-            label="Quiet hours" hint="No emails during this window (India time). In-app notifications still arrive." />
-          {quietOn && (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginLeft: 26, flexWrap: 'wrap' }}>
-              <label htmlFor="q-start" style={{ fontSize: '0.78rem' }}>From</label>
-              <select id="q-start" className="input-field" style={{ width: 'auto' }} value={prefs.quiet_hours_start ?? 20} onChange={e => set({ quiet_hours_start: Number(e.target.value) })}>{hours.map(h => <option key={h} value={h}>{hourLabel(h)}</option>)}</select>
-              <label htmlFor="q-end" style={{ fontSize: '0.78rem' }}>to</label>
-              <select id="q-end" className="input-field" style={{ width: 'auto' }} value={prefs.quiet_hours_end ?? 8} onChange={e => set({ quiet_hours_end: Number(e.target.value) })}>{hours.map(h => <option key={h} value={h}>{hourLabel(h)}</option>)}</select>
-            </div>
-          )}
         </div>
       </section>
 
@@ -252,16 +181,6 @@ function MyNotificationsTab() {
             <Toggle key={key} id={`ev-${key}`} checked={!prefs.muted_events.includes(key)} label={label}
               onChange={on => set({ muted_events: on ? prefs.muted_events.filter(k => k !== key) : [...prefs.muted_events, key] })} />
           ))}
-        </div>
-      </section>
-
-      <section className="glass-card" style={{ padding: '1.5rem' }} aria-labelledby="dg-h">
-        <h2 id="dg-h" style={{ ...SECTION_LABEL, marginBottom: 10 }}>Daily digest</h2>
-        <Toggle id="p-digest" checked={prefs.digest_enabled} onChange={v => set({ digest_enabled: v })} label="Email me a daily summary at about 9:00 AM IST"
-          hint="Overdue work, what's due in the next 24 hours, and what's waiting for review." />
-        <div style={{ marginTop: 12 }}>
-          <button type="button" className="btn-ghost" onClick={() => void sendDigest()} disabled={digestBusy}><Send size={14} /> {digestBusy ? 'Sending…' : 'Send me one now'}</button>
-          <ResultLine r={digestResult} />
         </div>
       </section>
 

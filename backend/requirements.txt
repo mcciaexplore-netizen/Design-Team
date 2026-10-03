@@ -14,4 +14,3 @@ python-multipart
 httpx
 reportlab
 websockets
-email-validator

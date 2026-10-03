@@ -1,12 +1,11 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 import models
 import delivery
-import digest
 import events
 from auth import get_current_user, require_lead
 from common import as_utc
@@ -27,9 +26,6 @@ def _public_settings(cfg: dict) -> dict:
         "slack_webhook_masked": _mask(cfg["slack_webhook"]),
         "slack_channel": cfg["slack_channel"],
         "slack_events": cfg["slack_events"],
-        "email_recipients": cfg["email_recipients"],
-        "email_on_breach": cfg["email_on_breach"],
-        "smtp_configured": delivery.smtp_configured(),
     }
 
 
@@ -44,8 +40,6 @@ class IntegrationSettingsUpdate(BaseModel):
     slack_webhook: Optional[str] = None
     slack_channel: Optional[str] = Field(default=None, max_length=80)
     slack_events: Optional[SlackEvents] = None
-    email_recipients: Optional[List[EmailStr]] = None
-    email_on_breach: Optional[bool] = None
 
     @field_validator("slack_webhook")
     @classmethod
@@ -68,8 +62,6 @@ def update_integration_settings(body: IntegrationSettingsUpdate, db: Session = D
     for key, value in data.items():
         if key == "slack_events" and value is not None:
             cfg["slack_events"] = value
-        elif key == "email_recipients" and value is not None:
-            cfg["email_recipients"] = [str(v) for v in value]
         elif value is not None:
             cfg[key] = value
     delivery.set_setting(db, delivery.INTEGRATIONS_KEY, cfg)
@@ -97,40 +89,18 @@ def test_slack(body: SlackTest = SlackTest(), db: Session = Depends(get_db), use
     return {"ok": ok, "detail": detail}
 
 
-class EmailTest(BaseModel):
-    to: Optional[EmailStr] = None
-
-
-@router.post("/api/integrations/email/test")
-def test_email(body: EmailTest = EmailTest(), user: models.User = Depends(require_lead)):
-    ok, detail = delivery.send_email(
-        str(body.to or user.email), "DesignDesk test email",
-        "This is a test email from DesignDesk. If you can read it, email delivery works.",
-    )
-    return {"ok": ok, "detail": detail}
-
-
 # ── Per-user preferences ─────────────────────────────────────────────────────
 
 class PreferencesUpdate(BaseModel):
     in_app_enabled: Optional[bool] = None
-    email_enabled: Optional[bool] = None
-    digest_enabled: Optional[bool] = None
-    quiet_hours_start: Optional[int] = Field(default=None, ge=0, le=23)
-    quiet_hours_end: Optional[int] = Field(default=None, ge=0, le=23)
     muted_events: Optional[List[str]] = None
 
 
 def _prefs_payload(prefs: Optional[models.UserPreference]) -> dict:
     return {
         "in_app_enabled": prefs.in_app_enabled if prefs else True,
-        "email_enabled": prefs.email_enabled if prefs else True,
-        "digest_enabled": prefs.digest_enabled if prefs else False,
-        "quiet_hours_start": prefs.quiet_hours_start if prefs else None,
-        "quiet_hours_end": prefs.quiet_hours_end if prefs else None,
         "muted_events": (prefs.muted_events or []) if prefs else [],
         "available_events": events.EVENT_LABELS,
-        "smtp_configured": delivery.smtp_configured(),
     }
 
 
@@ -156,22 +126,6 @@ def update_preferences(body: PreferencesUpdate, db: Session = Depends(get_db), u
     db.commit()
     db.refresh(prefs)
     return _prefs_payload(prefs)
-
-
-@router.get("/api/me/digest")
-def preview_digest(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    return digest.build_digest(db, user)
-
-
-@router.post("/api/me/digest/send")
-def send_my_digest(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    ok, detail = digest.send_digest_to(db, user)
-    return {"ok": ok, "detail": detail}
-
-
-@router.post("/api/digest/run")
-def run_digest_now(db: Session = Depends(get_db), _user: models.User = Depends(require_lead)):
-    return digest.send_daily_digests(db, force=True)
 
 
 # ── In-app notifications ─────────────────────────────────────────────────────

@@ -5,13 +5,14 @@ import logging
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 import models
+from common import Email
 from database import get_db
 
 logger = logging.getLogger(__name__)
@@ -153,7 +154,7 @@ def me(user: models.User = Depends(get_current_user)):
 
 class RegisterRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=80)
-    email: EmailStr
+    email: Email
     company: str = Field(min_length=2, max_length=80)
     password: str = Field(min_length=8, max_length=128)
 

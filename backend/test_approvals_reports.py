@@ -92,14 +92,6 @@ def test_request_validation_and_permissions(client):
     assert client.post(f"/api/tickets/{t['id']}/approval-requests", json={"proof_version_id": mine["id"]}, headers=auth(client, "a@tata.com")).status_code == 403
     assert client.post(f"/api/tickets/{t['id']}/approval-requests", json={"proof_version_id": mine["id"], "ttl_hours": 0}, headers=des).status_code == 422
     assert client.post(f"/api/tickets/{t['id']}/approval-requests", json={"proof_version_id": mine["id"], "ttl_hours": 9999}, headers=des).status_code == 422
-    assert client.post(f"/api/tickets/{t['id']}/approval-requests", json={"proof_version_id": mine["id"], "recipient_email": "nope"}, headers=des).status_code == 422
-
-
-def test_link_is_emailed_when_recipient_given(client, monkeypatch):
-    sent = []
-    monkeypatch.setattr(delivery, "send_email", lambda to, s, b, h=None: (sent.append((to, b)) or (True, "ok")))
-    _, _, req, token = setup_review(client, recipient_email="client@tata.com")
-    assert req["email"]["ok"] is True and sent[0][0] == "client@tata.com" and f"/review/{token}" in sent[0][1]
 
 
 def test_new_request_supersedes_old_link(client):

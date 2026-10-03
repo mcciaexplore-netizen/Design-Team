@@ -8,10 +8,9 @@ from typing import Literal, Optional
 
 import pytz
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-import delivery
 import events
 import models
 from auth import get_current_user, get_ticket_for_user, require_staff
@@ -42,7 +41,7 @@ def _proof_out(p: models.ProofVersion) -> dict:
 def _request_out(r: models.ApprovalRequest, version: Optional[int] = None) -> dict:
     expired = r.status == "pending" and as_utc(r.expires_at) < _now()
     return {"id": r.id, "ticket_id": r.ticket_id, "proof_version_id": r.proof_version_id, "proof_version": version,
-            "status": "expired" if expired else r.status, "recipient_email": r.recipient_email,
+            "status": "expired" if expired else r.status,
             "expires_at": as_utc(r.expires_at).isoformat(), "decided_at": as_utc(r.decided_at).isoformat() if r.decided_at else None,
             "decided_by_name": r.decided_by_name, "decision_comment": r.decision_comment,
             "created_at": as_utc(r.created_at).isoformat() if r.created_at else None}
@@ -91,7 +90,6 @@ def proof_file(proof_id: int, db: Session = Depends(get_db), user: models.User =
 class ApprovalCreate(BaseModel):
     proof_version_id: int
     ttl_hours: int = Field(default=DEFAULT_TTL_HOURS, ge=1, le=MAX_TTL_HOURS)
-    recipient_email: Optional[EmailStr] = None
 
 
 @router.post("/api/tickets/{ticket_id}/approval-requests", status_code=201)
@@ -106,27 +104,18 @@ def create_approval_request(ticket_id: int, body: ApprovalCreate, db: Session = 
         models.ApprovalRequest.ticket_id == ticket.id, models.ApprovalRequest.status == "pending").update({"status": "revoked"})
     token = secrets.token_urlsafe(32)
     req = models.ApprovalRequest(ticket_id=ticket.id, proof_version_id=proof.id, token_hash=_hash(token),
-                                 recipient_email=str(body.recipient_email) if body.recipient_email else None,
                                  expires_at=_now() + datetime.timedelta(hours=body.ttl_hours), created_by_id=user.id)
     db.add(req)
     if ticket.status not in (models.TicketStatus.IN_REVIEW, models.TicketStatus.DELIVERED):
         ticket.status = models.TicketStatus.IN_REVIEW
     db.flush()
-    log_audit(db, ticket.id, user, "Sent for approval", {"proof_version": proof.version, "expires_in_hours": body.ttl_hours,
-                                                          "recipient": req.recipient_email})
+    log_audit(db, ticket.id, user, "Sent for approval", {"proof_version": proof.version, "expires_in_hours": body.ttl_hours})
     db.commit()
     db.refresh(req)
 
     link = f"{PUBLIC_APP_URL()}/review/{token}"
-    email_result = None
-    if req.recipient_email:
-        ok, detail = delivery.send_email(
-            req.recipient_email, f"Please review: {ticket.title}",
-            f"{user.full_name} has shared a design for your review: {ticket.title} (version {proof.version}).\n\n"
-            f"Review, approve or request changes here (link expires {as_utc(req.expires_at).strftime('%d %b %Y')}):\n{link}\n")
-        email_result = {"ok": ok, "detail": detail}
     # The link is returned exactly once; only its hash is stored.
-    return {**_request_out(req, proof.version), "review_url": link, "email": email_result}
+    return {**_request_out(req, proof.version), "review_url": link}
 
 
 @router.get("/api/tickets/{ticket_id}/approval-requests")
