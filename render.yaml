@@ -1,3 +1,8 @@
+databases:
+  - name: designflow-db
+    plan: free
+    databaseName: designflow
+
 services:
   # Backend API
   - type: web
@@ -11,7 +16,9 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.7
       - key: DATABASE_URL
-        sync: false # postgresql+psycopg://user:pass@host:5432/db (Render Postgres "Internal Database URL", with +psycopg added)
+        fromDatabase:
+          name: designflow-db
+          property: connectionString
       - key: SECRET_KEY
         generateValue: true
       - key: CRON_SECRET
@@ -19,9 +26,9 @@ services:
       - key: ALLOWED_ORIGINS
         sync: false # the frontend URL, e.g. https://designflow-web.onrender.com
       - key: SEED_STAFF_PASSWORD
-        sync: false
+        generateValue: true # shown in the Render dashboard; used for lead/designer demo accounts
       - key: SEED_CLIENT_PASSWORD
-        sync: false
+        generateValue: true
       - key: JIRA_WEBHOOK_SECRET
         sync: false
       - key: PUBLIC_APP_URL
