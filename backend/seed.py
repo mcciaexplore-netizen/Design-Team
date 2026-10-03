@@ -7,7 +7,18 @@ import models
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def migrate():
+    """Apply pending migrations so seeding works even if the start command skipped `alembic upgrade head`."""
+    from alembic import command
+    from alembic.config import Config
+    here = os.path.dirname(os.path.abspath(__file__))
+    cfg = Config(os.path.join(here, "alembic.ini"))
+    cfg.set_main_option("script_location", os.path.join(here, "alembic"))
+    command.upgrade(cfg, "head")
+
+
 def seed():
+    migrate()
     if not os.getenv("DATABASE_URL", "sqlite").startswith("sqlite") and not (os.getenv("SEED_STAFF_PASSWORD") and os.getenv("SEED_CLIENT_PASSWORD")):
         print("Refusing to seed a non-SQLite database with default passwords. Set SEED_STAFF_PASSWORD and SEED_CLIENT_PASSWORD.")
         return
