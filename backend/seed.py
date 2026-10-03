@@ -5,7 +5,6 @@ from passlib.context import CryptContext
 from database import SessionLocal, engine
 import models
 
-models.Base.metadata.create_all(bind=engine)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def seed():

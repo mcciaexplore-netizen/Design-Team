@@ -1,13 +1,13 @@
 import React from 'react';
-import { Clock, CheckCircle, ArrowRight, Play, MessageSquare, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle, ArrowRight, Play, MessageSquare, AlertCircle, Paperclip, ShieldCheck, FileImage } from 'lucide-react';
 
-interface AuditLogEntry {
+export interface AuditLogEntry {
   id:        string;
   action:    string;
   actor:     string;
   timestamp: string;
   details?:  string;
-  type:      'status_change' | 'comment' | 'timer_start' | 'timer_stop' | 'created' | 'alert';
+  type:      'status_change' | 'comment' | 'timer_start' | 'timer_stop' | 'created' | 'alert' | 'attachment' | 'approval' | 'proof';
 }
 
 interface ActivityTimelineProps {
@@ -21,6 +21,9 @@ const TYPE_MAP: Record<string, { icon: any; color: string; bg: string; border: s
   timer_start:   { icon: Play,          color: '#8B5CF6', bg: 'rgba(139,92,246,0.08)',  border: 'rgba(139,92,246,0.15)'  },
   timer_stop:    { icon: Clock,         color: '#64748B', bg: 'rgba(100,116,139,0.08)', border: 'rgba(100,116,139,0.14)' },
   comment:       { icon: MessageSquare, color: '#f97316', bg: 'rgba(249,115,22,0.08)',  border: 'rgba(249,115,22,0.14)'  },
+  attachment:    { icon: Paperclip,     color: '#0ea5e9', bg: 'rgba(14,165,233,0.08)',  border: 'rgba(14,165,233,0.15)' },
+  approval:      { icon: ShieldCheck,   color: '#059669', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.15)' },
+  proof:         { icon: FileImage,     color: '#8B5CF6', bg: 'rgba(139,92,246,0.08)',  border: 'rgba(139,92,246,0.15)' },
   alert:         { icon: AlertCircle,   color: '#EF4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.14)'   },
 };
 
@@ -33,6 +36,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ logs }) => (
   >
     <h3 className="section-label" style={{ marginBottom: '1.25rem' }}>Activity History</h3>
 
+    {logs.length === 0 && <p style={{ fontSize: '0.82rem', color: '#94a3b8' }}>No activity yet.</p>}
     <div style={{ position: 'relative', paddingLeft: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Vertical line */}
       <div style={{ position: 'absolute', left: 14, top: 8, bottom: 8, width: 2, background: 'rgba(226,232,240,0.85)', borderRadius: 2 }} />

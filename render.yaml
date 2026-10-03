@@ -5,7 +5,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python seed.py && uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: alembic upgrade head && python seed.py && uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
@@ -23,6 +23,18 @@ services:
       - key: SEED_CLIENT_PASSWORD
         sync: false
       - key: JIRA_WEBHOOK_SECRET
+        sync: false
+      - key: PUBLIC_APP_URL
+        sync: false # the frontend URL; used in client review links
+      - key: SMTP_HOST
+        sync: false # optional: enables email notifications, digests and review emails
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
         sync: false
       - key: S3_ENDPOINT_URL
         sync: false

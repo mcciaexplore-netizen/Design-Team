@@ -7,3 +7,6 @@ __pycache__/
 .pytest_cache/
 node_modules/
 dist/
+backend/uploads/
+_*.db
+_smoke*

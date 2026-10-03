@@ -25,6 +25,16 @@ const FigmaEmbed: React.FC<FigmaEmbedProps> = ({ url }) => {
     );
   }
 
+  /* Never frame anything but a real figma.com link, whatever the stored value is. */
+  let host = '';
+  try { const u = new URL(url); host = u.protocol === 'https:' ? u.hostname : ''; } catch { /* invalid */ }
+  if (host !== 'www.figma.com' && host !== 'figma.com') {
+    return (
+      <div role="alert" style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.82rem', border: '1px dashed rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)' }}>
+        This link is not a valid Figma link, so it can't be previewed.
+      </div>
+    );
+  }
   const embedUrl = `https://www.figma.com/embed?embed_host=designdesk&url=${encodeURIComponent(url)}`;
 
   return (

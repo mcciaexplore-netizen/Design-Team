@@ -135,3 +135,31 @@ def test_ticket_requester_and_org_come_from_token(client):
 def test_jira_webhook_rejects_without_secret(client):
     assert client.post("/api/webhooks/jira", json={}).status_code == 403
     assert client.post("/api/webhooks/jira", json={}, headers={"X-Webhook-Secret": "guess"}).status_code == 403
+
+
+# ── Live event feed ──────────────────────────────────────────────────────────
+
+def test_live_feed_requires_a_valid_token(client):
+    from starlette.websockets import WebSocketDisconnect
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/ws/anyone"):
+            pass
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/ws/anyone?token=garbage"):
+            pass
+
+
+def test_live_feed_delivers_events_only_to_people_who_may_see_them(client):
+    tata = login(client, "a@tata.com").json()["access_token"]
+    acme = login(client, "b@acme.com").json()["access_token"]
+    lead = login(client, "lead@x.com").json()["access_token"]
+    with client.websocket_connect(f"/ws/x?token={tata}") as ws_tata, \
+         client.websocket_connect(f"/ws/x?token={acme}") as ws_acme, \
+         client.websocket_connect(f"/ws/x?token={lead}") as ws_lead:
+        make_ticket(client, "a@tata.com", "Tata poster")
+        msg = ws_lead.receive_json()
+        assert msg["type"] == "ticket_created" and msg["title"] == "Tata poster" and msg["by"] == "Tata A"
+        assert ws_tata.receive_json()["ticketNumber"] == msg["ticketNumber"]
+        # The ACME client must not hear about TATA's ticket: send ACME's own, and it should be the first thing they get.
+        make_ticket(client, "b@acme.com", "Acme flyer")
+        assert ws_acme.receive_json()["title"] == "Acme flyer"

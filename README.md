@@ -4,7 +4,7 @@
 - **Frontend**: React + TypeScript, Vite, Tailwind CSS v4, `@fullcalendar/react`, `@dnd-kit/core`
 - **Backend Core**: FastAPI, PostgreSQL (Neon/Supabase), SQLAlchemy, Alembic
 - **Background & SLA**: Cron-triggered `/internal/tick` endpoint running idempotently for SLA tracking, escalations, and auto-close.
-- **Storage**: Cloudflare R2 / Supabase Storage (S3-Compatible API) for secure, private CDR delivery via Presigned URLs. No local disk storage.
+- **Storage**: Cloudflare R2 / Supabase Storage (S3-compatible) when `S3_ENDPOINT_URL` is set; otherwise local disk (`UPLOAD_DIR`) for development. Files are only served through authenticated endpoints.
 - **Deployment**: Render via `render.yaml` (Static frontend + Web Service backend).
 
 ## Local Development Setup
@@ -21,9 +21,10 @@
    python -m venv venv
    .\venv\Scripts\activate
    pip install -r requirements.txt
-   alembic upgrade head
+   alembic upgrade head      # creates the schema (SQLite by default; set DATABASE_URL for PostgreSQL)
    python seed.py
    uvicorn main:app --reload
+   pytest                    # optional: run the backend tests
    ```
 
 3. **Frontend Setup (Native NPM)**

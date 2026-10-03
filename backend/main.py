@@ -2,10 +2,14 @@ import os
 import secrets
 from fastapi import FastAPI, Depends, HTTPException, status, Header, WebSocket, WebSocketDisconnect, BackgroundTasks, Response
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Dict
 
-import models, schemas, auth
+import models, schemas, auth, events
+import realtime
+import notify_api, collab, views_bulk, templates_recurring, timetracking, approvals, reports
+from common import log_audit, compute_due_at, next_ticket_number
 from auth import get_current_user, require_staff, require_lead, is_client, get_ticket_for_user
 from database import engine, get_db
 from sla_engine import calculate_due_date
@@ -16,9 +20,6 @@ import forecasting
 from integrations import handle_incoming_jira_webhook, notify_slack_high_priority_ticket, notify_slack_last_minute_change
 import io
 import csv
-
-# Create all tables (In production, use Alembic migrations instead)
-models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="DesignFlow API", version="1.0.0")
 
@@ -31,6 +32,13 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(notify_api.router)
+app.include_router(collab.router)
+app.include_router(views_bulk.router)
+app.include_router(templates_recurring.router)
+app.include_router(timetracking.router)
+app.include_router(approvals.router)
+app.include_router(reports.router)
 app.include_router(forecasting.router, dependencies=[Depends(require_staff)])
 
 # --- WebSocket Manager ---
@@ -92,63 +100,48 @@ def get_tickets(db: Session = Depends(get_db), user: models.User = Depends(get_c
             query = query.filter(models.Ticket.client_org == user.client_org)
         else:
             query = query.filter(models.Ticket.requester_id == user.id)
-    return query.order_by(models.Ticket.created_at.desc()).all()
+    tickets = query.order_by(models.Ticket.created_at.desc()).all()
+    counts = dict(db.query(models.TicketComment.ticket_id, func.count(models.TicketComment.id))
+                  .filter(models.TicketComment.ticket_id.in_([t.id for t in tickets] or [0]))
+                  .group_by(models.TicketComment.ticket_id).all())
+    for t in tickets:
+        t.comment_count = counts.get(t.id, 0)
+    return tickets
 
 @app.post("/api/tickets", response_model=schemas.TicketResponse, status_code=status.HTTP_201_CREATED)
 def create_ticket(ticket: schemas.TicketCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), requester: models.User = Depends(get_current_user)):
-    # Simple ID generation logic
-    last_ticket = db.query(models.Ticket).order_by(models.Ticket.id.desc()).first()
-    next_id = last_ticket.id + 1 if last_ticket else 1
-    ticket_number = f"DF-{next_id:04d}"
+    design_type = db.query(models.DesignType).filter(
+        models.DesignType.id == ticket.design_type_id, models.DesignType.is_active == True
+    ).first()
+    if not design_type:
+        raise HTTPException(status_code=422, detail="Unknown design type")
 
     data = ticket.dict()
     if is_client(requester):
-        # Clients can request work but not assign it.
+        # Clients can request work but not plan it.
         data.pop("assignee_id", None)
+        data.pop("estimate_hours", None)
 
     db_ticket = models.Ticket(
         **data,
-        ticket_number=ticket_number,
+        ticket_number=next_ticket_number(db),
         requester_id=requester.id,
         client_org=requester.client_org,
+        due_at=compute_due_at(db, design_type, ticket.priority),
     )
     db.add(db_ticket)
+    db.flush()
+    log_audit(db, db_ticket.id, requester, "Created", {"status": db_ticket.status.value, "priority": db_ticket.priority.value})
     db.commit()
     db.refresh(db_ticket)
 
-    # Audit log
-    audit_log = models.AuditLog(
-        ticket_id=db_ticket.id,
-        changed_by_id=requester.id,
-        action="Created",
-        details={"status": db_ticket.status}
-    )
-    db.add(audit_log)
-    db.commit()
+    events.emit(db, "ticket_created", db_ticket, requester)
 
     # Feature 14: Slack Integration for high priority tickets
     if db_ticket.priority == models.TicketPriority.URGENT:
         background_tasks.add_task(notify_slack_high_priority_ticket, db_ticket)
 
     return db_ticket
-
-@app.get("/api/timesheets/export")
-def export_timesheets(db: Session = Depends(get_db), _user: models.User = Depends(require_lead)):
-    """Feature 9: Generate CSV timesheets based on time_spent_seconds."""
-    tickets = db.query(models.Ticket).filter(models.Ticket.time_spent_seconds > 0).all()
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Ticket ID", "Ticket Number", "Title", "Assignee ID", "Time Spent (Seconds)", "Time Spent (Hours)"])
-
-    for t in tickets:
-        hours = round(t.time_spent_seconds / 3600, 2)
-        writer.writerow([t.id, t.ticket_number, t.title, t.assignee_id or "Unassigned", t.time_spent_seconds, hours])
-
-    response = Response(content=output.getvalue())
-    response.headers["Content-Disposition"] = "attachment; filename=timesheet_export.csv"
-    response.headers["Content-Type"] = "text/csv"
-    return response
 
 @app.patch("/api/tickets/{ticket_id}", response_model=schemas.TicketResponse)
 def update_ticket(ticket_id: int, ticket_update: schemas.TicketUpdate, db: Session = Depends(get_db), user: models.User = Depends(require_staff)):
@@ -163,12 +156,55 @@ def update_ticket(ticket_id: int, ticket_update: schemas.TicketUpdate, db: Sessi
         if forbidden:
             raise HTTPException(status_code=403, detail="Only a Design Lead can change: " + ", ".join(sorted(forbidden)))
 
+    old_assignee = db_ticket.assignee_id
+    changes = {}
     for key, value in update_data.items():
+        old = getattr(db_ticket, key)
+        if old != value:
+            changes[key] = {"from": getattr(old, "value", old), "to": getattr(value, "value", value)}
         setattr(db_ticket, key, value)
+
+    if "status" in changes and db_ticket.status == models.TicketStatus.DELIVERED and db_ticket.delivered_at is None:
+        db_ticket.delivered_at = datetime.datetime.now(pytz.utc)
+    if changes:
+        log_audit(db, db_ticket.id, user, "Updated", changes)
 
     db.commit()
     db.refresh(db_ticket)
+
+    if "status" in changes:
+        events.emit(db, "ticket_moved", db_ticket, user, {"to": db_ticket.status.value})
+    if db_ticket.assignee_id and db_ticket.assignee_id != old_assignee:
+        events.emit(db, "ticket_assigned", db_ticket, user)
     return db_ticket
+
+@app.post("/api/tickets/{ticket_id}/duplicate", response_model=schemas.TicketResponse, status_code=status.HTTP_201_CREATED)
+def duplicate_ticket(ticket_id: int, db: Session = Depends(get_db), user: models.User = Depends(require_staff)):
+    """Copy a ticket as a fresh New ticket. It stays with the same client, so their portal still shows it."""
+    src = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
+    if not src:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    copy = models.Ticket(
+        ticket_number=next_ticket_number(db),
+        title=f"{src.title} (Copy)"[:200],
+        brief=src.brief,
+        design_type_id=src.design_type_id,
+        type_specific_fields=src.type_specific_fields,
+        priority=src.priority,
+        tags=list(src.tags or []),
+        figma_url=src.figma_url,
+        estimate_hours=src.estimate_hours,
+        requester_id=src.requester_id,
+        client_org=src.client_org,
+        due_at=compute_due_at(db, src.design_type, src.priority),
+    )
+    db.add(copy)
+    db.flush()
+    log_audit(db, copy.id, user, "Created", {"duplicated_from": src.ticket_number})
+    log_audit(db, src.id, user, "Duplicated", {"copy": copy.ticket_number})
+    db.commit()
+    db.refresh(copy)
+    return copy
 
 @app.post("/api/tickets/recalculate-sla")
 def recalculate_sla(db: Session = Depends(get_db), _user: models.User = Depends(require_lead)):
@@ -315,16 +351,46 @@ def update_pinpoint(ticket_id: int, pinpoint_id: int, resolved: bool, db: Sessio
     return db_pinpoint
 
 # --- WebSockets ---
+def _ws_session():
+    """A short-lived DB session for WebSocket handshakes (honours dependency overrides, e.g. in tests)."""
+    return (app.dependency_overrides.get(get_db) or get_db)()
+
+
+@app.websocket("/ws/{user_ref}")
+async def live_events(websocket: WebSocket, user_ref: str):
+    """Live feed of ticket events for the signed-in user. The path segment is ignored; identity comes from the token."""
+    gen = _ws_session()
+    db = next(gen)
+    try:
+        user = await auth.authenticate_websocket(websocket, db)
+    finally:
+        gen.close()
+    if not user:
+        await websocket.close(code=4401)
+        return
+    await websocket.accept()
+    sub = await realtime.register(websocket, user)
+    try:
+        while True:
+            await websocket.receive_text()  # We only push; this just notices the client leaving.
+    except WebSocketDisconnect:
+        pass
+    finally:
+        realtime.unregister(sub)
+
+
+
 @app.websocket("/api/tickets/{ticket_id}/ws")
 async def websocket_endpoint(websocket: WebSocket, ticket_id: int):
-    db = next(get_db())
+    gen = _ws_session()
+    db = next(gen)
     try:
         user = await auth.authenticate_websocket(websocket, db)
         ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
         allowed = bool(user and ticket and auth.can_access_ticket(user, ticket))
         sender = user.full_name if user else "User"
     finally:
-        db.close()
+        gen.close()
     if not allowed:
         await websocket.close(code=4401)
         return
@@ -375,39 +441,3 @@ def delete_subtask(ticket_id: int, subtask_id: int, db: Session = Depends(get_db
     db.delete(db_subtask)
     db.commit()
     return None
-
-# --- Time Tracking ---
-@app.post("/api/tickets/{ticket_id}/timer/start")
-def start_timer(ticket_id: int, db: Session = Depends(get_db), _user: models.User = Depends(require_staff)):
-    db_ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
-    if not db_ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    if db_ticket.timer_started_at is not None:
-        raise HTTPException(status_code=400, detail="Timer is already running")
-
-    db_ticket.timer_started_at = datetime.datetime.now(pytz.utc)
-    db.commit()
-    return {"message": "Timer started", "timer_started_at": db_ticket.timer_started_at}
-
-@app.post("/api/tickets/{ticket_id}/timer/stop")
-def stop_timer(ticket_id: int, db: Session = Depends(get_db), _user: models.User = Depends(require_staff)):
-    db_ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
-    if not db_ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    if db_ticket.timer_started_at is None:
-        raise HTTPException(status_code=400, detail="Timer is not running")
-
-    now = datetime.datetime.now(pytz.utc)
-    # Make sure timer_started_at has tzinfo before subtraction, or assume both are utc
-    start_time = db_ticket.timer_started_at
-    if start_time.tzinfo is None:
-         start_time = start_time.replace(tzinfo=pytz.utc)
-
-    elapsed = (now - start_time).total_seconds()
-    db_ticket.time_spent_seconds += int(elapsed)
-    db_ticket.timer_started_at = None
-    db.commit()
-
-    return {"message": "Timer stopped", "time_spent_seconds": db_ticket.time_spent_seconds}

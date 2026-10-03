@@ -10,7 +10,8 @@ from database import Base, SQLALCHEMY_DATABASE_URL
 import models # Ensure models are loaded
 
 config = context.config
-config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL)
+# ConfigParser treats % as interpolation, so escape it (passwords can contain it).
+config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -24,6 +25,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+        render_as_batch=SQLALCHEMY_DATABASE_URL.startswith("sqlite"),
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -36,7 +39,10 @@ def run_migrations_online() -> None:
     )
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            render_as_batch=connection.dialect.name == "sqlite",  # SQLite can't ALTER in place
         )
         with context.begin_transaction():
             context.run_migrations()

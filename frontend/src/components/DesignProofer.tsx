@@ -15,9 +15,14 @@ interface Pin {
 interface DesignProoferProps {
   ticketId: string;
   imageUrls: string[];
+  /** Stable ids stored with each pin (e.g. "proof:12"); defaults to the URL. Use these when URLs are temporary blob: URLs. */
+  imageKeys?: string[];
+  /** Label for each version, e.g. "Version 2". */
+  labels?: string[];
 }
 
-const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls }) => {
+const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imageKeys, labels }) => {
+  const keyOf = (i: number) => imageKeys?.[i] ?? imageUrls[i];
   const [activeVersionIdx, setActiveVersionIdx] = useState(0);
   const [pins,            setPins]            = useState<Pin[]>([]);
   const [activePinDraft,  setActivePinDraft]  = useState<{ x: number; y: number } | null>(null);
@@ -59,7 +64,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls }) =>
     if (!activePinDraft || !draftComment.trim()) return;
     
     const payload = {
-      image_url: imageUrls[activeVersionIdx],
+      image_url: keyOf(activeVersionIdx),
       x_pct: activePinDraft.x.toString(),
       y_pct: activePinDraft.y.toString(),
       content: draftComment
@@ -92,6 +97,15 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls }) =>
     }
   };
 
+  if (imageUrls.length === 0) {
+    return (
+      <div className="glass-card" style={{ padding: '2rem', textAlign: 'center' }}>
+        <p style={{ fontWeight: 700, color: '#0F172A' }}>No image proofs to annotate</p>
+        <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: 4 }}>Upload an image on the “Proofs &amp; approval” tab, then pin comments on it here.</p>
+      </div>
+    );
+  }
+
   return (
     <div
       className="glass-card"
@@ -110,7 +124,6 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls }) =>
             value={activeVersionIdx}
             onChange={(e) => {
               setActiveVersionIdx(Number(e.target.value));
-              setPins([]); // Clear pins when switching versions for demo simplicity
               setSelectedPinId(null);
             }}
             style={{
@@ -119,7 +132,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls }) =>
             }}
           >
             {imageUrls.map((_, idx) => (
-              <option key={idx} value={idx}>Version {idx + 1}</option>
+              <option key={idx} value={idx}>{labels?.[idx] ?? `Version ${idx + 1}`}</option>
             ))}
           </select>
         </div>
@@ -152,7 +165,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls }) =>
             />
 
             {/* Saved pins */}
-            {pins.filter(pin => pin.imageUrl === imageUrls[activeVersionIdx]).map((pin, index) => {
+            {pins.filter(pin => pin.imageUrl === keyOf(activeVersionIdx)).map((pin, index) => {
               const active = selectedPinId === pin.id;
               return (
                 <div
@@ -228,7 +241,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls }) =>
               </div>
             )}
 
-            {pins.filter(pin => pin.imageUrl === imageUrls[activeVersionIdx]).map((pin, index) => {
+            {pins.filter(pin => pin.imageUrl === keyOf(activeVersionIdx)).map((pin, index) => {
               const active = selectedPinId === pin.id;
               return (
                 <div

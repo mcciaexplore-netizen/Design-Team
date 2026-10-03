@@ -1,23 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   DndContext, DragOverlay, PointerSensor, KeyboardSensor, closestCenter,
   useSensor, useSensors, useDroppable, useDraggable,
-  type DragStartEvent, type DragEndEvent,
+  type DragStartEvent, type DragEndEvent, type DragOverEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Search, X, AlertTriangle, Copy, CheckSquare, MessageCircle } from 'lucide-react';
+import { Search, X, AlertTriangle, Copy, CheckSquare, MessageCircle, Bookmark, Save, Trash2 } from 'lucide-react';
 import {
-  type Ticket, STATUSES, DESIGNERS, PRIORITIES, PRIORITY_STYLE, DEFAULT_WIP_LIMITS, SEED_TICKETS,
+  type Ticket, STATUSES, PRIORITIES, PRIORITY_STYLE, DEFAULT_WIP_LIMITS,
 } from '../types';
 import TicketSlideOver from './TicketSlideOver';
 import { ToastContainer, useToast } from './Toast';
-
-/* ── Assignee color map ──────────────────────── */
-const ASSIGNEE_COLORS: Record<string, string> = {
-  Alice:   '#8B5CF6',
-  Bob:     '#059669',
-  Charlie: '#f97316',
-};
+import { useTickets, colorFor } from '../contexts/TicketsContext';
+import { useAuth } from '../contexts/AuthContext';
+import { apiJson } from '../api';
 
 /* ── helpers ─────────────────────────────────── */
 function fmtElapsed(totalSecs: number, startedAt: string | null): string {
@@ -61,12 +57,12 @@ function SLABadge({ dueAt }: { dueAt?: string }) {
 /* ── Ticket Card ─────────────────────────────── */
 function TicketCard({
   ticket, isSelected = false, isDragging = false,
-  now,
+  now, showSelect = false, onToggleSelect,
   onSingleClick, onDoubleClickTitle,
   editingTitle, onEditTitle, onSaveTitle, onDuplicate,
 }: {
   ticket: Ticket; isSelected?: boolean; isDragging?: boolean;
-  now: number;
+  now: number; showSelect?: boolean; onToggleSelect?: () => void;
   onSingleClick:     (e: React.MouseEvent) => void;
   onDoubleClickTitle: () => void;
   editingTitle:   string | null;
@@ -101,8 +97,20 @@ function TicketCard({
     >
       {/* Ticket number + badges */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem' }}>
-        <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.1em', color: '#94a3b8', textTransform: 'uppercase', fontFamily: 'var(--font-body)' }}>{ticket.number}</span>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            className="card-select"
+            aria-label={`Select ${ticket.number}`}
+            checked={isSelected}
+            data-visible={showSelect || isSelected}
+            onChange={onToggleSelect}
+            onClick={e => e.stopPropagation()}
+            onPointerDown={e => e.stopPropagation()}
+          />
+        )}
+        <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.08em', color: '#64748b', textTransform: 'uppercase', fontFamily: 'var(--font-body)', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: 3 }}>{ticket.number}</span>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', minWidth: 0 }}>
           {ticket.info_score !== undefined && (
             <span className={ticket.info_score < 90 ? 'badge-red' : 'badge-green'} title="AI Info Score">
               AI {ticket.info_score}%
@@ -158,7 +166,7 @@ function TicketCard({
 
       {/* Assignee avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.625rem' }}>
-        <div style={{ width: 20, height: 20, borderRadius: '99px', background: ASSIGNEE_COLORS[ticket.assignee] ?? '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 800, color: 'white', flexShrink: 0 }}>
+        <div style={{ width: 20, height: 20, borderRadius: '99px', background: colorFor(ticket.assignee), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.55rem', fontWeight: 800, color: 'white', flexShrink: 0 }}>
           {(ticket.assignee || 'U').slice(0, 1)}
         </div>
         <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748B' }}>{ticket.assignee || 'Unassigned'}</span>
@@ -173,10 +181,10 @@ function TicketCard({
               {ticket.subtasks.filter(s => s.is_completed).length}/{ticket.subtasks.length}
             </span>
           )}
-          {ticket.comments?.length > 0 && (
+          {(ticket.comment_count ?? 0) > 0 && (
             <span className="ticket-meta-chip">
               <MessageCircle size={10} />
-              {ticket.comments.length}
+              {ticket.comment_count}
             </span>
           )}
         </div>
@@ -198,8 +206,8 @@ function TicketCard({
 }
 
 /* ── Draggable wrapper ─────────────────────── */
-function DraggableTicket({ ticket, isSelected, now, onSingleClick, onDoubleClickTitle, editingTicketId, editingTitle, onEditTitle, onSaveTitle, onDuplicate }: {
-  ticket: Ticket; isSelected: boolean; now: number;
+function DraggableTicket({ ticket, isSelected, showSelect, onToggleSelect, now, onSingleClick, onDoubleClickTitle, editingTicketId, editingTitle, onEditTitle, onSaveTitle, onDuplicate }: {
+  ticket: Ticket; isSelected: boolean; showSelect: boolean; onToggleSelect: () => void; now: number;
   onSingleClick: (e: React.MouseEvent) => void;
   onDoubleClickTitle: () => void;
   editingTicketId: string | null; editingTitle: string;
@@ -216,7 +224,7 @@ function DraggableTicket({ ticket, isSelected, now, onSingleClick, onDoubleClick
     >
       <TicketCard
         ticket={ticket} isSelected={isSelected} isDragging={false}
-        now={now}
+        now={now} showSelect={showSelect} onToggleSelect={onToggleSelect}
         onSingleClick={onSingleClick}
         onDoubleClickTitle={onDoubleClickTitle}
         editingTitle={editingTicketId === ticket.id ? editingTitle : null}
@@ -286,14 +294,73 @@ function DroppableColumn({ id, label, count, wipLimit, isOver, children }: {
   );
 }
 
+/* ── Filters & views ─────────────────────────── */
+interface BoardFilters {
+  search:     string;
+  statuses:   string[];
+  priorities: string[];
+  assignee:   string | null;       // 'me' | 'unassigned' | user id
+  requester:  'me' | null;
+  sla:        'any' | 'overdue' | 'breaching_soon' | 'on_track';
+  tags:       string[];
+}
+
+interface SavedView { id: number; name: string; filters: BoardFilters; is_shared: boolean; owner: string; is_mine: boolean }
+
+const EMPTY_FILTERS: BoardFilters = { search: '', statuses: [], priorities: [], assignee: null, requester: null, sla: 'any', tags: [] };
+const DONE_STATUSES = ['Delivered', 'Closed', 'Closed without approval'];
+const SOON_MS = 4 * 3_600_000;
+
+const QUICK_VIEWS: { id: string; name: string; filters: Partial<BoardFilters> }[] = [
+  { id: 'q:all',      name: 'All tickets',      filters: {} },
+  { id: 'q:mine',     name: 'My tickets',       filters: { assignee: 'me' } },
+  { id: 'q:soon',     name: 'Breaching soon',   filters: { sla: 'breaching_soon' } },
+  { id: 'q:overdue',  name: 'Overdue',          filters: { sla: 'overdue' } },
+  { id: 'q:urgent',   name: 'Urgent & high',    filters: { priorities: ['Urgent', 'High'] } },
+  { id: 'q:waiting',  name: 'Waiting on client', filters: { statuses: ['Waiting on Requester'] } },
+  { id: 'q:review',   name: 'In review',        filters: { statuses: ['In Review'] } },
+];
+
+function ticketMatches(t: Ticket, f: BoardFilters, myId: number | null, nowMs: number): boolean {
+  const q = f.search.trim().toLowerCase();
+  if (q && ![t.title, t.number, t.assignee, ...(t.tags ?? [])].some(x => x?.toLowerCase().includes(q))) return false;
+  if (f.statuses.length && !f.statuses.includes(t.status)) return false;
+  if (f.priorities.length && !f.priorities.includes(t.priority)) return false;
+  if (f.assignee === 'me' && (myId === null || t.assignee_id !== myId)) return false;
+  if (f.assignee === 'unassigned' && t.assignee_id) return false;
+  if (f.assignee && f.assignee !== 'me' && f.assignee !== 'unassigned' && String(t.assignee_id ?? '') !== f.assignee) return false;
+  if (f.requester === 'me' && (myId === null || t.requester_id !== myId)) return false;
+  if (f.tags.length && !f.tags.some(x => (t.tags ?? []).includes(x))) return false;
+  if (f.sla !== 'any') {
+    const open = !DONE_STATUSES.includes(t.status);
+    const due = t.due_at ? new Date(t.due_at).getTime() : NaN;
+    if (!open || Number.isNaN(due)) return false;
+    const left = due - nowMs;
+    if (f.sla === 'overdue' && left > 0) return false;
+    if (f.sla === 'breaching_soon' && !(left > 0 && left <= SOON_MS)) return false;
+    if (f.sla === 'on_track' && left <= SOON_MS) return false;
+  }
+  return true;
+}
+
+const sameFilters = (a: BoardFilters, b: BoardFilters) => JSON.stringify(a) === JSON.stringify(b);
+
 /* ── Main KanbanBoard ─────────────────────── */
+type GroupBy = 'status' | 'assignee';
+
 const KanbanBoard = () => {
-  const [tickets,       setTickets]       = useState<Ticket[]>(SEED_TICKETS);
-  const [groupBy]                 = useState<'status' | 'assignee' | 'priority'>('assignee');
-  const [searchQuery,   setSearchQuery]   = useState('');
-  const [filterPrio,    setFilterPrio]    = useState('');
-  const [filterAssignee,setFilterAssignee]= useState('');
-  const [filterSLA,     setFilterSLA]     = useState<'all' | 'overdue' | 'ok'>('all');
+  const { user } = useAuth();
+  const { tickets, staff, loading, error, refresh, updateTicket, bulkUpdate } = useTickets();
+  const isLead = user?.role === 'Design Lead';
+  const myId = user ? Number(user.id) : null;
+
+  const [groupBy, setGroupBy] = useState<GroupBy>(() => (localStorage.getItem('board_group') === 'assignee' ? 'assignee' : 'status'));
+  const [filters, setFilters] = useState<BoardFilters>(EMPTY_FILTERS);
+  const [activeView, setActiveView] = useState<string>('q:all');
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [savingView, setSavingView] = useState(false);
+  const [viewName, setViewName] = useState('');
+  const [viewShared, setViewShared] = useState(false);
   const [selectedIds,   setSelectedIds]   = useState<Set<string>>(new Set());
   const [slideOverId,   setSlideOverId]   = useState<string | null>(null);
   const [editingId,     setEditingId]     = useState<string | null>(null);
@@ -302,13 +369,30 @@ const KanbanBoard = () => {
   const [activeTicket,  setActiveTicket]  = useState<Ticket | null>(null);
   const [overColId,     setOverColId]     = useState<string | null>(null);
   const [now,           setNow]           = useState(Date.now());
+  const [bulkTag,       setBulkTag]       = useState('');
 
   const { toasts, addToast, removeToast } = useToast();
+  const fail = useCallback((e: unknown, fallback: string) => addToast(e instanceof Error ? e.message : fallback, 'error'), [addToast]);
 
   /* 1-second clock for real-time timers */
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => { try { localStorage.setItem('board_group', groupBy); } catch { /* private mode */ } }, [groupBy]);
+
+  /* Saved views */
+  const loadViews = useCallback(async () => {
+    try { setSavedViews(await apiJson<SavedView[]>('/api/views')); } catch { /* views are optional */ }
+  }, []);
+  useEffect(() => { void loadViews(); }, [loadViews]);
+
+  /* Escape clears the selection */
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedIds(prev => (prev.size ? new Set() : prev)); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
   }, []);
 
   const sensors = useSensors(
@@ -317,72 +401,92 @@ const KanbanBoard = () => {
   );
 
   /* ── Computed ── */
-  const getGroupKey = (t: Ticket) =>
-    groupBy === 'assignee' ? (t.assignee || 'Unassigned') :
-    groupBy === 'priority' ? t.priority : t.status;
+  const visible = useMemo(() => tickets.filter(t => ticketMatches(t, filters, myId, now)), [tickets, filters, myId, Math.floor(now / 30_000)]); // eslint-disable-line react-hooks/exhaustive-deps
+  const assigneeColumns = useMemo(() => {
+    const names = ['Unassigned', ...staff.map(s => s.name)];
+    for (const t of tickets) if (t.assignee && !names.includes(t.assignee)) names.push(t.assignee);
+    return names;
+  }, [staff, tickets]);
 
-  const getGroupings = () =>
-    groupBy === 'assignee' ? DESIGNERS :
-    groupBy === 'priority' ? PRIORITIES : STATUSES;
+  const getGroupKey = (t: Ticket) => (groupBy === 'assignee' ? (t.assignee || 'Unassigned') : t.status);
+  const groupings = groupBy === 'assignee' ? assigneeColumns : STATUSES;
 
-  /* Filtered tickets (opacity-fade rather than hide) */
-  const matchesFilter = useCallback((t: Ticket) => {
-    const q = searchQuery.toLowerCase();
-    if (q && !t.title.toLowerCase().includes(q) && !t.number.toLowerCase().includes(q)) return false;
-    if (filterPrio && t.priority !== filterPrio) return false;
-    if (filterAssignee && (t.assignee || 'Unassigned') !== filterAssignee) return false;
-    if (filterSLA === 'overdue' && new Date(t.due_at) > new Date()) return false;
-    if (filterSLA === 'ok'      && new Date(t.due_at) <= new Date()) return false;
-    return true;
-  }, [searchQuery, filterPrio, filterAssignee, filterSLA]);
-
-  const activeFilters = !!(searchQuery || filterPrio || filterAssignee || filterSLA !== 'all');
-
+  const filtersActive = !sameFilters(filters, EMPTY_FILTERS);
+  const currentSaved = savedViews.find(v => `s:${v.id}` === activeView);
   const slideOverTicket = tickets.find(t => t.id === slideOverId) ?? null;
 
-  const updateTicket = useCallback((id: string, patch: Partial<Ticket>) => {
-    setTickets(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t));
-  }, []);
+  /* ── View handling ── */
+  const applyFilters = (patch: Partial<BoardFilters>) => {
+    setFilters(prev => ({ ...prev, ...patch }));
+    setActiveView('custom');
+  };
+
+  const chooseView = (id: string) => {
+    setSavingView(false);
+    if (id === 'custom') return;
+    if (id.startsWith('q:')) {
+      const v = QUICK_VIEWS.find(x => x.id === id);
+      setFilters({ ...EMPTY_FILTERS, ...(v?.filters ?? {}) });
+    } else {
+      const v = savedViews.find(x => `s:${x.id}` === id);
+      if (v) setFilters({ ...EMPTY_FILTERS, ...v.filters });
+    }
+    setActiveView(id);
+  };
+
+  const saveView = async () => {
+    const name = viewName.trim();
+    if (!name) return;
+    try {
+      const v = await apiJson<SavedView>('/api/views', { method: 'POST', json: { name, filters, is_shared: viewShared } });
+      await loadViews();
+      setActiveView(`s:${v.id}`);
+      setSavingView(false); setViewName(''); setViewShared(false);
+      addToast(`Saved view "${v.name}"`, 'success');
+    } catch (e) { fail(e, 'Could not save the view.'); }
+  };
+
+  const deleteView = async (v: SavedView) => {
+    try {
+      await apiJson(`/api/views/${v.id}`, { method: 'DELETE' });
+      await loadViews();
+      chooseView('q:all');
+      addToast(`Deleted view "${v.name}"`, 'info');
+    } catch (e) { fail(e, 'Could not delete the view.'); }
+  };
 
   /* ── Inline edit ── */
   const startEdit = (t: Ticket) => { setEditingId(t.id); setEditingTitle(t.title); };
   const saveEdit  = () => {
-    if (editingId && editingTitle.trim()) updateTicket(editingId, { title: editingTitle.trim() });
+    const id = editingId, title = editingTitle.trim();
     setEditingId(null);
+    if (id && title && title !== tickets.find(t => t.id === id)?.title) {
+      updateTicket(id, { title }).catch(e => fail(e, 'Could not rename the ticket.'));
+    }
   };
 
-  const handleDuplicateTicket = (ticket: Ticket) => {
-    const nextNumber = Math.max(...tickets.map(t => parseInt(t.number.split('-')[1] || '0'))) + 1;
-    const newTicket: Ticket = {
-      ...ticket,
-      id: Date.now().toString(),
-      number: `DF-${String(nextNumber).padStart(4, '0')}`,
-      title: `${ticket.title} (Copy)`,
-      status: 'New',
-      timer_started_at: null,
-      time_spent_seconds: 0,
-    };
-    setTickets(prev => [...prev, newTicket]);
-    addToast(`Duplicated as ${newTicket.number}`, 'success');
+  const handleDuplicateTicket = async (ticket: Ticket) => {
+    try {
+      const copy = await apiJson<{ ticket_number: string }>(`/api/tickets/${ticket.id}/duplicate`, { method: 'POST' });
+      await refresh();
+      addToast(`Duplicated as ${copy.ticket_number}`, 'success');
+    } catch (e) { fail(e, 'Could not duplicate the ticket.'); }
   };
 
   /* ── Click logic ── */
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
   const handleCardClick = (e: React.MouseEvent, ticket: Ticket) => {
     if (editingId === ticket.id) return;
-    if (e.shiftKey || e.metaKey || e.ctrlKey) {
-      setSelectedIds(prev => {
-        const n = new Set(prev);
-        n.has(ticket.id) ? n.delete(ticket.id) : n.add(ticket.id);
-        return n;
-      });
-    } else {
-      setSlideOverId(ticket.id);
-    }
+    if (e.shiftKey || e.metaKey || e.ctrlKey) toggleSelect(ticket.id);
+    else if (selectedIds.size > 0) toggleSelect(ticket.id);
+    else setSlideOverId(ticket.id);
   };
 
   /* ── DnD ── */
   const handleDragStart  = (e: DragStartEvent)  => setActiveTicket(tickets.find(t => t.id === e.active.id) ?? null);
-  const handleDragOver   = (e: any)             => setOverColId(e.over?.id ?? null);
+  const handleDragOver   = (e: DragOverEvent)   => setOverColId(e.over ? String(e.over.id) : null);
   const handleDragEnd    = (e: DragEndEvent)    => {
     const { active, over } = e;
     setActiveTicket(null); setOverColId(null);
@@ -391,203 +495,242 @@ const KanbanBoard = () => {
     const ticketId  = String(active.id);
     const targetCol = String(over.id);
     const ticket    = tickets.find(t => t.id === ticketId);
-    if (!ticket) return;
+    if (!ticket || getGroupKey(ticket) === targetCol) return;
 
-    let patch: Partial<Ticket> = {};
-    if (groupBy === 'status')   patch = { status:   targetCol };
-    if (groupBy === 'assignee') patch = { assignee: targetCol === 'Unassigned' ? '' : targetCol };
-    if (groupBy === 'priority') patch = { priority: targetCol };
+    const patch: Partial<Ticket> = groupBy === 'status' ? { status: targetCol } : { assignee: targetCol === 'Unassigned' ? '' : targetCol };
+    updateTicket(ticketId, patch)
+      .then(() => addToast(`${ticket.number} moved to "${targetCol}"`, 'success'))
+      .catch(e => fail(e, 'Could not move the ticket.'));
+  };
 
-    if (!Object.keys(patch).length) return;
-    updateTicket(ticketId, patch);
-
-    const to = patch.status ?? patch.assignee ?? patch.priority ?? targetCol;
-    addToast(`DF-${ticket.number.split('-')[1]} moved to "${to || 'Unassigned'}"`, 'success');
+  /* ── Bulk actions (server-side, with per-ticket results) ── */
+  const runBulk = async (change: Parameters<typeof bulkUpdate>[1], label: string) => {
+    const ids = [...selectedIds];
+    try {
+      const res = await bulkUpdate(ids, change);
+      if (res.updated.length) addToast(`${label}: ${res.updated.length} ticket${res.updated.length > 1 ? 's' : ''} updated`, 'success');
+      if (res.failed.length) addToast(`${res.failed.length} could not be changed (${[...new Set(res.failed.map(f => f.reason))].join(', ')})`, 'warning');
+      setSelectedIds(new Set());
+    } catch (e) { fail(e, 'Bulk update failed.'); }
   };
 
   /* ── Render board column list ── */
-  const renderBoardColumns = () => {
-    const GROUPINGS = getGroupings();
-    return GROUPINGS.map(group => {
-      const colTickets = tickets.filter(t => getGroupKey(t) === group);
+  const renderBoardColumns = () =>
+    groupings.map(group => {
+      const colTickets = visible.filter(t => getGroupKey(t) === group);
       return (
         <DroppableColumn
           key={group} id={group} label={group}
           count={colTickets.length}
-          wipLimit={wipLimits[group]}
+          wipLimit={groupBy === 'status' ? wipLimits[group] : undefined}
           isOver={overColId === group}
         >
           {colTickets.map(ticket => (
-            <div
+            <DraggableTicket
               key={ticket.id}
-              style={{ opacity: matchesFilter(ticket) ? 1 : 0.2, transition: 'opacity 0.25s' }}
-            >
-              <DraggableTicket
-                ticket={ticket}
-                isSelected={selectedIds.has(ticket.id)}
-                now={now}
-                onSingleClick={e => handleCardClick(e, ticket)}
-                onDoubleClickTitle={() => startEdit(ticket)}
-                editingTicketId={editingId}
-                editingTitle={editingTitle}
-                onEditTitle={setEditingTitle}
-                onSaveTitle={saveEdit}
-                onDuplicate={() => handleDuplicateTicket(ticket)}
-              />
-            </div>
+              ticket={ticket}
+              isSelected={selectedIds.has(ticket.id)}
+              showSelect={selectedIds.size > 0}
+              onToggleSelect={() => toggleSelect(ticket.id)}
+              now={now}
+              onSingleClick={e => handleCardClick(e, ticket)}
+              onDoubleClickTitle={() => startEdit(ticket)}
+              editingTicketId={editingId}
+              editingTitle={editingTitle}
+              onEditTitle={setEditingTitle}
+              onSaveTitle={saveEdit}
+              onDuplicate={() => handleDuplicateTicket(ticket)}
+            />
           ))}
         </DroppableColumn>
       );
     });
-  };
+
+  const ctl = { width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.78rem' } as const;
+  const darkSelect = { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', borderRadius: 8, fontSize: '0.75rem', padding: '0.3rem 0.6rem', cursor: 'pointer', width: 'auto' } as const;
+  const mine = savedViews.filter(v => v.is_mine);
+  const shared = savedViews.filter(v => !v.is_mine);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      {/* ── Filter / Controls Bar ── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.625rem', alignItems: 'center', marginBottom: '1rem' }}>
-        {/* Search */}
+      {error && (
+        <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: '#b91c1c', borderRadius: 10, padding: '0.5rem 0.875rem', marginBottom: '0.75rem', fontSize: '0.8rem' }}>
+          {error}
+          <button type="button" className="btn-ghost" style={{ padding: '0.25rem 0.7rem', fontSize: '0.75rem', marginLeft: 'auto' }} onClick={() => void refresh()}>Retry</button>
+        </div>
+      )}
+
+      {/* ── Views + filters ── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+        <label className="section-label" htmlFor="board-view" style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Bookmark size={12} /> View</label>
+        <select id="board-view" className="input-field" value={activeView} onChange={e => chooseView(e.target.value)} style={{ ...ctl, minWidth: 170 }}>
+          {activeView === 'custom' && <option value="custom">Custom filters</option>}
+          <optgroup label="Quick views">
+            {QUICK_VIEWS.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </optgroup>
+          {mine.length > 0 && <optgroup label="My views">{mine.map(v => <option key={v.id} value={`s:${v.id}`}>{v.name}</option>)}</optgroup>}
+          {shared.length > 0 && <optgroup label="Shared by the team">{shared.map(v => <option key={v.id} value={`s:${v.id}`}>{v.name} ({v.owner})</option>)}</optgroup>}
+        </select>
+
+        {filtersActive && !savingView && activeView === 'custom' && (
+          <button type="button" className="btn-ghost" style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }} onClick={() => setSavingView(true)}>
+            <Save size={12} /> Save view
+          </button>
+        )}
+        {currentSaved && (currentSaved.is_mine || isLead) && (
+          <button type="button" className="chip" onClick={() => void deleteView(currentSaved)} style={{ display: 'flex', alignItems: 'center', gap: 4 }} title="Delete this saved view">
+            <Trash2 size={11} /> Delete view
+          </button>
+        )}
+
+        <div role="group" aria-label="Group board by" style={{ marginLeft: 'auto', display: 'inline-flex', border: '1px solid rgba(226,232,240,0.9)', borderRadius: 9, overflow: 'hidden', background: 'white' }}>
+          {(['status', 'assignee'] as GroupBy[]).map(g => (
+            <button key={g} type="button" onClick={() => setGroupBy(g)} aria-pressed={groupBy === g}
+              style={{ padding: '0.35rem 0.8rem', fontSize: '0.74rem', fontWeight: 700, border: 'none', cursor: 'pointer',
+                       background: groupBy === g ? 'var(--brand-soft)' : 'transparent', color: groupBy === g ? 'var(--brand)' : '#64748b' }}>
+              {g === 'status' ? 'By stage' : 'By person'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {savingView && (
+        <form onSubmit={e => { e.preventDefault(); void saveView(); }} className="animate-fade-in"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem', padding: '0.5rem 0.75rem', background: '#f8fafc', border: '1px solid rgba(226,232,240,0.9)', borderRadius: 10 }}>
+          <label htmlFor="view-name" className="section-label">Name this view</label>
+          <input id="view-name" className="input-field" autoFocus maxLength={60} value={viewName} onChange={e => setViewName(e.target.value)} placeholder="e.g. Urgent for TATA" style={{ ...ctl, width: 220 }} />
+          {isLead && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.76rem', color: '#475569' }}>
+              <input type="checkbox" checked={viewShared} onChange={e => setViewShared(e.target.checked)} /> Share with the team
+            </label>
+          )}
+          <button type="submit" className="btn-primary" style={{ padding: '0.35rem 0.9rem', fontSize: '0.76rem' }} disabled={!viewName.trim()}>Save</button>
+          <button type="button" className="btn-ghost" style={{ padding: '0.35rem 0.9rem', fontSize: '0.76rem' }} onClick={() => setSavingView(false)}>Cancel</button>
+        </form>
+      )}
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
         <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 160, maxWidth: 300 }}>
           <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
           <input
             className="input-field"
+            aria-label="Search tickets"
             placeholder="Search tickets…"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '2.1rem', paddingRight: searchQuery ? '2rem' : undefined, width: '100%' }}
+            value={filters.search}
+            onChange={e => applyFilters({ search: e.target.value })}
+            style={{ paddingLeft: '2.1rem', paddingRight: filters.search ? '2rem' : undefined, width: '100%' }}
           />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 2 }}><X size={13} /></button>
+          {filters.search && (
+            <button type="button" aria-label="Clear search" onClick={() => applyFilters({ search: '' })} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 2 }}><X size={13} /></button>
           )}
         </div>
 
-        {/* Priority filter */}
-        <select className="input-field" value={filterPrio} onChange={e => setFilterPrio(e.target.value)} style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.78rem' }}>
-          <option value="">All Priorities</option>
+        <select className="input-field" aria-label="Priority" value={filters.priorities.join(',')} onChange={e => applyFilters({ priorities: e.target.value ? e.target.value.split(',') : [] })} style={ctl}>
+          <option value="">All priorities</option>
           {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+          <option value="Urgent,High">Urgent + High</option>
         </select>
 
-        {/* Assignee filter */}
-        <select className="input-field" value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.78rem' }}>
-          <option value="">All Designers</option>
-          {DESIGNERS.map(d => <option key={d} value={d}>{d}</option>)}
+        <select className="input-field" aria-label="Assignee" value={filters.assignee ?? ''} onChange={e => applyFilters({ assignee: e.target.value || null })} style={ctl}>
+          <option value="">Everyone</option>
+          <option value="me">Me</option>
+          <option value="unassigned">Unassigned</option>
+          {staff.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
         </select>
 
-        {/* SLA filter */}
-        <select className="input-field" value={filterSLA} onChange={e => setFilterSLA(e.target.value as any)} style={{ width: 'auto', padding: '0.4rem 0.75rem', fontSize: '0.78rem' }}>
-          <option value="all">All SLA</option>
+        <select className="input-field" aria-label="SLA" value={filters.sla} onChange={e => applyFilters({ sla: e.target.value as BoardFilters['sla'] })} style={ctl}>
+          <option value="any">Any SLA</option>
           <option value="overdue">Overdue</option>
-          <option value="ok">On Track</option>
+          <option value="breaching_soon">Breaching in 4h</option>
+          <option value="on_track">On track</option>
         </select>
 
-        {activeFilters && (
-          <button
-            onClick={() => { setSearchQuery(''); setFilterPrio(''); setFilterAssignee(''); setFilterSLA('all'); }}
-            className="chip"
-            style={{ color: '#EF4444', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.05)', display: 'flex', alignItems: 'center', gap: 4 }}
-          >
+        {filtersActive && (
+          <button type="button" onClick={() => chooseView('q:all')} className="chip" style={{ color: '#EF4444', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.05)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <X size={11} /> Clear filters
           </button>
         )}
-
+        <span aria-live="polite" style={{ marginLeft: 'auto', fontSize: '0.74rem', color: '#64748b' }}>
+          {filtersActive ? `${visible.length} of ${tickets.length} tickets` : `${tickets.length} ticket${tickets.length === 1 ? '' : 's'}`}
+        </span>
       </div>
 
       {/* Bulk action floating bar */}
       {selectedIds.size > 0 && (
-        <div className="animate-fade-in" style={{
+        <div className="animate-fade-in" role="toolbar" aria-label="Bulk actions" style={{
           position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 50, display: 'flex', alignItems: 'center', gap: '0.5rem',
+          zIndex: 50, display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center',
+          maxWidth: 'calc(100vw - 2rem)',
           background: '#0f172a', borderRadius: 14, padding: '0.6rem 1rem',
           boxShadow: '0 8px 32px rgba(0,0,0,0.25), 0 2px 8px rgba(0,0,0,0.15)',
           border: '1px solid rgba(255,255,255,0.08)',
         }}>
           <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', paddingRight: '0.5rem', borderRight: '1px solid rgba(255,255,255,0.12)' }}>
-            {selectedIds.size} ticket{selectedIds.size > 1 ? 's' : ''} selected
+            {selectedIds.size} selected
           </span>
 
-          {/* Move to status */}
-          <select
-            className="input-field"
-            onChange={e => {
-              if (!e.target.value) return;
-              selectedIds.forEach(id => updateTicket(id, { status: e.target.value }));
-              addToast(`Moved ${selectedIds.size} ticket${selectedIds.size > 1 ? 's' : ''} to "${e.target.value}"`, 'success');
-              setSelectedIds(new Set());
-              e.target.value = '';
-            }}
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', borderRadius: 8, fontSize: '0.75rem', padding: '0.3rem 0.6rem', cursor: 'pointer', width: 'auto' }}
-            defaultValue=""
-          >
+          <select aria-label="Move selected to stage" className="input-field" defaultValue="" style={darkSelect}
+            onChange={e => { const v = e.target.value; e.target.value = ''; if (v) void runBulk({ status: v }, `Moved to ${v}`); }}>
             <option value="" disabled>Move to…</option>
             {STATUSES.map(s => <option key={s} value={s} style={{ background: '#0f172a' }}>{s}</option>)}
           </select>
 
-          {/* Reassign */}
-          <select
-            className="input-field"
-            onChange={e => {
-              if (!e.target.value) return;
-              const assignee = e.target.value === 'Unassigned' ? '' : e.target.value;
-              selectedIds.forEach(id => updateTicket(id, { assignee }));
-              addToast(`Reassigned ${selectedIds.size} ticket${selectedIds.size > 1 ? 's' : ''} to ${e.target.value}`, 'success');
-              setSelectedIds(new Set());
-              e.target.value = '';
-            }}
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', borderRadius: 8, fontSize: '0.75rem', padding: '0.3rem 0.6rem', cursor: 'pointer', width: 'auto' }}
-            defaultValue=""
-          >
-            <option value="" disabled>Reassign to…</option>
-            {DESIGNERS.map(d => <option key={d} value={d} style={{ background: '#0f172a' }}>{d}</option>)}
-          </select>
+          {isLead && (
+            <>
+              <select aria-label="Assign selected to" className="input-field" defaultValue="" style={darkSelect}
+                onChange={e => { const v = e.target.value; e.target.value = ''; if (!v) return; void runBulk({ assignee_id: v === 'none' ? null : Number(v) }, 'Reassigned'); }}>
+                <option value="" disabled>Assign to…</option>
+                <option value="none" style={{ background: '#0f172a' }}>Unassigned</option>
+                {staff.map(s => <option key={s.id} value={s.id} style={{ background: '#0f172a' }}>{s.name}</option>)}
+              </select>
+              <select aria-label="Set priority of selected" className="input-field" defaultValue="" style={darkSelect}
+                onChange={e => { const v = e.target.value; e.target.value = ''; if (v) void runBulk({ priority: v }, `Priority ${v}`); }}>
+                <option value="" disabled>Priority…</option>
+                {PRIORITIES.map(p => <option key={p} value={p} style={{ background: '#0f172a' }}>{p}</option>)}
+              </select>
+            </>
+          )}
 
-          {/* Delete */}
-          <button
-            onClick={() => {
-              if (!confirm(`Delete ${selectedIds.size} ticket${selectedIds.size > 1 ? 's' : ''}?`)) return;
-              setTickets(prev => prev.filter(t => !selectedIds.has(t.id)));
-              addToast(`Deleted ${selectedIds.size} ticket${selectedIds.size > 1 ? 's' : ''}`, 'error');
-              setSelectedIds(new Set());
-            }}
-            style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: 8, padding: '0.3rem 0.7rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
-          >
-            Delete
-          </button>
+          <form style={{ display: 'flex', gap: 4 }} onSubmit={e => { e.preventDefault(); const tag = bulkTag.trim(); if (tag) { void runBulk({ add_tags: [tag] }, `Tagged "${tag}"`); setBulkTag(''); } }}>
+            <input aria-label="Add tag to selected" className="input-field" value={bulkTag} maxLength={30} onChange={e => setBulkTag(e.target.value)} placeholder="Add tag…" style={{ ...darkSelect, width: 110, cursor: 'text' }} />
+            <button type="submit" disabled={!bulkTag.trim()} style={{ ...darkSelect, fontWeight: 700 }}>Add</button>
+          </form>
 
-          {/* Clear */}
-          <button
-            onClick={() => setSelectedIds(new Set())}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
-            title="Clear selection"
-          >
+          <button type="button" onClick={() => setSelectedIds(new Set())}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
+            title="Clear selection (Esc)" aria-label="Clear selection">
             <X size={15} />
           </button>
         </div>
       )}
 
       {/* ── Board ── */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-        <div style={{ display: 'flex', flex: 1, gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem', alignItems: 'flex-start' }}>
-          {renderBoardColumns()}
+      {loading && tickets.length === 0 ? (
+        <div role="status" style={{ display: 'flex', gap: '0.75rem' }}>
+          {[0, 1, 2, 3].map(i => <div key={i} className="glass-card" style={{ width: 276, height: 220, opacity: 0.5 }} />)}
         </div>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+          <div style={{ display: 'flex', flex: 1, gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem', alignItems: 'flex-start' }}>
+            {renderBoardColumns()}
+          </div>
 
-        <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.4,0,0.2,1)' }}>
-          {activeTicket && (
-            <TicketCard
-              ticket={activeTicket} isDragging={true} now={now}
-              onSingleClick={() => {}} onDoubleClickTitle={() => {}}
-              editingTitle={null} onEditTitle={() => {}} onSaveTitle={() => {}}
-              onDuplicate={() => {}}
-            />
-          )}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.4,0,0.2,1)' }}>
+            {activeTicket && (
+              <TicketCard
+                ticket={activeTicket} isDragging={true} now={now}
+                onSingleClick={() => {}} onDoubleClickTitle={() => {}}
+                editingTitle={null} onEditTitle={() => {}} onSaveTitle={() => {}}
+                onDuplicate={() => {}}
+              />
+            )}
+          </DragOverlay>
+        </DndContext>
+      )}
 
       {/* Slide-over */}
-      <TicketSlideOver
-        ticket={slideOverTicket}
-        onClose={() => setSlideOverId(null)}
-        onUpdate={updateTicket}
-      />
+      <TicketSlideOver ticket={slideOverTicket} onClose={() => setSlideOverId(null)} />
 
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -596,4 +739,3 @@ const KanbanBoard = () => {
 };
 
 export default KanbanBoard;
-

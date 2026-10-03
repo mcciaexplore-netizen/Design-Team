@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiJson } from '../api';
 import { AlertTriangle, TrendingUp, Users, CheckCircle2 } from 'lucide-react';
 
 interface ForecastData {
@@ -12,27 +13,16 @@ interface ForecastData {
 
 const ForecastingWidget = () => {
   const [forecasts, setForecasts] = useState<ForecastData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setTimeout(() => {
-      setForecasts([
-        {
-          designer_id: 1, designer_name: 'Alice',
-          daily_capacity_hours: 8,
-          is_overloaded_next_7_days: true,
-          overload_date: '2026-10-02',
-          projected_capacity_percentage: 115,
-        },
-        {
-          designer_id: 2, designer_name: 'Bob',
-          daily_capacity_hours: 8,
-          is_overloaded_next_7_days: false,
-          overload_date: null,
-          projected_capacity_percentage: 75,
-        },
-      ]);
-    }, 500);
-  }, []);
+  const load = () => {
+    apiJson<{ forecast: ForecastData[] }>('/api/forecasting/capacity')
+      .then(r => { setForecasts(r.forecast); setError(null); })
+      .catch(e => setError(e instanceof Error ? e.message : 'Could not load the forecast.'))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []);
 
   return (
     <div className="glass-card" style={{ padding: '1.5rem' }}>
@@ -45,10 +35,13 @@ const ForecastingWidget = () => {
           <h3 style={{ fontSize: '0.95rem', fontWeight: 800, fontFamily: 'var(--font-heading)', color: '#0F172A', letterSpacing: '-0.02em' }}>
             7-Day Capacity Forecast
           </h3>
-          <p style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 2 }}>Predictive algorithm analysis</p>
+          <p style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 2 }}>Planned effort vs. capacity, next 7 days</p>
         </div>
       </div>
 
+      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Calculating…</p>}
+      {error && <p role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c' }}>{error} <button type="button" className="chip" onClick={load}>Retry</button></p>}
+      {!loading && !error && forecasts.length === 0 && <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>No designers to forecast yet.</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
         {forecasts.map(f => {
           const overloaded = f.is_overloaded_next_7_days;
@@ -103,7 +96,7 @@ const ForecastingWidget = () => {
               {overloaded && (
                 <p style={{ fontSize: '0.72rem', color: '#EF4444', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, fontFamily: 'var(--font-body)' }}>
                   <AlertTriangle size={12} />
-                  Bottleneck predicted on {f.overload_date}. Reassign tasks.
+                  Bottleneck predicted on {f.overload_date ? new Date(f.overload_date + 'T00:00:00').toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) : 'an upcoming day'} — consider reassigning work.
                 </p>
               )}
 
@@ -117,11 +110,6 @@ const ForecastingWidget = () => {
           );
         })}
 
-        {forecasts.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.82rem' }}>
-            Loading forecast data…
-          </div>
-        )}
       </div>
     </div>
   );

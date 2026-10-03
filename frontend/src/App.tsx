@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import KanbanBoard from './components/KanbanBoard';
 import CalendarPage from './pages/CalendarPage';
 import NotificationBell from './components/NotificationBell';
@@ -10,145 +10,129 @@ import TicketCreateModal from './components/TicketCreateModal';
 import CommandPalette from './components/CommandPalette';
 import LoginPage from './pages/LoginPage';
 import SettingsPage from './pages/SettingsPage';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ReportsPage from './pages/ReportsPage';
+import TemplatesPage from './pages/TemplatesPage';
+import WorkloadPage from './pages/WorkloadPage';
+import ReviewPage from './pages/ReviewPage';
+import { AuthProvider, useAuth, type UserRole } from './contexts/AuthContext';
+import { TicketsProvider, useTickets } from './contexts/TicketsContext';
 import { ToastContainer, useToast } from './components/Toast';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useTicketSocket } from './hooks/useTicketSocket';
 import {
-  LayoutDashboard, Calendar as CalendarIcon,
-  BarChart3, Image as ImageIcon, Plus, Users, Zap, LogOut, Search, ChevronRight, Settings
+  LayoutDashboard, Calendar as CalendarIcon, BarChart3, Image as ImageIcon, Plus, Users, Zap, LogOut, Search,
+  ChevronRight, Settings, FileText, Repeat, Gauge, type LucideIcon,
 } from 'lucide-react';
 
-const NAV_ITEMS = [
-  { to: '/',              label: 'Kanban Board',        icon: LayoutDashboard },
-  { to: '/calendar',      label: 'SLA Calendar',        icon: CalendarIcon    },
-  { to: '/dashboard',     label: 'Performance',         icon: BarChart3       },
-  { to: '/library',       label: 'Asset Library',       icon: ImageIcon       },
+interface NavItem { to: string; label: string; icon: LucideIcon; roles: UserRole[] }
+interface NavGroup { title: string; items: NavItem[] }
+
+const STAFF: UserRole[] = ['Design Lead', 'Designer'];
+const NAV_GROUPS: NavGroup[] = [
+  { title: 'Workspace', items: [
+    { to: '/',         label: 'Kanban Board', icon: LayoutDashboard, roles: STAFF },
+    { to: '/calendar', label: 'SLA Calendar', icon: CalendarIcon,    roles: STAFF },
+    { to: '/workload', label: 'Workload',     icon: Gauge,           roles: STAFF },
+    { to: '/library',  label: 'Asset Library', icon: ImageIcon,      roles: STAFF },
+  ] },
+  { title: 'Insights', items: [
+    { to: '/dashboard', label: 'Performance', icon: BarChart3, roles: ['Design Lead'] },
+    { to: '/reports',   label: 'Reports',     icon: FileText,  roles: ['Design Lead'] },
+  ] },
+  { title: 'Portals', items: [
+    { to: '/client-portal', label: 'Client Portal', icon: Users, roles: ['Design Lead', 'Designer', 'Client'] },
+  ] },
+  { title: 'Admin', items: [
+    { to: '/templates', label: 'Templates & schedules', icon: Repeat, roles: ['Design Lead'] },
+  ] },
+  { title: 'Account', items: [
+    { to: '/settings', label: 'Settings', icon: Settings, roles: ['Design Lead', 'Designer', 'Client'] },
+  ] },
 ];
 
-const PAGE_TITLES: Record<string, string> = {
-  '/':              'Board Overview',
-  '/calendar':      'SLA Calendar',
-  '/dashboard':     'Performance Dashboard',
-  '/library':       'Asset Library',
-  '/client-portal': 'Client Portal',
-  '/tickets':       'Ticket Detail',
-  '/settings':      'Integrations & Alerts',
-};
+const PAGE_TITLES: [string, string][] = [
+  ['/client-portal', 'My requests'],
+  ['/calendar',      'SLA Calendar'],
+  ['/dashboard',     'Performance'],
+  ['/reports',       'Reports'],
+  ['/workload',      'Team workload'],
+  ['/templates',     'Templates & schedules'],
+  ['/library',       'Asset Library'],
+  ['/tickets',       'Ticket'],
+  ['/settings',      'Settings'],
+  ['/',              'Board'],
+];
 
 const PAGE_SUBTITLES: Record<string, string> = {
   '/':              'Drag tickets between stages to keep work moving',
   '/calendar':      'Deadlines and SLA windows at a glance',
-  '/dashboard':     'Throughput, turnaround and team load',
+  '/dashboard':     'The last 30 days of delivery and this week’s load',
+  '/reports':       'SLA trends, revisions per client, exports',
+  '/workload':      'Who has capacity, and who is about to fall behind',
+  '/templates':     'Reusable ticket bundles and recurring schedules',
   '/library':       'Approved designs and reusable assets',
-  '/client-portal': 'Submit and track design requests',
-  '/settings':      'Slack, email and escalation thresholds',
+  '/client-portal': 'Track requests and review designs',
+  '/settings':      'Notifications, digests and integrations',
 };
+
+function titleFor(pathname: string): string {
+  const hit = PAGE_TITLES.find(([prefix]) => (prefix === '/' ? pathname === '/' : pathname.startsWith(prefix)));
+  return hit ? hit[1] : 'DesignDesk';
+}
 
 function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
   const location  = useLocation();
   const { logout, user } = useAuth();
+  const role = user?.role;
 
   return (
     <aside className="app-sidebar w-64 flex-shrink-0 flex flex-col z-10">
-      {/* Logo */}
       <div className="app-brand flex items-center gap-3 mb-6 px-2">
-        <img
-          src="/mccia_logo.jpg"
-          alt="MCCIA Applied AI Studio"
-          className="h-14 object-contain"
-          style={{ maxWidth: 180 }}
-        />
+        <img src="/mccia_logo.jpg" alt="MCCIA Applied AI Studio" className="h-14 object-contain" style={{ maxWidth: 180 }} />
       </div>
 
-      {/* Subtitle */}
       <div className="app-subtitle px-2 mb-5">
         <p className="section-label" style={{ color: '#0f172a', fontSize: '0.68rem' }}>Applied AI Studio</p>
-        <p className="text-[0.7rem] mt-0.5" style={{ color: '#94a3b8' }}>Design Workflow Platform</p>
+        <p className="text-[0.7rem] mt-0.5" style={{ color: '#64748b' }}>Design Workflow Platform</p>
       </div>
 
-      {/* New Ticket CTA */}
-      <button
-        onClick={onNewTicket}
-        className="app-create-ticket btn-primary w-full mb-5 justify-center"
-        style={{ borderRadius: 'var(--radius-btn)', gap: '0.5rem' }}
-      >
+      <button type="button" onClick={onNewTicket} className="app-create-ticket btn-primary w-full mb-5 justify-center" style={{ borderRadius: 'var(--radius-btn)', gap: '0.5rem' }}>
         <Plus size={14} strokeWidth={2.5} />
-        New Ticket
+        {role === 'Client' ? 'New Request' : 'New Ticket'}
       </button>
 
-      {/* Navigation */}
       <nav className="app-side-nav space-y-0.5 flex-1" aria-label="Main navigation">
-        <p className="sidebar-section-title mb-2">Workspace</p>
-        {NAV_ITEMS.filter(item => {
-          if (user?.role === 'Designer' && item.label !== 'Kanban Board') return false;
-          return true;
-        }).map(({ to, label, icon: Icon }) => {
-          const active = location.pathname === to;
+        {NAV_GROUPS.map((group, gi) => {
+          const items = group.items.filter(i => role && i.roles.includes(role));
+          if (!items.length) return null;
           return (
-            <Link
-              key={to}
-              to={to}
-              className={`app-nav-link flex items-center gap-3 px-3 py-2.5 text-sm rounded-md transition-all duration-200${active ? ' is-active' : ''}`}
-              style={{ fontWeight: active ? 700 : 600 }}
-              aria-current={active ? 'page' : undefined}
-            >
-              <Icon size={16} strokeWidth={active ? 2.5 : 2} />
-              <span style={{ flex: 1 }}>{label}</span>
-              {active && <ChevronRight size={13} style={{ opacity: 0.4 }} />}
-            </Link>
+            <div key={group.title} style={{ display: 'contents' }}>
+              {gi > 0 && <div className="app-nav-divider" style={{ margin: '0.875rem 0 0.5rem' }} />}
+              <p className="sidebar-section-title mb-2">{group.title}</p>
+              {items.map(({ to, label, icon: Icon }) => {
+                const active = location.pathname === to;
+                return (
+                  <Link
+                    key={to} to={to}
+                    className={`app-nav-link flex items-center gap-3 px-3 py-2.5 text-sm rounded-md transition-all duration-200${active ? ' is-active' : ''}`}
+                    style={{ fontWeight: active ? 700 : 600 }}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    <Icon size={16} strokeWidth={active ? 2.5 : 2} />
+                    <span style={{ flex: 1 }}>{label}</span>
+                    {active && <ChevronRight size={13} style={{ opacity: 0.4 }} />}
+                  </Link>
+                );
+              })}
+            </div>
           );
         })}
-
-        <div className="app-nav-divider" style={{ margin: '0.875rem 0 0.5rem' }} />
-        <p className="sidebar-section-title mb-2">Portals</p>
-
-        <Link
-          to="/client-portal"
-          className={`app-nav-link flex items-center gap-3 px-3 py-2.5 text-sm rounded-md transition-all duration-200${location.pathname === '/client-portal' ? ' is-active' : ''}`}
-          style={{ fontWeight: location.pathname === '/client-portal' ? 700 : 600 }}
-          aria-current={location.pathname === '/client-portal' ? 'page' : undefined}
-        >
-          <Users size={16} strokeWidth={location.pathname === '/client-portal' ? 2.5 : 2} />
-          <span style={{ flex: 1 }}>Client Portal</span>
-          {location.pathname === '/client-portal' && <ChevronRight size={13} style={{ opacity: 0.4 }} />}
-        </Link>
-
-        {user?.role === 'Design Lead' && (
-          <>
-            <div className="app-nav-divider" style={{ margin: '0.875rem 0 0.5rem' }} />
-            <p className="sidebar-section-title mb-2">Admin</p>
-            <Link
-              to="/settings"
-              className={`app-nav-link flex items-center gap-3 px-3 py-2.5 text-sm rounded-md transition-all duration-200${location.pathname === '/settings' ? ' is-active' : ''}`}
-              style={{ fontWeight: location.pathname === '/settings' ? 700 : 600 }}
-              aria-current={location.pathname === '/settings' ? 'page' : undefined}
-            >
-              <Settings size={16} strokeWidth={location.pathname === '/settings' ? 2.5 : 2} />
-              <span style={{ flex: 1 }}>Integrations</span>
-              {location.pathname === '/settings' && <ChevronRight size={13} style={{ opacity: 0.4 }} />}
-            </Link>
-          </>
-        )}
       </nav>
 
-      {/* User + Logout */}
       <div className="app-user-area">
         {user && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '0.625rem 0.75rem', borderRadius: 10,
-            background: 'var(--brand-soft)',
-            border: '1px solid rgba(0,63,138,0.1)',
-            marginBottom: 8,
-          }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '99px',
-              background: user.color,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.68rem', fontWeight: 800, color: 'white', flexShrink: 0,
-              boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-            }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--brand-soft)', border: '1px solid rgba(0,63,138,0.1)', marginBottom: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '99px', background: user.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800, color: 'white', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
               {user.initials}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -158,43 +142,22 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
           </div>
         )}
         <button
+          type="button"
           onClick={logout}
-          className="app-nav-link"
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-            padding: '0.5rem 0.75rem', background: 'none',
-            border: '1px solid rgba(226, 232, 240, 0.8)',
-            borderRadius: 8, cursor: 'pointer', color: '#64748B',
-            fontSize: '0.78rem', fontWeight: 600,
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239,68,68,0.3)';
-            (e.currentTarget as HTMLElement).style.color = '#EF4444';
-            (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.04)';
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = 'rgba(226, 232, 240, 0.8)';
-            (e.currentTarget as HTMLElement).style.color = '#64748B';
-            (e.currentTarget as HTMLElement).style.background = 'none';
-          }}
+          className="app-nav-link app-signout"
         >
           <LogOut size={14} /> Sign out
         </button>
       </div>
 
-      {/* Footer */}
-      <div
-        className="app-brand-footer mt-3 px-3 py-2.5 rounded-lg"
-        style={{ background: 'rgba(0,63,138,0.03)', border: '1px solid rgba(0,63,138,0.07)' }}
-      >
+      <div className="app-brand-footer mt-3 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(0,63,138,0.03)', border: '1px solid rgba(0,63,138,0.07)' }}>
         <div className="flex items-center gap-2">
           <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Zap size={13} color="white" />
           </div>
           <div>
             <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>AI Studio</p>
-            <p style={{ fontSize: '0.6rem', color: '#94a3b8' }}>Powered by MCCIA</p>
+            <p style={{ fontSize: '0.6rem', color: '#64748b' }}>Powered by MCCIA</p>
           </div>
         </div>
       </div>
@@ -202,35 +165,44 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
   );
 }
 
+/** Renders children only for allowed roles; everyone else is sent to their home page. */
+function RequireRole({ roles, children }: { roles: UserRole[]; children: ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return null;
+  if (!roles.includes(user.role)) return <Navigate to={user.role === 'Client' ? '/client-portal' : '/'} replace />;
+  return <>{children}</>;
+}
+
 function AppShell() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const location = useLocation();
   const { user } = useAuth();
-  const pageTitle = PAGE_TITLES[location.pathname] ?? 'DesignDesk';
+  const pageTitle = titleFor(location.pathname);
+  const subtitle = PAGE_SUBTITLES[location.pathname];
   const { toasts, addToast, removeToast } = useToast();
+  const { refresh } = useTickets();
 
-  /* Live ticket event messages from backend WebSocket */
   const handleSocketMessage = useCallback((msg: import('./hooks/useTicketSocket').SocketMessage) => {
-    if (msg.type === 'ticket_moved')
-      addToast(`${msg.by} moved ${msg.ticketNumber} → ${msg.to}`, 'info');
-    else if (msg.type === 'ticket_created')
-      addToast(`${msg.by} created ${msg.ticketNumber}: ${msg.title}`, 'info');
-    else if (msg.type === 'sla_breach')
-      addToast(`SLA breach: ${msg.ticketNumber} — ${msg.title}`, 'warning');
-    else if (msg.type === 'comment_added')
-      addToast(`${msg.by} commented on ${msg.ticketNumber}`, 'info');
-  }, [addToast]);
+    void refresh();
+    const mine = 'by' in msg && msg.by === user?.name;
+    if (mine) return;
+    if (msg.type === 'ticket_moved') addToast(`${msg.by} moved ${msg.ticketNumber} → ${msg.to}`, 'info');
+    else if (msg.type === 'ticket_created') addToast(`${msg.by} created ${msg.ticketNumber}: ${msg.title}`, 'info');
+    else if (msg.type === 'sla_breach') addToast(`SLA breach: ${msg.ticketNumber} — ${msg.title}`, 'warning');
+    else if (msg.type === 'comment_added') addToast(`${msg.by} commented on ${msg.ticketNumber}`, 'info');
+  }, [addToast, refresh, user?.name]);
 
   useTicketSocket({ userId: user?.id ?? 'guest', onMessage: handleSocketMessage });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) return;
+      const el = e.target as HTMLElement;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setIsCommandPaletteOpen(true);
-      } else if (e.key === 'c' || e.key === 'C') {
+      } else if (!e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'c' || e.key === 'C')) {
         e.preventDefault();
         setIsCreateModalOpen(true);
       } else if (e.key === 'Escape') {
@@ -241,82 +213,63 @@ function AppShell() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const home = user?.role === 'Client' ? '/client-portal' : '/';
+
   return (
     <div className="app-shell flex h-screen font-body">
       <a href="#main-content" className="skip-link">Skip to content</a>
       <Sidebar onNewTicket={() => setIsCreateModalOpen(true)} />
 
       <main className="flex-1 flex flex-col relative z-0 min-w-0">
-        {/* Top Header */}
         <header className="app-header h-16 flex items-center px-8 justify-between sticky top-0 z-20">
           <div className="app-header-title">
-            <h2
-              className="font-heading font-bold"
-              style={{ fontSize: 'clamp(1.1rem, 2vw, 1.35rem)', letterSpacing: '-0.02em', color: '#0f172a' }}
-            >
-              {pageTitle}
-            </h2>
-            {PAGE_SUBTITLES[location.pathname] && (
-              <p className="app-header-subtitle">{PAGE_SUBTITLES[location.pathname]}</p>
-            )}
+            <h2 className="font-heading font-bold" style={{ fontSize: 'clamp(1.1rem, 2vw, 1.35rem)', letterSpacing: '-0.02em', color: '#0f172a' }}>{pageTitle}</h2>
+            {subtitle && <p className="app-header-subtitle">{subtitle}</p>}
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              className="app-header-search"
-              onClick={() => setIsCommandPaletteOpen(true)}
-              aria-label="Search the workspace"
-              title="Search (Ctrl+K)"
-            >
+            <button type="button" className="app-header-search" onClick={() => setIsCommandPaletteOpen(true)} aria-label="Search the workspace" title="Search (Ctrl+K)">
               <Search size={15} />
               <span>Search anything…</span>
               <kbd>Ctrl K</kbd>
             </button>
 
             <div style={{ width: 1, height: 24, background: 'rgba(226,232,240,0.85)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><NotificationBell /></div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <NotificationBell />
-            </div>
-
-            <button
-              className="app-header-create btn-primary"
-              onClick={() => setIsCreateModalOpen(true)}
-              style={{ gap: '0.4rem' }}
-            >
+            <button type="button" className="app-header-create btn-primary" onClick={() => setIsCreateModalOpen(true)} style={{ gap: '0.4rem' }}>
               <Plus size={14} strokeWidth={2.5} />
               <span>New ticket</span>
             </button>
 
             {user && (
               <div className="flex items-center gap-2.5" style={{ borderLeft: '1px solid rgba(226,232,240,0.85)', paddingLeft: '0.875rem', marginLeft: '0.125rem' }}>
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
-                  style={{ background: user.color, fontSize: '0.68rem', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', cursor: 'default' }}
-                  title={`${user.name} · ${user.role}`}
-                >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style={{ background: user.color, fontSize: '0.68rem', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', cursor: 'default' }} title={`${user.name} · ${user.role}`}>
                   {user.initials}
                 </div>
                 <div className="hidden sm:block text-right" style={{ lineHeight: 1.2 }}>
                   <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{user.name}</p>
-                  <p style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 500 }}>{user.role}</p>
+                  <p style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 500 }}>{user.role}</p>
                 </div>
               </div>
             )}
           </div>
         </header>
 
-        {/* Content Area */}
         <div id="main-content" tabIndex={-1} className="app-content flex-1 overflow-auto px-8 py-7 relative">
           <div className="h-full animate-fade-in-up">
             <Routes>
-              <Route path="/"              element={<KanbanBoard />}      />
-              <Route path="/calendar"      element={<CalendarPage />}     />
-              <Route path="/dashboard"     element={<Dashboard />}        />
-              <Route path="/library"       element={<LibraryPage />}      />
+              <Route path="/" element={<RequireRole roles={STAFF}><KanbanBoard /></RequireRole>} />
+              <Route path="/calendar" element={<RequireRole roles={STAFF}><CalendarPage /></RequireRole>} />
+              <Route path="/workload" element={<RequireRole roles={STAFF}><WorkloadPage /></RequireRole>} />
+              <Route path="/library" element={<RequireRole roles={STAFF}><LibraryPage /></RequireRole>} />
+              <Route path="/dashboard" element={<RequireRole roles={['Design Lead']}><Dashboard /></RequireRole>} />
+              <Route path="/reports" element={<RequireRole roles={['Design Lead']}><ReportsPage /></RequireRole>} />
+              <Route path="/templates" element={<RequireRole roles={['Design Lead']}><TemplatesPage /></RequireRole>} />
               <Route path="/client-portal" element={<ClientPortalPage onNewRequest={() => setIsCreateModalOpen(true)} />} />
-              <Route path="/tickets/:id"   element={<TicketDetailPage />} />
-              <Route path="/settings"      element={<SettingsPage />}     />
+              <Route path="/tickets/:id" element={<TicketDetailPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to={home} replace />} />
             </Routes>
           </div>
         </div>
@@ -341,6 +294,16 @@ function App() {
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+
+  /* The client review link works without signing in. */
+  if (location.pathname.startsWith('/review/')) {
+    return (
+      <Routes>
+        <Route path="/review/:token" element={<ReviewPage />} />
+      </Routes>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -355,7 +318,11 @@ function AppContent() {
 
   if (!isAuthenticated) return <LoginPage />;
 
-  return <AppShell />;
+  return (
+    <TicketsProvider>
+      <AppShell />
+    </TicketsProvider>
+  );
 }
 
 export default App;

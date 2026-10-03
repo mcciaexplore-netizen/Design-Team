@@ -1,11 +1,12 @@
-import { API_BASE } from '../api';
+import { API_BASE, getToken } from '../api';
 import { useEffect, useRef } from 'react';
 
 export type SocketMessage =
   | { type: 'ticket_moved';   ticketNumber: string; to: string; by: string }
   | { type: 'ticket_created'; ticketNumber: string; title: string; by: string }
   | { type: 'sla_breach';     ticketNumber: string; title: string }
-  | { type: 'comment_added';  ticketNumber: string; by: string };
+  | { type: 'comment_added';  ticketNumber: string; by: string }
+  | { type: 'ticket_updated'; ticketNumber: string; by: string };
 
 interface Options {
   userId: string;
@@ -15,7 +16,7 @@ interface Options {
 }
 
 /**
- * Opens a WebSocket to ws://127.0.0.1:8000/ws/{userId} and calls
+ * Opens an authenticated WebSocket to the API's /ws endpoint and calls
  * onMessage for each parsed JSON frame. Reconnects automatically on
  * close/error. Silently no-ops if the backend is unreachable.
  */
@@ -30,7 +31,9 @@ export function useTicketSocket({ userId, onMessage, reconnectDelay = 3000 }: Op
     const connect = () => {
       if (!mountedRef.current) return;
       try {
-        const ws = new WebSocket(`${API_BASE.replace(/^http/, 'ws')}/ws/${encodeURIComponent(userId)}`);
+        const token = getToken();
+        if (!token) return;
+        const ws = new WebSocket(`${API_BASE.replace(/^http/, 'ws')}/ws/${encodeURIComponent(userId)}?token=${encodeURIComponent(token)}`);
         wsRef.current = ws;
 
         ws.onmessage = (ev) => {
@@ -40,8 +43,8 @@ export function useTicketSocket({ userId, onMessage, reconnectDelay = 3000 }: Op
           } catch { /* ignore malformed frames */ }
         };
 
-        ws.onclose = () => {
-          if (!mountedRef.current) return;
+        ws.onclose = (ev) => {
+          if (!mountedRef.current || ev.code === 4401) return;
           timerRef.current = setTimeout(connect, reconnectDelay);
         };
 

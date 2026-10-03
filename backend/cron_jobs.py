@@ -3,6 +3,7 @@ import pytz
 import models
 from sqlalchemy.orm import Session
 from notifications import handle_overdue_escalations, notify_user
+import events
 
 def run_all_cron_jobs(db: Session):
     now = datetime.datetime.now(pytz.UTC)
@@ -51,6 +52,11 @@ def run_all_cron_jobs(db: Session):
             due_at = due_at.replace(tzinfo=pytz.UTC)
             
         if now > due_at:
+            # First time we see it overdue: flag it and alert leads / Slack once.
+            if not ticket.is_overdue:
+                ticket.is_overdue = True
+                db.commit()
+                events.emit(db, "sla_breach", ticket)
             # Overdue
             diff_hours = (now - due_at).total_seconds() / 3600
             # Simplify working hours overdue to absolute hours for this endpoint
@@ -61,3 +67,17 @@ def run_all_cron_jobs(db: Session):
                 notify_user(db, ticket.assignee, f"Ticket {ticket.ticket_number} due in <6 hrs", "6_HR_WARNING", ticket.id)
             
     db.commit()
+
+    # 3. Recurring tickets and the daily digest (each is idempotent per tick)
+    from templates_recurring import run_due_rules
+    from digest import send_daily_digests
+    try:
+        run_due_rules(db, now)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Recurring rules failed")
+    try:
+        send_daily_digests(db, now)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Daily digest failed")

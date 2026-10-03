@@ -43,7 +43,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     setError(null);
-    setIsLoading(true);
     try {
       const form = new URLSearchParams();
       form.append('username', email.trim());
@@ -78,8 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(TOKEN_KEY, data.access_token);
       localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
       setUser(authUser);
-    } finally {
-      setIsLoading(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Sign-in failed.');
+      throw e;
     }
   };
 
