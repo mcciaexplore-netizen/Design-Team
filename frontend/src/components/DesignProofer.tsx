@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { authFetch } from '../api';
 import { Send, MapPin, X, MessageCircle } from 'lucide-react';
 
 interface Pin {
@@ -25,7 +26,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls }) =>
   const imageRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:8000/api/tickets/${ticketId}/pinpoints`)
+    authFetch(`/api/tickets/${ticketId}/pinpoints`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -65,7 +66,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls }) =>
     };
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/tickets/${ticketId}/pinpoints`, {
+      const res = await authFetch(`/api/tickets/${ticketId}/pinpoints`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

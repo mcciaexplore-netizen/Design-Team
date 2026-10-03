@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, TrendingUp, Users, CheckCircle2 } from 'lucide-react';
 
 interface ForecastData {

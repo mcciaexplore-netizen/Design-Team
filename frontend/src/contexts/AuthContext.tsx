@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { API_BASE, TOKEN_KEY } from '../api';
 
 /* ─── Types ───────────────────────────────── */
 export type UserRole = 'Design Lead' | 'Designer' | 'Client';
@@ -21,14 +22,6 @@ interface AuthContextType {
   error:           string | null;
 }
 
-/* ─── Mock users ──────────────────────────── */
-const MOCK_USERS: (AuthUser & { password: string })[] = [
-  { id: '1', name: 'Priya Sharma',   email: 'lead@mccia.in',     password: 'mccia123', role: 'Design Lead', initials: 'PS', color: '#003F8A' },
-  { id: '2', name: 'Alice Fernandez',email: 'alice@mccia.in',    password: 'mccia123', role: 'Designer',    initials: 'AF', color: '#8B5CF6' },
-  { id: '3', name: 'Bob Mehta',      email: 'bob@mccia.in',      password: 'mccia123', role: 'Designer',    initials: 'BM', color: '#059669' },
-  { id: '4', name: 'Client (TATA)',   email: 'client@tata.com',  password: 'client123',role: 'Client',      initials: 'CL', color: '#f97316' },
-];
-
 /* ─── Context ─────────────────────────────── */
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -42,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /* Restore session from localStorage */
   useEffect(() => {
     const stored = localStorage.getItem(SESSION_KEY);
-    if (stored) {
+    if (stored && localStorage.getItem(TOKEN_KEY)) {
       try { setUser(JSON.parse(stored)); } catch {}
     }
     setIsLoading(false);
@@ -51,63 +44,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     setError(null);
     setIsLoading(true);
-
-    /* Try real backend first; fall back to mock if unreachable */
     try {
       const form = new URLSearchParams();
-      form.append('username', email);
+      form.append('username', email.trim());
       form.append('password', password);
 
-      const res = await fetch('http://127.0.0.1:8000/api/auth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: form.toString(),
-        signal: AbortSignal.timeout(3000),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        /* Map backend response to AuthUser shape */
-        const authUser: AuthUser = {
-          id:       String(data.user?.id ?? data.sub ?? email),
-          name:     data.user?.full_name ?? data.user?.email ?? email,
-          email:    data.user?.email ?? email,
-          role:     data.user?.role ?? 'Designer',
-          initials: (data.user?.full_name ?? email).split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
-          color:    data.user?.role === 'Design Lead' ? '#003F8A' : data.user?.role === 'Client' ? '#f97316' : '#8B5CF6',
-        };
-        if (data.access_token) {
-          localStorage.setItem('mccia_access_token', data.access_token);
-        }
-        localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
-        setUser(authUser);
-        setIsLoading(false);
-        return;
+      let res: Response;
+      try {
+        res = await fetch(`${API_BASE}/api/auth/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form.toString(),
+          signal: AbortSignal.timeout(8000),
+        });
+      } catch {
+        throw new Error('Cannot reach the server. Check that the backend is running.');
       }
-    } catch {
-      /* Backend unreachable — fall through to mock */
-    }
 
-    /* Mock fallback */
-    await new Promise(r => setTimeout(r, 600));
-    const found = MOCK_USERS.find(
-      u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    if (!found) {
+      if (res.status === 401) throw new Error('Invalid email or password.');
+      if (!res.ok) throw new Error('Sign-in failed. Please try again.');
+
+      const data = await res.json();
+      const u = data.user;
+      const role: UserRole = u.role === 'Design Lead' || u.role === 'Client' ? u.role : 'Designer';
+      const authUser: AuthUser = {
+        id:       String(u.id),
+        name:     u.full_name,
+        email:    u.email,
+        role,
+        initials: u.full_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
+        color:    role === 'Design Lead' ? '#003F8A' : role === 'Client' ? '#f97316' : '#8B5CF6',
+      };
+      localStorage.setItem(TOKEN_KEY, data.access_token);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
+      setUser(authUser);
+    } finally {
       setIsLoading(false);
-      throw new Error('Invalid email or password.');
     }
-    const { password: _pw, ...authUser } = found;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
-    setUser(authUser);
-    setIsLoading(false);
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(TOKEN_KEY);
     setUser(null);
     setError(null);
-  };
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('auth:expired', logout);
+    return () => window.removeEventListener('auth:expired', logout);
+  }, [logout]);
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, error }}>

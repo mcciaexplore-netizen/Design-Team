@@ -86,7 +86,7 @@ function formatBytes(n: number): string {
 /* ─── Sub-components ─────────────────────────── */
 
 /** Simple bold/italic/list rich-text toolbar over a contenteditable div */
-function RichTextEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function RichTextEditor({ onChange }: { value?: string; onChange: (v: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
 
   const exec = (cmd: string, val?: string) => {

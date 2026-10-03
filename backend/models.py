@@ -69,6 +69,8 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(RoleEnum), default=RoleEnum.REQUESTER, nullable=False)
     daily_capacity_hours = Column(Integer, default=8, nullable=False)
+    client_org = Column(String, nullable=True, index=True) # Set for client (Requester) users; scopes ticket access
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class DesignType(Base):
@@ -116,6 +118,7 @@ class Ticket(Base):
     
     requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     requester = relationship("User", foreign_keys=[requester_id])
+    client_org = Column(String, nullable=True, index=True) # Copied from requester; drives client portal access
 
     
     assignee_id = Column(Integer, ForeignKey("users.id"), nullable=True)

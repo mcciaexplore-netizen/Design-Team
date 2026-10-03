@@ -1,3 +1,4 @@
+import { API_BASE } from '../api';
 import { useEffect, useRef } from 'react';
 
 export type SocketMessage =
@@ -29,7 +30,7 @@ export function useTicketSocket({ userId, onMessage, reconnectDelay = 3000 }: Op
     const connect = () => {
       if (!mountedRef.current) return;
       try {
-        const ws = new WebSocket(`ws://127.0.0.1:8000/ws/${encodeURIComponent(userId)}`);
+        const ws = new WebSocket(`${API_BASE.replace(/^http/, 'ws')}/ws/${encodeURIComponent(userId)}`);
         wsRef.current = ws;
 
         ws.onmessage = (ev) => {

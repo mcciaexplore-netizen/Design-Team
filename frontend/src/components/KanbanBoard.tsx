@@ -5,7 +5,7 @@ import {
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { GripVertical, Search, X, Columns, AlignLeft, AlertTriangle, Copy, User, CheckSquare, MessageCircle } from 'lucide-react';
+import { Search, X, AlertTriangle, Copy, CheckSquare, MessageCircle } from 'lucide-react';
 import {
   type Ticket, STATUSES, DESIGNERS, PRIORITIES, PRIORITY_STYLE, DEFAULT_WIP_LIMITS, SEED_TICKETS,
 } from '../types';
@@ -61,12 +61,12 @@ function SLABadge({ dueAt }: { dueAt?: string }) {
 /* ── Ticket Card ─────────────────────────────── */
 function TicketCard({
   ticket, isSelected = false, isDragging = false,
-  dragHandleProps = {}, now,
+  now,
   onSingleClick, onDoubleClickTitle,
   editingTitle, onEditTitle, onSaveTitle, onDuplicate,
 }: {
   ticket: Ticket; isSelected?: boolean; isDragging?: boolean;
-  dragHandleProps?: Record<string, any>; now: number;
+  now: number;
   onSingleClick:     (e: React.MouseEvent) => void;
   onDoubleClickTitle: () => void;
   editingTitle:   string | null;
@@ -93,22 +93,14 @@ function TicketCard({
         padding:        '1rem',
         boxShadow:      isDragging ? '0 24px 48px rgba(0,63,138,0.1)' : isSelected ? '0 0 0 2px rgba(59,130,246,0.3)' : undefined,
         transform:      isDragging ? 'rotate(2deg) scale(1.03)' : 'none',
-        cursor:         isDragging ? 'grabbing' : 'pointer',
+        cursor:         isDragging ? 'grabbing' : 'grab',
         transition:     isDragging ? 'none' : 'box-shadow 0.2s, border-color 0.2s, transform 0.15s',
         userSelect:     'none',
         position:       'relative',
       }}
     >
-      {/* Grip handle */}
-      <div {...dragHandleProps} style={{ position: 'absolute', top: 7, right: 7, color: 'rgba(100,116,139,0.3)', cursor: 'grab', padding: 3, borderRadius: 4, zIndex: 1 }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#3b82f6'}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(100,116,139,0.3)'}
-      >
-        <GripVertical size={13} />
-      </div>
-
       {/* Ticket number + badges */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem', paddingRight: '1.1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem' }}>
         <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.1em', color: '#94a3b8', textTransform: 'uppercase', fontFamily: 'var(--font-body)' }}>{ticket.number}</span>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
           {ticket.info_score !== undefined && (
@@ -140,6 +132,7 @@ function TicketCard({
           onKeyDown={e => { if (e.key === 'Enter') onSaveTitle(); if (e.key === 'Escape') onSaveTitle(); }}
           onBlur={onSaveTitle}
           onClick={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
           style={{ fontSize: '0.85rem', fontWeight: 700, padding: '0.25rem 0.5rem', marginBottom: '0.5rem', width: '100%' }}
         />
       ) : (
@@ -215,10 +208,15 @@ function DraggableTicket({ ticket, isSelected, now, onSingleClick, onDoubleClick
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: ticket.id, data: { ticket } });
   return (
-    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.3 : 1, transition: 'opacity 0.15s' }}>
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={{ opacity: isDragging ? 0.3 : 1, transition: 'opacity 0.15s', touchAction: 'none' }}
+    >
       <TicketCard
         ticket={ticket} isSelected={isSelected} isDragging={false}
-        dragHandleProps={{ ...attributes, ...listeners }} now={now}
+        now={now}
         onSingleClick={onSingleClick}
         onDoubleClickTitle={onDoubleClickTitle}
         editingTitle={editingTicketId === ticket.id ? editingTitle : null}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Folder, Image as ImageIcon, Search, Tag, MoreVertical, Upload } from 'lucide-react';
 
 const LibraryPage = () => {

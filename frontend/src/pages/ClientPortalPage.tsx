@@ -1,4 +1,3 @@
-import React from 'react';
 import { Ticket as TicketIcon, CheckCircle, Clock } from 'lucide-react';
 import CDRApprovalGate from '../components/CDRApprovalGate';
 

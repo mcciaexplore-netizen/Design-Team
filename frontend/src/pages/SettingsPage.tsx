@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authFetch } from '../api';
 import { Bell, MessageSquare, Save, TestTube2, CheckCircle2, AlertTriangle, Mail } from 'lucide-react';
 
 const SECTION_LABEL: React.CSSProperties = {
@@ -64,7 +65,7 @@ const SettingsPage: React.FC = () => {
     if (!slackWebhook) { setTestSt('fail'); setTimeout(() => setTestSt('idle'), 2000); return; }
     setTestSt('testing');
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/integrations/slack/test', {
+      const res = await authFetch('/api/integrations/slack/test', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ webhook_url: slackWebhook, channel: slackChannel }),
@@ -79,15 +80,6 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 680, paddingBottom: '3rem' }}>
-      <div style={{ marginBottom: '1.75rem' }}>
-        <h1 style={{ fontSize: 'clamp(1.3rem,3vw,1.6rem)', fontFamily: 'var(--font-heading)', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', marginBottom: 4 }}>
-          Integrations &amp; Alerts
-        </h1>
-        <p style={{ fontSize: '0.875rem', color: '#64748B' }}>
-          Configure Slack notifications, email alerts, and SLA escalation thresholds.
-        </p>
-      </div>
-
       {/* ── Slack ──────────────────────────── */}
       <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -95,8 +87,8 @@ const SettingsPage: React.FC = () => {
             <MessageSquare size={16} />
           </div>
           <div>
-            <p style={SECTION_LABEL}>Slack Integration</p>
-            <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: -10 }}>Post SLA alerts and ticket events to a Slack channel via Incoming Webhook.</p>
+            <p style={{ ...SECTION_LABEL, marginBottom: 2 }}>Slack Integration</p>
+            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Post SLA alerts and ticket events to a Slack channel via Incoming Webhook.</p>
           </div>
         </div>
 

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { authFetch } from '../api';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Clock, ChevronDown, GitBranch, Tag, RotateCcw } from 'lucide-react';
-import { SEED_TICKETS, STATUSES, PRIORITIES, PRIORITY_STYLE, type Ticket } from '../types';
+import { ArrowLeft, Clock, ChevronDown, GitBranch, Tag } from 'lucide-react';
+import { SEED_TICKETS, STATUSES, PRIORITY_STYLE, type Ticket } from '../types';
 import ActivityTimeline from '../components/ActivityTimeline';
 import CDRApprovalGate  from '../components/CDRApprovalGate';
 import DesignProofer    from '../components/DesignProofer';
@@ -184,7 +185,7 @@ const TicketDetailPage: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Action Buttons */}
           {(() => {
-            const isWithin24Hours = ticket.due_at && (new Date(ticket.due_at).getTime() - Date.now()) < 24 * 3600 * 1000;
+            const isWithin24Hours = !!ticket.due_at && (new Date(ticket.due_at).getTime() - Date.now()) < 24 * 3600 * 1000;
             return (ticket.status === 'In Review' || ticket.status === 'Delivered') && (
               <button
                 className="btn-primary"
@@ -376,7 +377,7 @@ const TicketDetailPage: React.FC = () => {
               <button className="btn-ghost" onClick={() => setShowRevisionModal(false)}>Cancel</button>
               <button className="btn-primary" onClick={async () => {
                 try {
-                  const res = await fetch(`http://127.0.0.1:8000/api/tickets/${ticket.id}/revisions`, {
+                  const res = await authFetch(`/api/tickets/${ticket.id}/revisions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ reason_for_change: `[${revisionCategory}] ${revisionReason}` })

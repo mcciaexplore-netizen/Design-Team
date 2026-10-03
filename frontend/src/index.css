@@ -951,3 +951,25 @@ select.input-field { cursor: pointer; }
 @media (max-width: 767px) {
   .app-header-subtitle { display: none; }
 }
+
+/* ── Refinements from visual review ── */
+.input-field { border-radius: 10px; min-height: 40px; }
+.app-create-ticket { border-radius: 10px !important; min-height: 42px; }
+.app-nav-link { min-height: 40px; }
+.icon-tile:hover { transform: none; }
+
+/* Nav links: subtle inset focus ring instead of a heavy outline box */
+.app-nav-link:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgb(0 63 138 / 45%);
+}
+
+/* Sidebar: thin, unobtrusive scrollbar */
+.app-sidebar { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.app-sidebar:hover { scrollbar-color: #d5dde8 transparent; }
+.app-sidebar::-webkit-scrollbar { width: 4px; }
+.app-sidebar::-webkit-scrollbar-thumb { background: transparent; }
+.app-sidebar:hover::-webkit-scrollbar-thumb { background: #d5dde8; }
+
+/* Sidebar section titles: better contrast */
+.sidebar-section-title { color: #64748b; }
