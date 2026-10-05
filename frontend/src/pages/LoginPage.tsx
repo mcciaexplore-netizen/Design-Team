@@ -127,7 +127,7 @@ const LoginPage: React.FC = () => {
           </div>
 
           {/* Demo accounts (dev builds only) */}
-          {import.meta.env.DEV && !signup && <div style={{ marginBottom: '1.5rem' }}>
+          {!signup && <div style={{ marginBottom: '1.5rem' }}>
             <p style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>Try a demo account</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {DEMO_ACCOUNTS.map(acc => (
@@ -272,14 +272,12 @@ const LoginPage: React.FC = () => {
             Your session is encrypted and secured.
           </p>
 
-          {import.meta.env.DEV && (
           <div style={{ background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 10, padding: '0.75rem 1rem', marginTop: '1.25rem' }}>
             <p style={{ fontSize: '0.7rem', color: '#64748B', lineHeight: 1.6 }}>
               <strong style={{ color: '#18181b' }}>Demo credentials:</strong>{' '}
               Use the quick-login buttons above or: <code style={{ background: 'white', padding: '1px 5px', borderRadius: 4, fontSize: '0.68rem' }}>lead@mccia.in</code> / <code style={{ background: 'white', padding: '1px 5px', borderRadius: 4, fontSize: '0.68rem' }}>mccia123</code>
             </p>
           </div>
-          )}
         </div>
       </div>
     </div>
