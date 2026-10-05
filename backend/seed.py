@@ -47,10 +47,9 @@ def seed():
         return
     db: Session = SessionLocal()
 
-    ensure_admin(db)
-
-    # Check if users already exist
-    if db.query(models.User).first():
+    # Check if the demo data already exists (the admin account alone must not count as "seeded")
+    if db.query(models.DesignType).first():
+        ensure_admin(db)
         print("Database already seeded.")
         return
         
@@ -64,8 +63,11 @@ def seed():
         models.User(email="client@tata.com", full_name="Client (TATA)", role=models.RoleEnum.REQUESTER, client_org="TATA", hashed_password=pwd_context.hash(os.getenv("SEED_CLIENT_PASSWORD", "client123"))),
         models.User(email="client@acme.com", full_name="Client (ACME)", role=models.RoleEnum.REQUESTER, client_org="ACME", hashed_password=pwd_context.hash(os.getenv("SEED_CLIENT_PASSWORD", "client123"))),
     ]
-    db.add_all(users)
+    existing = {e for (e,) in db.query(models.User.email).all()}
+    db.add_all([u for u in users if u.email not in existing])
     db.commit()
+    ensure_admin(db)
+    users = [db.query(models.User).filter_by(email=u.email).one() for u in users]
     
     # Design Types
     dt_banner = models.DesignType(
