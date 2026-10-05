@@ -999,3 +999,48 @@ select.input-field { cursor: pointer; }
   .app-nav-link { flex: 0 0 auto; min-width: 66px; }
   .app-signout { display: none; }
 }
+
+/* ── Design tokens for inline-styled components (contrast-checked on white) ── */
+:root {
+  --text-strong:  #0f172a;
+  --text-soft:    #475569;   /* 7.6:1 on white */
+  --text-hint:    #64748b;   /* 4.8:1 on white – lightest allowed for text */
+  --border-soft:  rgba(226, 232, 240, 0.85);
+  --danger-text:  #b91c1c;
+  --danger-bg:    rgba(239, 68, 68, 0.07);
+  --danger-border: rgba(239, 68, 68, 0.25);
+}
+
+.app-spinner--sm { width: 16px; height: 16px; border-width: 2px; margin: 0; display: inline-block; }
+
+/* ── Login page ── */
+.login-shell { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; font-family: var(--font-body); }
+.login-brand {
+  background: #18181b; display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 3rem; position: relative; overflow: hidden;
+}
+.login-panel {
+  background: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 3rem 2.5rem; overflow-y: auto;
+}
+.login-mobile-brand { display: none; align-items: center; gap: 10px; margin-bottom: 1.5rem; font-weight: 800; color: var(--text-strong); }
+.login-mobile-brand span.mark { width: 36px; height: 36px; border-radius: 10px; background: #18181b; display: flex; align-items: center; justify-content: center; }
+.login-demo-btn {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 0.625rem 0.875rem;
+  border-radius: 10px; cursor: pointer; text-align: left; transition: background 0.15s, border-color 0.15s;
+  background: var(--demo-bg); border: 1px solid var(--demo-border);
+}
+.login-demo-btn:hover { background: var(--demo-bg-hover); border-color: var(--demo-border-hover); }
+.login-label { font-size: 0.8rem; font-weight: 700; color: var(--text-strong); display: block; margin-bottom: 6px; }
+.login-link-btn { background: none; border: none; cursor: pointer; color: #18181b; font-weight: 700; font-size: inherit; padding: 0; text-decoration: underline; }
+
+@media (max-width: 900px) {
+  .login-shell { grid-template-columns: 1fr; }
+  .login-brand { display: none; }
+  .login-panel { padding: 2rem 1.25rem; justify-content: flex-start; min-height: 100vh; }
+  .login-mobile-brand { display: flex; }
+}
+
+/* Header user chip: the sidebar already shows the full profile on desktop */
+.app-header-user { display: none; align-items: center; }
+@media (max-width: 767px) { .app-header-user { display: flex; } }

@@ -17,13 +17,38 @@ def migrate():
     command.upgrade(cfg, "head")
 
 
+def ensure_admin(db: Session):
+    """Promote (or create) the ADMIN_EMAIL account as Design Lead. Runs on every deploy, so it is idempotent."""
+    email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    if not email:
+        return
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user:
+        if user.role != models.RoleEnum.DESIGN_LEAD:
+            user.role = models.RoleEnum.DESIGN_LEAD
+            user.client_org = None
+            db.commit()
+            print(f"Promoted {email} to Design Lead.")
+        return
+    password = os.getenv("ADMIN_PASSWORD")
+    if not password:
+        print(f"ADMIN_EMAIL={email} has no account yet; set ADMIN_PASSWORD to create it (or register it in the app, then redeploy).")
+        return
+    db.add(models.User(email=email, full_name=os.getenv("ADMIN_NAME", "MCCIA Admin"), role=models.RoleEnum.DESIGN_LEAD,
+                       hashed_password=pwd_context.hash(password)))
+    db.commit()
+    print(f"Created admin account {email}.")
+
+
 def seed():
     migrate()
     if not os.getenv("DATABASE_URL", "sqlite").startswith("sqlite") and not (os.getenv("SEED_STAFF_PASSWORD") and os.getenv("SEED_CLIENT_PASSWORD")):
         print("Refusing to seed a non-SQLite database with default passwords. Set SEED_STAFF_PASSWORD and SEED_CLIENT_PASSWORD.")
         return
     db: Session = SessionLocal()
-    
+
+    ensure_admin(db)
+
     # Check if users already exist
     if db.query(models.User).first():
         print("Database already seeded.")

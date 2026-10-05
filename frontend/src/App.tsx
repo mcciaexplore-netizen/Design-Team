@@ -54,14 +54,10 @@ const PAGE_TITLES: [string, string][] = [
 
 const PAGE_SUBTITLES: Record<string, string> = {
   '/':              'Drag tickets between stages to keep work moving',
-  '/calendar':      'Deadlines and SLA windows at a glance',
   '/dashboard':     'The last 30 days of delivery and this week’s load',
-  '/reports':       'SLA trends, revisions per client, exports',
   '/workload':      'Who has capacity, and who is about to fall behind',
-  '/templates':     'Reusable ticket bundles and recurring schedules',
-  '/library':       'Approved designs and reusable assets',
   '/client-portal': 'Track requests and review designs',
-  '/settings':      'Notifications, digests and integrations',
+  '/settings':      'Notifications and integrations',
 };
 
 function titleFor(pathname: string): string {
@@ -81,8 +77,8 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
       </div>
 
       <div className="app-subtitle px-2 mb-5">
-        <p className="section-label" style={{ color: '#0f172a', fontSize: '0.68rem' }}>Applied AI Studio</p>
-        <p className="text-[0.7rem] mt-0.5" style={{ color: '#64748b' }}>Design Workflow Platform</p>
+        <p className="section-label" style={{ color: 'var(--text-strong)', fontSize: '0.68rem' }}>Applied AI Studio</p>
+        <p className="text-[0.7rem] mt-0.5" style={{ color: 'var(--text-hint)' }}>Design Workflow Platform</p>
       </div>
 
       <button type="button" onClick={onNewTicket} className="app-create-ticket btn-primary w-full mb-5 justify-center" style={{ borderRadius: 'var(--radius-btn)', gap: '0.5rem' }}>
@@ -99,7 +95,9 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
               {gi > 0 && <div className="app-nav-divider" style={{ margin: '0.875rem 0 0.5rem' }} />}
               <p className="sidebar-section-title mb-2">{group.title}</p>
               {items.map(({ to, label, icon: Icon }) => {
-                const active = location.pathname === to;
+                const active = location.pathname === to
+                  || (to === '/client-portal' && location.pathname.startsWith('/tickets/') && role === 'Client')
+                  || (to === '/' && location.pathname.startsWith('/tickets/') && role !== 'Client');
                 return (
                   <Link
                     key={to} to={to}
@@ -125,7 +123,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
               {user.initials}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.25 }}>{user.name}</p>
+              <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.25 }}>{user.name}</p>
               <p style={{ fontSize: '0.65rem', color: 'var(--brand)', fontWeight: 600, marginTop: 1 }}>{user.role}</p>
             </div>
           </div>
@@ -145,8 +143,8 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
             <Zap size={13} color="white" />
           </div>
           <div>
-            <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>AI Studio</p>
-            <p style={{ fontSize: '0.6rem', color: '#64748b' }}>Powered by MCCIA</p>
+            <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1.2 }}>AI Studio</p>
+            <p style={{ fontSize: '0.6rem', color: 'var(--text-hint)' }}>Powered by MCCIA</p>
           </div>
         </div>
       </div>
@@ -212,7 +210,7 @@ function AppShell() {
       <main className="flex-1 flex flex-col relative z-0 min-w-0">
         <header className="app-header h-16 flex items-center px-8 justify-between sticky top-0 z-20">
           <div className="app-header-title">
-            <h2 className="font-heading font-bold" style={{ fontSize: 'clamp(1.1rem, 2vw, 1.35rem)', letterSpacing: '-0.02em', color: '#0f172a' }}>{pageTitle}</h2>
+            <h2 className="font-heading font-bold" style={{ fontSize: 'clamp(1.1rem, 2vw, 1.35rem)', letterSpacing: '-0.02em', color: 'var(--text-strong)' }}>{pageTitle}</h2>
             {subtitle && <p className="app-header-subtitle">{subtitle}</p>}
           </div>
 
@@ -223,22 +221,18 @@ function AppShell() {
               <kbd>Ctrl K</kbd>
             </button>
 
-            <div style={{ width: 1, height: 24, background: 'rgba(226,232,240,0.85)' }} />
+            <div style={{ width: 1, height: 24, background: 'var(--border-soft)' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><NotificationBell /></div>
 
-            <button type="button" className="app-header-create btn-primary" onClick={() => setIsCreateModalOpen(true)} style={{ gap: '0.4rem' }}>
+            <button type="button" className="app-header-create btn-primary" onClick={() => setIsCreateModalOpen(true)} aria-label={user?.role === 'Client' ? 'New request' : 'New ticket'} style={{ gap: '0.4rem' }}>
               <Plus size={14} strokeWidth={2.5} />
-              <span>New ticket</span>
+              <span>{user?.role === 'Client' ? 'New request' : 'New ticket'}</span>
             </button>
 
             {user && (
-              <div className="flex items-center gap-2.5" style={{ borderLeft: '1px solid rgba(226,232,240,0.85)', paddingLeft: '0.875rem', marginLeft: '0.125rem' }}>
+              <div className="app-header-user" style={{ borderLeft: '1px solid var(--border-soft)', paddingLeft: '0.875rem', marginLeft: '0.125rem' }}>
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style={{ background: user.color, fontSize: '0.68rem', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', cursor: 'default' }} title={`${user.name} · ${user.role}`}>
                   {user.initials}
-                </div>
-                <div className="hidden sm:block text-right" style={{ lineHeight: 1.2 }}>
-                  <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{user.name}</p>
-                  <p style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 500 }}>{user.role}</p>
                 </div>
               </div>
             )}

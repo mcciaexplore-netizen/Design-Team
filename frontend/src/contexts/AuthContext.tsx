@@ -66,10 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ full_name: input.fullName, email: input.email, company: input.company, password: input.password }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(60000),
       });
     } catch {
-      throw new Error('Cannot reach the server. Check that the backend is running.');
+      throw new Error('Cannot reach the server. It may be waking up (free hosting can take about a minute), or the backend may be down.');
     }
     if (!res.ok) {
       let detail = '';
@@ -94,10 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: form.toString(),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(60000),
         });
       } catch {
-        throw new Error('Cannot reach the server. Check that the backend is running.');
+        throw new Error('Cannot reach the server. It may be waking up (free hosting can take about a minute), or the backend may be down.');
       }
 
       if (res.status === 401) throw new Error('Invalid email or password.');

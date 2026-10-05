@@ -29,6 +29,10 @@ services:
         generateValue: true # shown in the Render dashboard; used for lead/designer demo accounts
       - key: SEED_CLIENT_PASSWORD
         generateValue: true
+      - key: ADMIN_EMAIL
+        value: mcciaexplore@gmail.com # promoted to Design Lead (admin) on every deploy
+      - key: ADMIN_PASSWORD
+        sync: false # only used to create the account if it does not exist yet
       - key: JIRA_WEBHOOK_SECRET
         sync: false
       - key: PUBLIC_APP_URL
