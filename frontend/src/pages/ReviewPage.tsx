@@ -38,7 +38,7 @@ function Shell({ children }: { children: ReactNode }) {
     <div style={{ minHeight: '100vh', background: '#f4f6f9', color: '#0f172a', overflowX: 'hidden' }}>
       <header style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '10px 16px' }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
-          <img src="/mccia_logo.jpg" alt="MCCIA Applied AI Studio" style={{ height: 40, maxWidth: '100%', objectFit: 'contain' }} />
+          <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 40, maxWidth: '100%', objectFit: 'contain' }} />
         </div>
       </header>
       <main style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px 48px' }}>{children}</main>

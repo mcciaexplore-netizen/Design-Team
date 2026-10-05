@@ -73,7 +73,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
   return (
     <aside className="app-sidebar w-64 flex-shrink-0 flex flex-col z-10">
       <div className="app-brand flex items-center gap-3 mb-6 px-2">
-        <img src="/mccia_logo.jpg" alt="MCCIA Applied AI Studio" className="h-14 object-contain" style={{ maxWidth: 180 }} />
+        <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" className="h-12 object-contain" style={{ maxWidth: 180 }} />
       </div>
 
       <div className="app-subtitle px-2 mb-5">

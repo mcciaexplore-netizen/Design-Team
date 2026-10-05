@@ -96,8 +96,7 @@ const LoginPage: React.FC = () => {
         <div style={{ width: '100%', maxWidth: 400 }}>
 
           <div className="login-mobile-brand">
-            <span className="mark"><Zap size={18} color="white" aria-hidden="true" /></span>
-            <span>MCCIA Applied AI Studio</span>
+            <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 40, objectFit: 'contain' }} />
           </div>
 
           <div style={{ marginBottom: '2rem' }}>
