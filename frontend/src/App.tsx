@@ -222,14 +222,18 @@ function AppShell() {
       {!isClient && <Sidebar onNewTicket={() => openNewRequest()} />}
 
       <main className="flex-1 flex flex-col relative z-0 min-w-0">
-        <header className="app-header h-16 flex items-center px-8 justify-between sticky top-0 z-20">
-          <div className="app-header-title" style={isClient ? { display: 'flex', alignItems: 'center', gap: 14 } : undefined}>
-            {isClient && <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 36, objectFit: 'contain' }} />}
-            <div>
+        <header className={`app-header h-16 flex items-center px-8 justify-between sticky top-0 z-20 ${isClient ? 'client-header' : ''}`}>
+          {isClient ? (
+            /* The page has its own heading, so the client's top bar is just the brand. */
+            <Link to="/client-portal" aria-label="MCCIA Applied AI Studio, my requests" style={{ display: 'inline-flex', alignItems: 'center' }}>
+              <img src="/mccia_logo.png" alt="" style={{ height: 34, width: 'auto', maxWidth: 160, objectFit: 'contain', display: 'block' }} />
+            </Link>
+          ) : (
+            <div className="app-header-title">
               <h2 className="font-heading font-bold" style={{ fontSize: 'clamp(1.1rem, 2vw, 1.35rem)', letterSpacing: '-0.02em', color: 'var(--text-strong)' }}>{pageTitle}</h2>
               {subtitle && <p className="app-header-subtitle">{subtitle}</p>}
             </div>
-          </div>
+          )}
 
           <div className="flex items-center gap-3">
             {!isClient && (<>
@@ -258,7 +262,7 @@ function AppShell() {
             {isClient && (
               <>
                 <Link to="/settings" aria-label="Settings" title="Settings" className="app-header-search" style={{ padding: '0.45rem', minWidth: 0 }}><Settings size={16} /></Link>
-                <button type="button" className="btn-ghost" onClick={logout} style={{ gap: '0.4rem' }}><LogOut size={14} /> Sign out</button>
+                <button type="button" className="btn-ghost" onClick={logout} style={{ gap: '0.4rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}><LogOut size={14} /> <span className="client-signout-label">Sign out</span></button>
               </>
             )}
           </div>

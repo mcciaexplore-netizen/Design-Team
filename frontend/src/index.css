@@ -1053,3 +1053,20 @@ select.input-field { cursor: pointer; }
   .app-side-nav::-webkit-scrollbar { display: none; }
   .app-nav-link { flex: 1 0 68px; }
 }
+
+
+/* Client portal header on phones: the page has its own "New request" button, and the avatar is redundant. */
+@media (max-width: 767px) {
+  .client-header { padding-left: 1rem; padding-right: 1rem; }
+  .client-header .app-header-create,
+  .client-header .app-header-user,
+  .client-header .client-signout-label { display: none; }
+  .client-header > div { gap: 0.4rem; }
+}
+
+/* Client portal lists on narrow screens: tabs share the row; only the current progress step keeps its label. */
+@media (max-width: 520px) {
+  .portal-tabs { width: 100%; }
+  .portal-tabs button { flex: 1 1 auto; justify-content: center; padding: 0.45rem 0.3rem !important; gap: 4px !important; font-size: 0.74rem !important; }
+  .portal-step:not([aria-current]) .portal-step-text { display: none; }
+}
