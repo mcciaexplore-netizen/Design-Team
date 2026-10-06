@@ -1,24 +1,28 @@
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import KanbanBoard from './components/KanbanBoard';
 import NotificationBell from './components/NotificationBell';
-import Dashboard from './components/Dashboard';
 import ClientPortalPage from './pages/ClientPortalPage';
-import TicketDetailPage from './pages/TicketDetailPage';
 import TicketCreateModal from './components/TicketCreateModal';
 import CommandPalette from './components/CommandPalette';
 import LoginPage from './pages/LoginPage';
-import ForcePasswordChangePage from './pages/ForcePasswordChangePage';
-import SettingsPage from './pages/SettingsPage';
-import MyTasksPage from './pages/MyTasksPage';
-import WorkloadPage from './pages/WorkloadPage';
-import ReviewPage from './pages/ReviewPage';
-import RequestFormPage from './pages/RequestFormPage';
-import TrackPage from './pages/TrackPage';
+// Pages other than the first screen load on demand, so nobody downloads the charts library or the calendar
+// until they open them.
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const TicketDetailPage = lazy(() => import('./pages/TicketDetailPage'));
+const ForcePasswordChangePage = lazy(() => import('./pages/ForcePasswordChangePage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
+const WorkloadPage = lazy(() => import('./pages/WorkloadPage'));
+const ReviewPage = lazy(() => import('./pages/ReviewPage'));
+const RequestFormPage = lazy(() => import('./pages/RequestFormPage'));
+const TrackPage = lazy(() => import('./pages/TrackPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
+
+const PageLoading = () => <p role="status" style={{ color: 'var(--text-hint)', padding: '1rem' }}>Loading…</p>;
 import { AuthProvider, useAuth, type UserRole } from './contexts/AuthContext';
 import { TicketsProvider, useTickets } from './contexts/TicketsContext';
 import { ToastContainer, useToast } from './components/Toast';
-import { useState, useEffect, useCallback, lazy, Suspense, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense, type ReactNode } from 'react';
 import { useTicketSocket } from './hooks/useTicketSocket';
 import { NewRequestContext } from './contexts/NewRequestContext';
 import type { RequestPrefill } from './requestForm';
@@ -182,8 +186,11 @@ function AppShell() {
   const { refresh } = useTickets();
   const openNewRequest = useCallback((answers?: RequestPrefill) => { setPrefill(answers ?? null); setIsCreateModalOpen(true); }, []);
 
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSocketMessage = useCallback((msg: import('./hooks/useTicketSocket').SocketMessage) => {
-    void refresh();
+    // A burst of live events (a bulk update, several comments) reloads the list once, not once per event.
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => void refresh(), 600);
     const mine = 'by' in msg && msg.by === user?.name;
     if (mine) return;
     if (msg.type === 'ticket_moved') addToast(`${msg.by} moved ${msg.ticketNumber} → ${msg.to}`, 'info');
@@ -270,17 +277,19 @@ function AppShell() {
 
         <div id="main-content" tabIndex={-1} className="app-content flex-1 overflow-auto px-8 py-7 relative">
           <div className="h-full animate-fade-in-up" style={isClient ? { maxWidth: 980, margin: '0 auto', width: '100%' } : undefined}>
+            <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<RequireRole roles={STAFF}><KanbanBoard /></RequireRole>} />
               <Route path="/my-tasks" element={<RequireRole roles={STAFF}><MyTasksPage /></RequireRole>} />
               <Route path="/workload" element={<RequireRole roles={STAFF}><WorkloadPage /></RequireRole>} />
               <Route path="/dashboard" element={<RequireRole roles={['Design Lead']}><Dashboard /></RequireRole>} />
-              <Route path="/calendar" element={isClient ? <Navigate to="/client-portal" replace /> : <Suspense fallback={<p role="status" style={{ color: 'var(--text-hint)' }}>Loading calendar…</p>}><CalendarPage /></Suspense>} />
+              <Route path="/calendar" element={isClient ? <Navigate to="/client-portal" replace /> : <CalendarPage />} />
               <Route path="/client-portal" element={<ClientPortalPage onNewRequest={() => openNewRequest()} />} />
               <Route path="/tickets/:id" element={<TicketDetailPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={home} replace />} />
             </Routes>
+            </Suspense>
           </div>
         </div>
 
@@ -310,16 +319,18 @@ function AppContent() {
   /* The client review link works without signing in. */
   if (location.pathname.startsWith('/review/')) {
     return (
-      <Routes>
-        <Route path="/review/:token" element={<ReviewPage />} />
-      </Routes>
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          <Route path="/review/:token" element={<ReviewPage />} />
+        </Routes>
+      </Suspense>
     );
   }
 
   /* So does the design request form. */
-  if (location.pathname === '/request') return <RequestFormPage />;
+  if (location.pathname === '/request') return <Suspense fallback={<PageLoading />}><RequestFormPage /></Suspense>;
   if (location.pathname.startsWith('/track/')) {
-    return <Routes><Route path="/track/:token" element={<TrackPage />} /></Routes>;
+    return <Suspense fallback={<PageLoading />}><Routes><Route path="/track/:token" element={<TrackPage />} /></Routes></Suspense>;
   }
 
   if (isLoading) {
@@ -334,7 +345,7 @@ function AppContent() {
   }
 
   if (!isAuthenticated) return <LoginPage />;
-  if (user?.mustChangePassword) return <ForcePasswordChangePage />;
+  if (user?.mustChangePassword) return <Suspense fallback={<PageLoading />}><ForcePasswordChangePage /></Suspense>;
 
   return (
     <TicketsProvider>

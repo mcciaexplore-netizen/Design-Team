@@ -4,6 +4,7 @@ import secrets
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,19 @@ async def json_errors(request: Request, call_next):
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         return JSONResponse({"detail": "The server had a problem. Please try again."}, status_code=500)
 
+
+class SelectiveGZip(GZipMiddleware):
+    """Compress JSON and text responses. Image and file downloads are skipped: they are already compressed and
+    squeezing them again only burns CPU on a small server."""
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"].endswith(("/file", "/download")):
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
+
+
+app.add_middleware(SelectiveGZip, minimum_size=1024)
 
 # Production sets ALLOWED_ORIGINS. Without it (local development) any localhost port is allowed, so it doesn't matter
 # which port Vite picks.

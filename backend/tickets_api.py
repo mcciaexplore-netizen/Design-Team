@@ -5,7 +5,7 @@ from typing import List
 import pytz
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 import auth
 import capacity_engine
@@ -44,7 +44,11 @@ def get_design_types(db: Session = Depends(get_db), _user: models.User = Depends
 
 @router.get("/api/tickets", response_model=List[schemas.TicketResponse])
 def get_tickets(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    query = db.query(models.Ticket)
+    # Load the people, design type and subtasks up front. Without this every ticket costs its own queries,
+    # which is what made the board slow once there were a few hundred tickets.
+    query = db.query(models.Ticket).options(
+        joinedload(models.Ticket.requester), joinedload(models.Ticket.assignee), joinedload(models.Ticket.design_type),
+        selectinload(models.Ticket.subtasks))
     if is_client(user):
         if user.client_org:
             query = query.filter(models.Ticket.client_org == user.client_org)
