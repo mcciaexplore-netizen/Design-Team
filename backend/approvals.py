@@ -13,9 +13,10 @@ from sqlalchemy.orm import Session
 
 import delivery
 import events
+import revision_engine
 import models
 from auth import get_current_user, get_ticket_for_user, require_staff
-from common import as_utc, assign_to_last_submitter, mark_delivered, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
+from common import as_utc, mark_delivered, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["approvals"])
@@ -86,6 +87,8 @@ async def upload_proof(ticket_id: int, file: UploadFile = File(...), note: Optio
                        db: Session = Depends(get_db), user: models.User = Depends(require_staff)):
     """Upload a design version. By default it is sent to the client for approval in the same step."""
     ticket = get_ticket_for_user(db, ticket_id, user)
+    if ticket.is_locked:
+        raise HTTPException(status_code=409, detail="This version is closed. Upload the design on the newest version of the request.")
     data, name, content_type = await read_upload(file)
     key = store_bytes(data, name.rsplit(".", 1)[-1].lower())
     last = db.query(models.ProofVersion).filter(models.ProofVersion.ticket_id == ticket.id) \
@@ -245,6 +248,10 @@ def _apply_decision(db: Session, req: models.ApprovalRequest, body: "Decision", 
     if body.decision == "request_changes" and not (body.comment and body.comment.strip()):
         raise HTTPException(status_code=422, detail="Please describe the changes you would like")
 
+    current = db.query(models.Ticket).filter(models.Ticket.id == req.ticket_id).first()
+    if body.decision == "request_changes" and current and current.is_locked:
+        raise HTTPException(status_code=409, detail="This request is closed. Please raise a new request.")
+
     # Compare-and-set so a double-click or two reviewers cannot both record a decision.
     new_status = "approved" if body.decision == "approve" else "changes_requested"
     claimed = db.query(models.ApprovalRequest).filter(
@@ -257,15 +264,12 @@ def _apply_decision(db: Session, req: models.ApprovalRequest, body: "Decision", 
 
     ticket = db.query(models.Ticket).filter(models.Ticket.id == req.ticket_id).first()
     proof = db.query(models.ProofVersion).filter(models.ProofVersion.id == req.proof_version_id).first()
-    reassigned = None
+    child = None
     if body.decision == "approve":
         ticket.status = models.TicketStatus.DELIVERED
         mark_delivered(db, ticket)
     else:
-        ticket.status = models.TicketStatus.IN_PROGRESS
-        ticket.revision_count = (ticket.revision_count or 0) + 1
-        ticket.edit_window_ends_at = None
-        reassigned = assign_to_last_submitter(db, ticket)
+        child = revision_engine.request_changes(db, ticket, (body.comment or "").strip())
 
     log_audit(db, ticket.id, None, "Client approved" if body.decision == "approve" else "Client requested changes",
               {"proof_version": proof.version if proof else None, "comment": (body.comment or "").strip() or None},
@@ -273,9 +277,12 @@ def _apply_decision(db: Session, req: models.ApprovalRequest, body: "Decision", 
     db.commit()
     db.refresh(ticket)
     events.emit(db, "approval_decision", ticket, None, {"decision": new_status, "by": body.name.strip()})
-    if body.decision != "approve" and reassigned:
-        events.emit(db, "ticket_assigned", ticket, None)
-    return {"ok": True, "status": new_status}
+    out = {"ok": True, "status": new_status}
+    if child:
+        db.refresh(child)
+        revision_engine.announce(db, child)
+        out["new_ticket"] = {"id": child.id, "ticket_number": child.ticket_number}
+    return out
 
 
 class Decision(BaseModel):

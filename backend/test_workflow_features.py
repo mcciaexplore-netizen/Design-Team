@@ -87,18 +87,21 @@ def test_leaving_delivered_clears_the_window(client):
 
 # ── Revisions ────────────────────────────────────────────────────────────────
 
-def test_free_revision_reopens_the_ticket_for_the_last_proof_submitter(client):
+def test_changes_open_the_next_version_for_the_last_proof_submitter(client):
     t = make_ticket(client, "a@tata.com")
     upload_proof(client, t["id"])
     set_status(client, t["id"], "Delivered")
     r = client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "Bigger logo"}, headers=auth(client, "a@tata.com"))
     assert r.status_code == 201, r.text
-    body = r.json()
-    assert body["id"] == t["id"] and body["status"] == "In Progress" and body["revision_count"] == 1
-    assert body["assignee"]["email"] == "des@x.com"
+    v2 = r.json()
+    assert v2["id"] != t["id"] and v2["ticket_number"] == f"{t['ticket_number']}-V2" and v2["version_number"] == 2
+    assert v2["parent_id"] == t["id"] and v2["reason_for_change"] == "Bigger logo"
+    assert v2["status"] == "Assigned" and v2["assignee"]["email"] == "des@x.com"       # straight to the designer
+    v1 = db_ticket(t["id"])
+    assert v1.status == models.TicketStatus.REVISION_REQUESTED and v1.is_locked        # V1 is finished
 
 
-def test_revision_beyond_the_free_allowance_supersedes_with_a_child(client):
+def test_versions_past_the_free_allowance_are_flagged_but_still_just_versions(client):
     t = make_ticket(client, "a@tata.com")
     upload_proof(client, t["id"])
     db = TestingSessionLocal()
@@ -106,16 +109,24 @@ def test_revision_beyond_the_free_allowance_supersedes_with_a_child(client):
     db.commit()
     db.close()
     set_status(client, t["id"], "Delivered")
-    r = client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "Rework"}, headers=auth(client, "a@tata.com"))
-    assert r.status_code == 201, r.text
-    child = r.json()
-    assert child["id"] != t["id"] and child["ticket_number"].endswith("-V2") and child["status"] == "New"
-    assert child["assignee"]["email"] == "des@x.com"
-    parent = db_ticket(t["id"])
-    assert parent.status == models.TicketStatus.REVISION_REQUESTED and parent.is_locked
+    v2 = client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "Rework"}, headers=auth(client, "a@tata.com")).json()
+    assert "Extra revision" in v2["tags"]
+    tickets = client.get("/api/tickets", headers=auth(client, "lead@x.com")).json()
+    assert sorted(x["ticket_number"] for x in tickets) == [t["ticket_number"], f"{t['ticket_number']}-V2"]
 
 
-def test_client_approval_changes_go_back_to_the_last_submitter(client):
+def test_a_closed_ticket_cannot_be_reopened_through_the_api(client):
+    t = make_ticket(client, "a@tata.com")
+    set_status(client, t["id"], "Delivered")
+    db = TestingSessionLocal()
+    db.query(models.Ticket).filter_by(id=t["id"]).update({"is_locked": True})
+    db.commit()
+    db.close()
+    r = client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "More"}, headers=auth(client, "a@tata.com"))
+    assert r.status_code == 409
+
+
+def test_client_approval_changes_go_to_the_last_submitter_on_the_next_version(client):
     t = make_ticket(client, "a@tata.com")
     upload_proof(client, t["id"])
     proofs = client.get(f"/api/tickets/{t['id']}/proofs", headers=auth(client, "a@tata.com")).json()
@@ -123,8 +134,10 @@ def test_client_approval_changes_go_back_to_the_last_submitter(client):
     token = req["review_url"].rsplit("/", 1)[1]
     r = client.post(f"/api/public/review/{token}/decision", json={"decision": "request_changes", "name": "Rhea", "comment": "Change colours"})
     assert r.status_code == 200, r.text
-    after = db_ticket(t["id"])
-    assert after.status == models.TicketStatus.IN_PROGRESS and after.assignee_id is not None
+    new = db_ticket(r.json()["new_ticket"]["id"])
+    assert new.ticket_number.endswith("-V2") and new.status == models.TicketStatus.ASSIGNED and new.assignee_id is not None
+    assert new.reason_for_change == "Change colours"
+    assert db_ticket(t["id"]).status == models.TicketStatus.REVISION_REQUESTED
 
 
 # ── Public request form ──────────────────────────────────────────────────────
@@ -132,7 +145,7 @@ def test_client_approval_changes_go_back_to_the_last_submitter(client):
 def form(**over):
     tomorrow = datetime.date.today() + datetime.timedelta(days=7)
     data = {"name": "Meera Joshi", "email": "Meera@Example.com", "event_name": "AI Workshop", "event_date": "2030-01-10",
-            "design_requirement": "Flyer (Email/Whatsapp)", "delivery_date": tomorrow.isoformat(), "num_creatives": "2",
+            "design_requirement": "Flyer (Email / Print)", "delivery_date": tomorrow.isoformat(), "num_creatives": "2",
             "details": json.dumps({"size": "A4", "channel": "Email"})}   # the Flyer questions marked required
     data.update(over)
     return data
@@ -145,7 +158,7 @@ def test_request_form_creates_an_assigned_ticket_with_the_attachment(client):
     db = TestingSessionLocal()
     try:
         t = db.query(models.Ticket).filter_by(ticket_number=number).first()
-        assert t.title == "AI Workshop - Flyer (Email/Whatsapp)" and "blue theme" in t.brief
+        assert t.title == "AI Workshop - Flyer (Email / Print)" and "blue theme" in t.brief
         assert t.type_specific_fields["number_of_creatives"] == 2
         assert t.assignee.email == "des@x.com" and t.status == models.TicketStatus.ASSIGNED   # inactive designer is skipped
         assert t.requester.email == "meera@example.com" and t.requester.role == models.RoleEnum.REQUESTER
@@ -243,7 +256,7 @@ def test_portal_request_uses_the_signed_in_user(client):
     assert r.status_code == 201, r.text
     t = client.get("/api/tickets", headers=auth(client, "a@tata.com")).json()
     assert t[0]["id"] == r.json()["id"] and t[0]["client_org"] == "TATA" and t[0]["assignee"]["email"] == "des@x.com"
-    assert client.post("/api/requests", data={"event_name": "x", "event_date": "2030-02-01", "design_requirement": "Flyer (Email/Whatsapp)", "delivery_date": d}).status_code == 401
+    assert client.post("/api/requests", data={"event_name": "x", "event_date": "2030-02-01", "design_requirement": "Flyer (Email / Print)", "delivery_date": d}).status_code == 401
 
 
 # ── Jira ─────────────────────────────────────────────────────────────────────

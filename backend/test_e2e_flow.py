@@ -46,28 +46,28 @@ def test_full_e2e_flow(db, monkeypatch):
     ticket.edit_window_ends_at = past
     db.commit()
     
-    # 3. Request Changes (1 free revision allowed)
-    request_changes(db, ticket, "Make it bluer")
-    assert ticket.status == TicketStatus.IN_PROGRESS
-    assert ticket.revision_count == 1
-    assert ticket.edit_window_ends_at is None
-    
-    # 4. Deliver Again
-    ticket.status = TicketStatus.DELIVERED
-    ticket.edit_window_ends_at = past
+    # 3. Request Changes: V1 is closed as superseded and V2 is opened
+    v2 = request_changes(db, ticket, "Make it bluer")
     db.commit()
-    
-    # 5. Request Changes Again (Free limit exceeded -> creates duplicate child)
-    child = request_changes(db, ticket, "Still not right")
-    assert child.id != ticket.id
-    assert child.parent_id == ticket.id
-    assert child.ticket_number == "DF-0001-v2"
-    assert child.version_number == 2
-    assert child.status == TicketStatus.NEW
-    
-    # 6. Auto-Close (Cron Job replaces Celery)
-    # The original ticket is still DELIVERED, and edit window is in the past
-    
+    assert v2.ticket_number == "DF-0001-V2" and v2.parent_id == ticket.id and v2.status == TicketStatus.ASSIGNED
+    assert ticket.status == TicketStatus.REVISION_REQUESTED and ticket.is_locked
+    assert ticket.edit_window_ends_at is None
+
+    # 4. V2 is delivered, then asked to change again (past the free allowance of one): V3, flagged for the leads
+    v2.status = TicketStatus.DELIVERED
+    db.commit()
+    v3 = request_changes(db, v2, "Still not right")
+    db.commit()
+    assert v3.ticket_number == "DF-0001-V3" and "Extra revision" in v3.tags
+    assert db.query(Ticket).count() == 3
+
+    # 5. V3 is delivered and then left alone: auto-close (the cron job replaces Celery)
+    v3.status = TicketStatus.DELIVERED
+    v3.edit_window_ends_at = past
+    db.commit()
+    ticket = v3
+
+
     run_all_cron_jobs(db)
     
     # Re-fetch ticket from DB using a new session

@@ -144,22 +144,6 @@ def test_design_type_edit_window_overrides_the_global_default(client):
     assert 11.9 < hours < 12.1
 
 
-# ── Revision Requested status ────────────────────────────────────────────────
-
-def test_superseded_parent_is_marked_revision_requested(client):
-    db = TestingSessionLocal()
-    db.add(models.SystemSettings(max_free_revisions=0))
-    db.commit()
-    db.close()
-    t = make_ticket(client, "a@tata.com")
-    set_status(client, t["id"], "Delivered")
-    assert client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "More"}, headers=auth(client, "a@tata.com")).status_code == 201
-    parent = db_ticket(t["id"])
-    assert parent.status == models.TicketStatus.REVISION_REQUESTED and parent.is_locked
-    assert tick(client).status_code == 200
-    assert db_ticket(t["id"]).status == models.TicketStatus.REVISION_REQUESTED   # the tick leaves it alone
-
-
 # ── Waiting on requester ─────────────────────────────────────────────────────
 
 def notes(email):
@@ -298,22 +282,26 @@ def test_uploading_a_design_sends_it_to_the_client_for_approval(client):
     assert db_ticket(t["id"]).status == models.TicketStatus.DELIVERED
 
 
-def test_client_reply_sends_the_work_back_and_the_next_upload_goes_out_automatically(client):
+def test_client_reply_opens_the_next_version_and_its_upload_goes_out_automatically(client):
     t = make_ticket(client, "a@tata.com")
     upload_design(client, t["id"])
     cl = auth(client, "a@tata.com")
     first = [x for x in client.get(f"/api/tickets/{t['id']}/approval-requests", headers=cl).json() if x["status"] == "pending"][0]
     r = client.post(f"/api/approval-requests/{first['id']}/decision", json={"decision": "request_changes", "comment": "Make the logo bigger"}, headers=cl)
     assert r.status_code == 200, r.text
-    back = db_ticket(t["id"])
-    assert back.status == models.TicketStatus.IN_PROGRESS and back.assignee_id is not None        # straight back to the designer
+    v2_id = r.json()["new_ticket"]["id"]
+    v2 = db_ticket(v2_id)
+    assert v2.ticket_number == f"{t['ticket_number']}-V2" and v2.assignee_id is not None          # straight to the designer
+    assert db_ticket(t["id"]).is_locked
 
-    v2 = upload_design(client, t["id"]).json()
-    assert v2["version"] == 2 and v2["approval"]["status"] == "pending"
-    assert db_ticket(t["id"]).status == models.TicketStatus.IN_REVIEW
-    reqs = client.get(f"/api/tickets/{t['id']}/approval-requests", headers=cl).json()
-    assert [x["status"] for x in reqs if x["proof_version"] == 2] == ["pending"]
-    assert any("finished the changes" in n and "version 2" in n for n in notes("a@tata.com"))      # the client hears about the rework
+    assert upload_design(client, t["id"]).status_code == 409                                     # V1 takes no more designs
+    sent = upload_design(client, v2_id).json()                                                    # the redo goes on V2
+    assert sent["version"] == 1 and sent["approval"]["status"] == "pending"
+    assert db_ticket(v2_id).status == models.TicketStatus.IN_REVIEW
+    reqs = client.get(f"/api/tickets/{v2_id}/approval-requests", headers=cl).json()
+    assert [x["status"] for x in reqs] == ["pending"]
+    assert any("sent a design for your review" in n and f"{t['ticket_number']}-V2" in n for n in notes("a@tata.com"))   # the client hears about it
+    assert any("was assigned to you" in n and f"{t['ticket_number']}-V2" in n for n in notes("des@x.com"))      # and the designer gets the new ticket
 
 
 def test_a_new_upload_replaces_the_open_review(client):

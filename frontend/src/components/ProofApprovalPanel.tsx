@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CheckCircle2, Clipboard, Columns2, Download, Link2, RotateCcw, Send, Upload, XCircle } from 'lucide-react';
 import { apiJson, authFetch, downloadFile } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
-import type { Ticket } from '../types';
+import { DONE_STATUSES, type Ticket } from '../types';
 import { ProofCompare, RevisionTimeline } from './ProofCompare';
 import PinnableImage, { type PinItem } from './PinnableImage';
 
@@ -27,7 +28,7 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { da
 
 export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   const { user } = useAuth();
-  const { refresh } = useTickets();
+  const { refresh, tickets } = useTickets();
   const isClient = user?.role === 'Client';
   const [proofs, setProofs] = useState<Proof[]>([]);
   const [requests, setRequests] = useState<ApprovalReq[]>([]);
@@ -39,6 +40,9 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   const [sendNow, setSendNow] = useState(true);
   const [comparing, setComparing] = useState(false);
   const [pins, setPins] = useState<ApiPin[]>([]);
+  // When this ticket is a later version (V2, V3...), the version it grew from: its designs, decisions and marked spots.
+  const [parentData, setParentData] = useState<{ proofs: Proof[]; requests: ApprovalReq[]; pins: ApiPin[] } | null>(null);
+  const [nextVersion, setNextVersion] = useState<{ id: number; ticket_number: string } | null>(null);
   const autoCompared = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -58,12 +62,20 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
         apiJson<ApiPin[]>(`/api/tickets/${ticket.id}/pinpoints`),
       ]);
       setProofs(p); setRequests(r); setPins(marks); setError(null);
+      if (ticket.parent_id) {
+        const [pp, pr, pm] = await Promise.all([
+          apiJson<Proof[]>(`/api/tickets/${ticket.parent_id}/proofs`),
+          apiJson<ApprovalReq[]>(`/api/tickets/${ticket.parent_id}/approval-requests`),
+          apiJson<ApiPin[]>(`/api/tickets/${ticket.parent_id}/pinpoints`),
+        ]).catch(() => [[], [], []] as [Proof[], ApprovalReq[], ApiPin[]]);
+        setParentData({ proofs: pp, requests: pr, pins: pm });
+      } else setParentData(null);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not load proofs.'); }
     finally { setLoading(false); }
-  }, [ticket.id]);
+  }, [ticket.id, ticket.parent_id]);
 
   useEffect(() => {
-    setLoading(true); setCreated(null); setSendFor(null); setDeciding(null); setInfo(null); autoCompared.current = false;
+    setLoading(true); setCreated(null); setSendFor(null); setDeciding(null); setInfo(null); setNextVersion(null); autoCompared.current = false;
     void load();
     const id = setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 20_000);
     return () => clearInterval(id);
@@ -131,11 +143,13 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
     setPins(prev => [...prev, made]);
   };
 
-  const togglePin = async (pin: PinItem) => {
-    setPins(prev => prev.map(x => (x.id === pin.id ? { ...x, is_resolved: !pin.resolved } : x)));   // optimistic
-    try { await apiJson(`/api/tickets/${ticket.id}/pinpoints/${pin.id}?resolved=${!pin.resolved}`, { method: 'PATCH' }); }
+  const toggleOn = async (ticketId: string, pin: PinItem) => {
+    const flip = (all: ApiPin[]) => all.map(x => (x.id === pin.id ? { ...x, is_resolved: !pin.resolved } : x));   // optimistic
+    if (ticketId === ticket.id) setPins(flip); else setParentData(d => (d ? { ...d, pins: flip(d.pins) } : d));
+    try { await apiJson(`/api/tickets/${ticketId}/pinpoints/${pin.id}?resolved=${!pin.resolved}`, { method: 'PATCH' }); }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not update that spot.'); void load(); }
   };
+  const togglePin = (pin: PinItem) => toggleOn(ticket.id, pin);
 
   const decide = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,7 +159,8 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
       // Marked spots can stand in for a written note.
       const marked = pending?.proof_version_id ? pinItems(pending.proof_version_id).length : 0;
       const text = comment.trim() || (deciding.mode === 'request_changes' && marked ? `Please see the ${marked} marked spot${marked > 1 ? 's' : ''} on the design.` : null);
-      await apiJson(`/api/approval-requests/${deciding.id}/decision`, { method: 'POST', json: { decision: deciding.mode, comment: text } });
+      const res = await apiJson<{ new_ticket?: { id: number; ticket_number: string } }>(`/api/approval-requests/${deciding.id}/decision`, { method: 'POST', json: { decision: deciding.mode, comment: text } });
+      setNextVersion(res.new_ticket ?? null);
       setDeciding(null); setComment('');
       setInfo(deciding.mode === 'approve' ? 'Thank you — the design is approved.' : 'Thanks — your feedback was sent to the design team.');
       await load(); void refresh();
@@ -157,24 +172,34 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   const latest = proofs[0];
   const pendingMarks = pending?.proof_version_id ? pinItems(pending.proof_version_id).length : 0;
 
-  // "What changed": when a redo comes back, show the client's earlier feedback as a checklist and open the comparison.
-  const versionOf = new Map(proofs.map(x => [x.id, x.version]));
-  const askedForChanges = requests.filter(r => r.status === 'changes_requested' && (r.proof_version ?? 0) < (latest?.version ?? 0))
-    .sort((a, b) => (b.proof_version ?? 0) - (a.proof_version ?? 0))[0];
-  const earlierMarks = pins.filter(x => {
-    const id = x.image_url.startsWith('proof:') ? Number(x.image_url.slice(6)) : NaN;
-    return (versionOf.get(id) ?? Infinity) < (latest?.version ?? 0);
-  });
-  const isRedo = !!latest && !!askedForChanges && (!!pending || ticket.status === 'In Review');
-  const imageCount = proofs.filter(x => x.content_type?.startsWith('image/')).length;
+  // "What changed": on a later version, show the client's feedback on the version before as a checklist and open
+  // the comparison. Designs of both versions are numbered as one series so they can be compared.
+  const parentNumber = tickets.find(t => t.id === ticket.parent_id)?.number ?? 'the previous version';
+  const askedForChanges = parentData?.requests.filter(r => r.status === 'changes_requested').sort((a, b) => b.id - a.id)[0];
+  const earlierProofVersion = new Map((parentData?.proofs ?? []).map(x => [x.id, x.version]));
+  const isRedo = !!askedForChanges && !DONE_STATUSES.includes(ticket.status);
+
+  const ownAsc = [...proofs].sort((a, b) => a.version - b.version);
+  const parentAsc = [...(parentData?.proofs ?? [])].sort((a, b) => a.version - b.version);
+  const series = new Map([...parentAsc, ...ownAsc].map((x, idx) => [x.id, idx + 1] as [number, number]));
+  const chainProofs = [...parentAsc, ...ownAsc].map(x => ({ ...x, version: series.get(x.id) ?? x.version }));
+  const chainRequests = [...(parentData?.requests ?? []), ...requests]
+    .map(r => ({ ...r, proof_version: (r.proof_version_id ? series.get(r.proof_version_id) : undefined) ?? r.proof_version }));
+  const chainImages = chainProofs.filter(x => x.content_type?.startsWith('image/')).length;
+  const ownImages = proofs.filter(x => x.content_type?.startsWith('image/')).length;
 
   useEffect(() => {
-    if (isRedo && imageCount >= 2 && !autoCompared.current) { autoCompared.current = true; setComparing(true); }
-  }, [isRedo, imageCount]);
+    if (isRedo && ownImages >= 1 && chainImages >= 2 && !autoCompared.current) { autoCompared.current = true; setComparing(true); }
+  }, [isRedo, ownImages, chainImages]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {error && <p role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>{error}</p>}
+      {nextVersion && (
+        <p style={{ fontSize: '0.82rem', color: '#1e3a8a', background: 'rgba(37,99,235,0.07)', border: '1px solid rgba(37,99,235,0.22)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
+          The team continues on a new version: <Link to={`/tickets/${nextVersion.id}`} style={{ fontWeight: 800 }}>{nextVersion.ticket_number}</Link>
+        </p>
+      )}
       {info && <p role="status" style={{ fontSize: '0.8rem', color: '#047857', background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>{info}</p>}
 
       {/* Client decision (signed-in portal) */}
@@ -239,27 +264,27 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
         </div>
       )}
 
-      {isRedo && askedForChanges && (
+      {isRedo && askedForChanges && parentData && (
         <div className="glass-card" style={{ padding: '1rem' }} aria-labelledby={`chg-${ticket.id}`}>
           <h3 id={`chg-${ticket.id}`} className="section-label" style={{ marginBottom: 4 }}>
-            Changes requested on version {askedForChanges.proof_version}
+            Changes requested on {parentNumber}
           </h3>
           <p style={{ fontSize: '0.76rem', color: '#64748b', marginBottom: 8 }}>
-            Version {latest?.version} is the redo. {isClient ? 'Tick each item off as you check it.' : 'Tick each item off as you finish it.'}
+            This version carries those changes out. {isClient ? 'Tick each item off as you check it.' : 'Tick each item off as you finish it.'}
           </p>
           {askedForChanges.decision_comment && (
             <p style={{ fontSize: '0.82rem', color: '#334155', fontStyle: 'italic', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 8 }}>
               “{askedForChanges.decision_comment}”{askedForChanges.decided_by_name ? ` — ${askedForChanges.decided_by_name}` : ''}
             </p>
           )}
-          {earlierMarks.length > 0 && (
+          {parentData.pins.length > 0 && (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {earlierMarks.map(m => (
+              {parentData.pins.map(m => (
                 <li key={m.id}>
                   <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: '0.82rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={m.is_resolved} onChange={() => void togglePin({ id: m.id, x: 0, y: 0, content: m.content, author: m.author_name ?? '', resolved: m.is_resolved })} style={{ marginTop: 3, accentColor: '#059669' }} />
+                    <input type="checkbox" checked={m.is_resolved} onChange={() => void toggleOn(ticket.parent_id as string, { id: m.id, x: 0, y: 0, content: m.content, author: m.author_name ?? '', resolved: m.is_resolved })} style={{ marginTop: 3, accentColor: '#059669' }} />
                     <span style={{ textDecoration: m.is_resolved ? 'line-through' : 'none', color: m.is_resolved ? '#94a3b8' : '#334155', overflowWrap: 'anywhere' }}>
-                      <span style={{ color: '#94a3b8' }}>Version {versionOf.get(Number(m.image_url.slice(6)))}:</span> {m.content}
+                      <span style={{ color: '#94a3b8' }}>Version {earlierProofVersion.get(Number(m.image_url.slice(6)))}:</span> {m.content}
                     </span>
                   </label>
                 </li>
@@ -269,14 +294,14 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
         </div>
       )}
 
-      {proofs.filter(p => p.content_type?.startsWith('image/')).length >= 2 && (
+      {chainImages >= 2 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div>
             <button type="button" className="btn-ghost" aria-expanded={comparing} onClick={() => setComparing(c => !c)}>
               <Columns2 size={14} aria-hidden="true" /> {comparing ? 'Hide comparison' : 'Compare versions'}
             </button>
           </div>
-          {comparing && <ProofCompare proofs={proofs} requests={requests} />}
+          {comparing && <ProofCompare proofs={chainProofs} requests={chainRequests} />}
         </div>
       )}
 
@@ -315,7 +340,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
         </div>
       ))}
 
-      {(proofs.length > 1 || requests.length > 0) && <RevisionTimeline proofs={proofs} requests={requests} />}
+      {(chainProofs.length > 1 || chainRequests.length > 0) && <RevisionTimeline proofs={chainProofs} requests={chainRequests} />}
 
       {requests.length > 0 && (
         <div className="glass-card" style={{ padding: '1rem' }}>

@@ -86,20 +86,18 @@ def test_the_thread_merges_comments_designs_marks_and_decisions_in_order(client)
     time.sleep(1.1)
     client.post(f"/api/tickets/{tid}/comments", json={"content": "Also the date is wrong"}, headers=cl)
     time.sleep(1.1)
-    pending = [r for r in client.get(f"/api/tickets/{tid}/approval-requests", headers=cl).json() if r["status"] == "pending"][0]
-    client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "request_changes", "comment": "Please fix both"}, headers=cl)
-    time.sleep(1.1)
     client.post(f"/api/tickets/{tid}/comments", json={"content": "On it"}, headers=des)
     time.sleep(1.1)
-    upload_design(client, tid)
+    pending = [r for r in client.get(f"/api/tickets/{tid}/approval-requests", headers=cl).json() if r["status"] == "pending"][0]
+    client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "request_changes", "comment": "Please fix both"}, headers=cl)
 
     thread = client.get(f"/api/tickets/{tid}/thread", headers=cl).json()
     assert [(i["kind"], i.get("version")) for i in thread] == [
-        ("design_sent", 1), ("pin", 1), ("comment", None), ("decision", 1), ("comment", None), ("design_sent", 2)]
-    sent, mark, c1, decision, c2, resent = thread
+        ("design_sent", 1), ("pin", 1), ("comment", None), ("comment", None), ("decision", 1)]
+    sent, mark, c1, c2, decision = thread
     assert sent["by"] == "Designer" and mark["content"] == "Logo too small" and mark["by"] == "Tata A"
+    assert c1["author"]["full_name"] == "Tata A" and c2["content"] == "On it"
     assert decision["decision"] == "changes_requested" and decision["comment"] == "Please fix both" and decision["by"] == "Tata A"
-    assert c1["author"]["full_name"] == "Tata A" and c2["content"] == "On it" and resent["status"] == "pending"
     # the designer sees the very same conversation, and other organisations can't see it at all
     assert [i["kind"] for i in client.get(f"/api/tickets/{tid}/thread", headers=des).json()] == [i["kind"] for i in thread]
     assert client.get(f"/api/tickets/{tid}/thread", headers=auth(client, "b@acme.com")).status_code == 404

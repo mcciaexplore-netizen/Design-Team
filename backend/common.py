@@ -60,13 +60,13 @@ def track_waiting(ticket: models.Ticket, old: models.TicketStatus, new: models.T
         ticket.paused_at = None
 
 
-def assign_to_last_submitter(db: Session, ticket: models.Ticket) -> Optional[models.User]:
-    """Route rework to whoever submitted the latest proof. Returns the user if the assignee changed. Caller commits."""
-    proof = db.query(models.ProofVersion).filter(models.ProofVersion.ticket_id == ticket.id)         .order_by(models.ProofVersion.version.desc()).first()
+def last_proof_submitter(db: Session, ticket: models.Ticket) -> Optional[models.User]:
+    """Whoever submitted the latest proof, if they are still an active member of the team."""
+    proof = db.query(models.ProofVersion).filter(models.ProofVersion.ticket_id == ticket.id) \
+        .order_by(models.ProofVersion.version.desc()).first()
     user = db.query(models.User).filter(models.User.id == proof.created_by_id).first() if proof else None
-    if not user or not user.is_active or user.role == models.RoleEnum.REQUESTER or ticket.assignee_id == user.id:
+    if not user or not user.is_active or user.role == models.RoleEnum.REQUESTER:
         return None
-    ticket.assignee_id = user.id
     return user
 
 

@@ -153,9 +153,12 @@ def test_request_changes_requires_comment_and_reopens_work(client):
     assert decide(client, token, "request_changes").status_code == 422
     assert decide(client, token, "request_changes", comment="   ").status_code == 422
     assert client.get(f"/api/public/review/{token}").json()["status"] == "pending"   # failed attempts don't consume the link
-    assert decide(client, token, "request_changes", comment="Make the logo bigger").status_code == 200
-    ticket = [x for x in client.get("/api/tickets", headers=auth(client, "lead@x.com")).json() if x["id"] == t["id"]][0]
-    assert ticket["status"] == "In Progress" and ticket["revision_count"] == 1
+    done = decide(client, token, "request_changes", comment="Make the logo bigger")
+    assert done.status_code == 200 and done.json()["new_ticket"]["ticket_number"].endswith("-V2")
+    tickets = {x["id"]: x for x in client.get("/api/tickets", headers=auth(client, "lead@x.com")).json()}
+    ticket, v2 = tickets[t["id"]], tickets[done.json()["new_ticket"]["id"]]
+    assert ticket["status"] == "Revision Requested" and ticket["is_locked"]          # V1 is finished...
+    assert v2["status"] == "Assigned" and v2["parent_id"] == t["id"] and v2["reason_for_change"] == "Make the logo bigger"   # ...V2 carries on
     listing = client.get(f"/api/tickets/{t['id']}/approval-requests", headers=auth(client, "des@x.com")).json()[0]
     assert listing["status"] == "changes_requested" and listing["decision_comment"] == "Make the logo bigger" and listing["decided_by_name"] == "Rhea"
     assert any("requested changes" in n for n in lead_notes())

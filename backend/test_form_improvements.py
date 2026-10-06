@@ -3,6 +3,7 @@ import datetime
 import json
 
 import models
+import request_form
 from test_auth import TestingSessionLocal, auth, client  # noqa: F401
 from test_workflow_features import PNG, clear_hits, form, isolated  # noqa: F401
 
@@ -25,7 +26,7 @@ def test_options_list_questions_and_limits(client):
     o = client.get("/api/public/request-form").json()
     assert o["max_files"] == 5 and o["max_reference_links"] == 5
     assert set(o["questions"]) == set(o["design_requirements"]) and o["questions"]["Other"] == []
-    size = next(q for q in o["questions"]["Flyer (Email/Whatsapp)"] if q["id"] == "size")
+    size = next(q for q in o["questions"]["Flyer (Email / Print)"] if q["id"] == "size")
     assert size["type"] == "select" and size["required"] and "A4" in size["options"]
 
 
@@ -33,22 +34,24 @@ def test_required_per_type_answers_are_enforced_and_stored(client):
     assert post(client, details="").status_code == 422
     assert post(client, details=json.dumps({"size": "A9", "channel": "Email"})).status_code == 422
     assert post(client, details="not json").status_code == 422
-    answers = {"size": "Custom", "custom_size": "10x10 cm", "channel": "WhatsApp", "ignored": "x"}
+    answers = {"size": "Custom", "custom_size": "10x10 cm", "channel": "Print", "ignored": "x"}
     r = post(client, details=json.dumps(answers), content="Blue theme")
     assert r.status_code == 201, r.text
     t = ticket(r.json()["ticket_number"])
-    assert t.type_specific_fields["details"] == {"size": "Custom", "custom_size": "10x10 cm", "channel": "WhatsApp"}
+    assert t.type_specific_fields["details"] == {"size": "Custom", "custom_size": "10x10 cm", "channel": "Print"}
     assert t.type_specific_fields["content"] == "Blue theme"
-    assert "Size: Custom" in t.brief and "Where will it be shared?: WhatsApp" in t.brief
+    assert "Size: Custom" in t.brief and "Where will it be shared?: Print" in t.brief
 
 
-def test_multiselect_and_number_questions(client):
-    social = "Social Media Post (Insta, LinkedIn, Twitter)"
-    assert post(client, design_requirement=social, details=json.dumps({"platforms": []})).status_code == 422
-    assert post(client, design_requirement=social, details=json.dumps({"platforms": ["MySpace"]})).status_code == 422
-    r = post(client, design_requirement=social, details=json.dumps({"platforms": ["Instagram", "LinkedIn"]}))
+def test_multiselect_and_number_questions(client, monkeypatch):
+    # No built-in choice uses a multi-select today, so exercise that question type with a temporary one.
+    monkeypatch.setitem(request_form.QUESTIONS, "Other", [request_form._q("tags", "Tags", "multiselect", ["a", "b"], required=True)])
+    other = {"design_requirement": "Other", "other_details": "A mascot"}
+    assert post(client, **other, details=json.dumps({"tags": []})).status_code == 422
+    assert post(client, **other, details=json.dumps({"tags": ["zzz"]})).status_code == 422
+    r = post(client, **other, details=json.dumps({"tags": ["a", "b"]}))
     assert r.status_code == 201
-    assert ticket(r.json()["ticket_number"]).type_specific_fields["details"]["platforms"] == ["Instagram", "LinkedIn"]
+    assert ticket(r.json()["ticket_number"]).type_specific_fields["details"]["tags"] == ["a", "b"]
     slides = "Digital Backdrop & Slides"
     assert post(client, design_requirement=slides, details=json.dumps({"slides": "abc", "aspect_ratio": "16:9"})).status_code == 422
     r = post(client, design_requirement=slides, details=json.dumps({"slides": "12", "aspect_ratio": "16:9"}))
@@ -116,3 +119,39 @@ def test_portal_request_stores_details_and_links(client):
     db.close()
     missing = dict(data, details=json.dumps({"medium": "Print"}))
     assert client.post("/api/requests", data=missing, headers=auth(client, "a@tata.com")).status_code == 422
+
+
+# ── One choice per channel ───────────────────────────────────────────────────
+
+def test_whatsapp_instagram_and_linkedin_are_separate_choices_with_their_own_questions(client):
+    o = client.get("/api/public/request-form").json()
+    choices = o["design_requirements"]
+    for name in ("Flyer (Email / Print)", "WhatsApp creative", "Instagram post", "LinkedIn post", "Twitter / X post"):
+        assert name in choices
+    assert "Flyer (Email/Whatsapp)" not in choices and not any("Insta, LinkedIn" in c for c in choices)   # no more bundles
+    formats = {c: next(q for q in o["questions"][c] if q["id"] == "format")["options"] for c in ("WhatsApp creative", "Instagram post", "LinkedIn post")}
+    assert "Status (9:16)" in formats["WhatsApp creative"] and "Carousel" in formats["Instagram post"] and "Page banner (4:1)" in formats["LinkedIn post"]
+    assert len({tuple(v) for v in formats.values()}) == 3                    # genuinely different questions
+
+
+def test_each_channel_creates_its_own_design_type(client):
+    seen = {}
+    for choice, details in (("WhatsApp creative", {"format": "Status (9:16)"}), ("Instagram post", {"format": "Carousel"}),
+                            ("LinkedIn post", {"format": "Single image (1:1)"})):
+        clear_hits()
+        r = post(client, design_requirement=choice, details=json.dumps(details))
+        assert r.status_code == 201, (choice, r.text)
+        t = ticket(r.json()["ticket_number"])
+        db = TestingSessionLocal()
+        seen[choice] = db.query(models.DesignType).filter_by(id=t.design_type_id).one().name
+        db.close()
+        assert t.title.endswith(choice) and t.type_specific_fields["details"] == details
+    assert seen == {"WhatsApp creative": "WhatsApp Creative", "Instagram post": "Instagram Post", "LinkedIn post": "LinkedIn Post"}
+
+
+def test_a_choice_must_match_its_own_questions_and_old_bundled_names_are_rejected(client):
+    assert post(client, design_requirement="Instagram post", details=json.dumps({})).status_code == 422                     # format is required
+    assert post(client, design_requirement="Instagram post", details=json.dumps({"format": "Status (9:16)"})).status_code == 422   # a WhatsApp format
+    assert post(client, design_requirement="Flyer (Email / Print)", details=json.dumps({"size": "A4", "channel": "WhatsApp"})).status_code == 422
+    assert post(client, design_requirement="Flyer (Email/Whatsapp)").status_code == 422
+    assert post(client, design_requirement="Social Media Post (Insta, LinkedIn, Twitter)").status_code == 422

@@ -30,28 +30,38 @@ test('the designer uploads once; the client is notified, reviews in the portal, 
   await clientPage.getByRole('tab', { name: 'Proofs & approval' }).click();
   await expect(clientPage.getByText('Your review is needed')).toBeVisible();
 
-  // ...and replies with changes.
+  // ...and replies with changes. That opens the next version, V2, as a new ticket.
   await clientPage.getByRole('button', { name: 'Request changes' }).first().click();
   await clientPage.getByLabel('What should we change?').fill('Please make the headline bigger');
   await clientPage.getByRole('button', { name: 'Send feedback' }).click();
   await expect(clientPage.getByText('your feedback was sent')).toBeVisible();
+  const v2Link = clientPage.getByRole('link', { name: /-V2$/ });
+  await expect(v2Link).toBeVisible();
+  await v2Link.click();
+  await expect(clientPage).toHaveURL(/\/tickets\/\d+$/);
+  const v2Id = Number(clientPage.url().split('/').pop());
+  expect(v2Id).not.toBe(ticket.id);
 
-  // Designer: the work is back with them; the new upload goes out automatically and the client hears about it.
-  await page.reload();
+  // Designer: V2 is theirs; the upload goes out automatically and the client hears about it.
+  await page.goto(`/tickets/${v2Id}`);
   await page.getByRole('tab', { name: 'Proofs & approval' }).click();
   await page.getByLabel('Choose proof file').setInputFiles({ name: 'poster-v2.png', mimeType: 'image/png', buffer: PNG });
-  await expect(page.getByRole('status').first()).toContainText('Version 2 was sent to the client');
+  await expect(page.getByRole('status').first()).toContainText('was sent to the client');
 
   await clientPage.reload();
   await clientPage.getByRole('button', { name: /^Notifications/ }).click();
-  await expect(clientPage.getByRole('dialog', { name: 'Notifications' }).getByText(/finished the changes.*version 2/).first()).toBeVisible();
+  await expect(clientPage.getByRole('dialog', { name: 'Notifications' }).getByText(/sent a design for your review.*-V2/).first()).toBeVisible();
   await clientPage.keyboard.press('Escape');
   await clientPage.getByRole('tab', { name: 'Proofs & approval' }).click();
+  await expect(clientPage.getByRole('heading', { name: /^Changes requested on DF-/ })).toBeVisible();   // V1's feedback travels with V2
   await clientPage.getByRole('button', { name: 'Approve' }).first().click();
   await clientPage.getByRole('button', { name: 'Confirm approval' }).click();
   await expect(clientPage.getByText('the design is approved')).toBeVisible();
 
   const lead = await token(request, ACCOUNTS.lead);
   const after = await (await request.get(`${API}/api/tickets`, { headers: { Authorization: `Bearer ${lead}` } })).json();
-  expect(after.find((t: { id: number }) => t.id === ticket.id).status).toBe('Delivered');
+  const byId = (id: number) => after.find((t: { id: number }) => t.id === id);
+  expect(byId(v2Id).status).toBe('Delivered');
+  expect(byId(v2Id).parent_id).toBe(ticket.id);
+  expect(byId(ticket.id).status).toBe('Revision Requested');   // V1 is finished; V2 carried the work on
 });

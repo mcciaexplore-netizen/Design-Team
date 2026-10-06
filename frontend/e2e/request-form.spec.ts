@@ -5,7 +5,7 @@ import { ACCOUNTS, API, dateInDays, login, token } from './helpers';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
 const png = (name: string) => ({ name, mimeType: 'image/png', buffer: PNG });
 
-const FLYER = 'Flyer (Email/Whatsapp)';
+const FLYER = 'Flyer (Email / Print)';
 const radio = (root: Pick<Page, 'getByRole'>, name: string) => root.getByRole('radio', { name, exact: true });
 
 test('anyone can submit the public request form, get a ticket and follow it on the tracking page', async ({ page, request }) => {
@@ -24,7 +24,7 @@ test('anyone can submit the public request form, get a ticket and follow it on t
   await radio(page, FLYER).check();
   await expect(page.getByLabel('Please specify the design requirement *')).toHaveCount(0);
   await page.getByLabel('Size *', { exact: true }).selectOption('A5');
-  await page.getByLabel('Where will it be shared? *').selectOption('WhatsApp');
+  await page.getByLabel('Where will it be shared? *').selectOption('Print');
 
   await page.getByLabel('No. of creatives required').fill('2');
   await page.getByLabel('Share content for the design creatives').fill('Use the blue brand theme.');
@@ -52,7 +52,7 @@ test('anyone can submit the public request form, get a ticket and follow it on t
   expect(t.priority).toBe('Urgent');
   expect(t.status).toBe('Assigned');
   expect(t.assignee).not.toBeNull();
-  expect(t.type_specific_fields.details).toEqual({ size: 'A5', channel: 'WhatsApp' });
+  expect(t.type_specific_fields.details).toEqual({ size: 'A5', channel: 'Print' });
   expect(t.type_specific_fields.reference_links).toEqual(['https://www.canva.com/design/e2e']);
   expect(t.brief).toContain('Size: A5');
   const atts = await (await request.get(`${API}/api/tickets/${t.id}/attachments`, { headers })).json();
@@ -109,10 +109,24 @@ test('each design type asks its own questions', async ({ page }) => {
   await expect(page.getByLabel('Size *', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Where will it be shared? *')).toBeVisible();
 
-  await radio(page, 'Social Media Post (Insta, LinkedIn, Twitter)').check();
+  // WhatsApp, Instagram and LinkedIn are separate choices, each with its own formats.
+  await radio(page, 'WhatsApp creative').check();
   await expect(page.getByLabel('Where will it be shared? *')).toHaveCount(0);
-  await expect(page.getByRole('checkbox', { name: 'Instagram' })).toBeVisible();
-  await expect(page.getByRole('checkbox', { name: 'LinkedIn' })).toBeVisible();
+  await expect(page.getByLabel('Format *').locator('option', { hasText: 'Status (9:16)' })).toHaveCount(1);
+  await expect(page.getByLabel('Message or call-to-action to show on it')).toBeVisible();
+
+  await radio(page, 'Instagram post').check();
+  await expect(page.getByLabel('Format *').locator('option', { hasText: 'Carousel' })).toHaveCount(1);
+  await expect(page.getByLabel('Number of slides (for a carousel)')).toBeVisible();
+  await expect(page.getByLabel('Message or call-to-action to show on it')).toHaveCount(0);
+
+  await radio(page, 'LinkedIn post').check();
+  await expect(page.getByLabel('Format *').locator('option', { hasText: 'Page banner (4:1)' })).toHaveCount(1);
+  await expect(page.getByLabel('Format *').locator('option', { hasText: 'Reel cover' })).toHaveCount(0);
+
+  await radio(page, 'Twitter / X post').check();
+  await expect(page.getByLabel('Format *').locator('option', { hasText: 'Header banner (3:1)' })).toHaveCount(1);
+  await expect(page.getByRole('radio', { name: /Insta, LinkedIn/ })).toHaveCount(0);   // the old bundled choice is gone
 
   await radio(page, 'Flex/Banner/Standee').check();
   await expect(page.getByLabel('Size (width x height) *')).toBeVisible();
@@ -288,4 +302,33 @@ test('a finished request can be requested again from the portal and from the tic
   await page.goto(`/tickets/${id}`);
   await page.getByRole('button', { name: 'Request again' }).click();
   await expectPrefilled();
+});
+
+test('"Request again" on a ticket made before the channels were split lands on the right new choice', async ({ page, request }) => {
+  const client = await token(request, ACCOUNTS.client);
+  const lead = await token(request, ACCOUNTS.lead);
+  const types = await (await request.get(`${API}/api/design-types`, { headers: { Authorization: `Bearer ${client}` } })).json();
+  const old = async (title: string, design_requirement: string, details: object) => {
+    const made = await (await request.post(`${API}/api/tickets`, {
+      headers: { Authorization: `Bearer ${client}` },
+      data: { title, brief: 'older ticket', design_type_id: types[0].id,
+              type_specific_fields: { event_name: title, design_requirement, number_of_creatives: 1, details } },
+    })).json();
+    await request.patch(`${API}/api/tickets/${made.id}`, { headers: { Authorization: `Bearer ${lead}` }, data: { status: 'Delivered' } });
+  };
+  await old('Legacy WhatsApp flyer', 'Flyer (Email/Whatsapp)', { size: 'A4', channel: 'WhatsApp' });
+  await old('Legacy email flyer', 'Flyer (Email/Whatsapp)', { size: 'A5', channel: 'Email' });
+  await old('Legacy LinkedIn post', 'Social Media Post (Insta, LinkedIn, Twitter)', { platforms: ['LinkedIn', 'Instagram'] });
+
+  await login(page, ACCOUNTS.client);
+  await page.getByRole('button', { name: 'Completed' }).click();
+  const dialog = page.getByRole('dialog');
+  const again = async (title: string, requirement: string) => {
+    await page.getByRole('button', { name: new RegExp(`^Request again: ${title}`) }).click();
+    await expect(radio(page, requirement)).toBeChecked();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+  };
+  await again('Legacy WhatsApp flyer', 'WhatsApp creative');
+  await again('Legacy email flyer', FLYER);
+  await again('Legacy LinkedIn post', 'LinkedIn post');
 });

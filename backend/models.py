@@ -25,7 +25,7 @@ class TicketStatus(str, enum.Enum):
     DELIVERED = "Delivered"
     CLOSED = "Closed"
     CLOSED_WITHOUT_APPROVAL = "Closed without approval"
-    REVISION_REQUESTED = "Revision Requested" # Superseded by a newer versioned ticket after the client asked for changes
+    REVISION_REQUESTED = "Revision Requested" # No longer assigned: changes now reopen the same ticket. Kept for older rows.
 
 # Replaces hardcoded TicketStatus enum for custom pipelines
 class WorkflowStage(Base):

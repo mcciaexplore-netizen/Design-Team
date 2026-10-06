@@ -28,8 +28,11 @@ IST = pytz.timezone("Asia/Kolkata")
 
 # Form choice -> (design type name, SLA hours, effort hours). Missing design types are created on first use.
 REQUIREMENTS = {
-    "Flyer (Email/Whatsapp)": ("Flyer", 24, 3),
-    "Social Media Post (Insta, LinkedIn, Twitter)": ("Social Post", 48, 3),
+    "Flyer (Email / Print)": ("Flyer", 24, 3),
+    "WhatsApp creative": ("WhatsApp Creative", 24, 2),
+    "Instagram post": ("Instagram Post", 48, 3),
+    "LinkedIn post": ("LinkedIn Post", 48, 3),
+    "Twitter / X post": ("Twitter / X Post", 48, 2),
     "Flex/Banner/Standee": ("Banner", 24, 4),
     "Digital Backdrop & Slides": ("Digital Backdrop & Slides", 48, 6),
     "Directory": ("Directory", 96, 16),
@@ -52,14 +55,28 @@ def _q(id: str, label: str, type: str = "text", options: Optional[list] = None, 
 # Extra questions per design requirement. The form renders whatever is listed here, and answers are stored
 # in type_specific_fields["details"] by question id. type is "text", "select", "multiselect" or "number".
 QUESTIONS = {
-    "Flyer (Email/Whatsapp)": [
+    "Flyer (Email / Print)": [
         _q("size", "Size", "select", ["A4", "A5", "Square", "Custom"], required=True),
         _q("custom_size", "Custom size (if Custom)"),
-        _q("channel", "Where will it be shared?", "select", ["Email", "WhatsApp", "Print"], required=True),
+        _q("channel", "Where will it be shared?", "select", ["Email", "Print"], required=True),
     ],
-    "Social Media Post (Insta, LinkedIn, Twitter)": [
-        _q("platforms", "Platforms", "multiselect", ["Instagram", "LinkedIn", "Twitter"], required=True),
-        _q("size", "Size", "select", ["Square (1:1)", "Portrait (4:5)", "Landscape (16:9)", "Story (9:16)"]),
+    "WhatsApp creative": [
+        _q("format", "Format", "select", ["Message image (1:1)", "Status (9:16)", "Broadcast banner (16:9)"], required=True),
+        _q("message", "Message or call-to-action to show on it"),
+        _q("language", "Language"),
+    ],
+    "Instagram post": [
+        _q("format", "Format", "select", ["Feed post (1:1)", "Portrait post (4:5)", "Story (9:16)", "Reel cover (9:16)", "Carousel"], required=True),
+        _q("slides", "Number of slides (for a carousel)", "number"),
+        _q("tag", "Account or people to tag"),
+    ],
+    "LinkedIn post": [
+        _q("format", "Format", "select", ["Single image (1:1)", "Landscape image (1.91:1)", "Carousel (PDF)", "Page banner (4:1)", "Event banner"], required=True),
+        _q("slides", "Number of slides (for a carousel)", "number"),
+        _q("tag", "Page or people to tag"),
+    ],
+    "Twitter / X post": [
+        _q("format", "Format", "select", ["Image (16:9)", "Square image (1:1)", "Header banner (3:1)"], required=True),
     ],
     "Flex/Banner/Standee": [
         _q("size", "Size (width x height)", required=True),

@@ -40,45 +40,33 @@ def db():
     db.close()
     Base.metadata.drop_all(bind=engine)
 
-def test_free_revision_counts(db):
-    ticket = db.query(Ticket).filter_by(ticket_number="DF-0001").first()
-    
-    # First revision (allowed)
-    request_changes(db, ticket)
-    assert ticket.status == TicketStatus.IN_PROGRESS
-    assert ticket.revision_count == 1
-    
-    # Simulate delivery again
-    ticket.status = TicketStatus.DELIVERED
+def test_changes_open_the_next_version_and_close_the_old_one(db):
+    v1 = db.query(Ticket).filter_by(ticket_number="DF-0001").first()
+    v2 = request_changes(db, v1, reason="Make it bluer")
     db.commit()
-    
-    # Second revision (allowed)
-    request_changes(db, ticket)
-    assert ticket.status == TicketStatus.IN_PROGRESS
-    assert ticket.revision_count == 2
-    
-    # Simulate delivery again
-    ticket.status = TicketStatus.DELIVERED
-    db.commit()
-    
-    # Third revision (NOT allowed, must spawn child)
-    new_ticket = request_changes(db, ticket, reason="Missed the mark")
-    
-    assert new_ticket.id != ticket.id
-    assert new_ticket.parent_id == ticket.id
-    assert new_ticket.ticket_number == "DF-0001-v2"
-    assert new_ticket.version_number == 2
-    assert new_ticket.reason_for_change == "Missed the mark"
-    assert new_ticket.status == TicketStatus.NEW
 
-def test_locked_ticket_forces_child(db):
-    ticket = db.query(Ticket).filter_by(ticket_number="DF-0001").first()
-    ticket.is_locked = True
-    db.commit()
-    
-    # Even with 0 revisions, locked forces a child duplicate
-    new_ticket = request_changes(db, ticket, reason="New campaign phase")
-    
-    assert new_ticket.id != ticket.id
-    assert new_ticket.parent_id == ticket.id
-    assert new_ticket.ticket_number == "DF-0001-v2"
+    assert v2.id != v1.id and v2.parent_id == v1.id
+    assert v2.ticket_number == "DF-0001-V2" and v2.version_number == 2
+    assert v2.reason_for_change == "Make it bluer" and v2.title == v1.title and v2.status == TicketStatus.NEW
+    assert v2.due_at is not None
+    assert v1.status == TicketStatus.REVISION_REQUESTED and v1.is_locked      # V1 is finished; V2 carries on
+
+    v3 = request_changes(db, v2, reason="Again")
+    assert v3.ticket_number == "DF-0001-V3" and v3.parent_id == v2.id          # the number grows, it doesn't pile up suffixes
+
+
+def test_versions_past_the_free_allowance_are_tagged(db):
+    v = db.query(Ticket).filter_by(ticket_number="DF-0001").first()
+    seen = []
+    for _ in range(4):                                       # V2, V3, V4, V5 with two free revisions
+        v = request_changes(db, v)
+        seen.append((v.ticket_number, "Extra revision" in (v.tags or [])))
+    assert seen == [("DF-0001-V2", False), ("DF-0001-V3", False), ("DF-0001-V4", True), ("DF-0001-V5", True)]
+
+
+def test_a_closed_version_cannot_be_changed_again(db):
+    v1 = db.query(Ticket).filter_by(ticket_number="DF-0001").first()
+    request_changes(db, v1)
+    with pytest.raises(ValueError):
+        request_changes(db, v1, reason="Second try on the same version")
+    assert db.query(Ticket).count() == 2

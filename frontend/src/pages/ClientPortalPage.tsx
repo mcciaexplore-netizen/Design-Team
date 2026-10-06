@@ -19,6 +19,7 @@ const CLIENT_STATUS: Record<string, string> = {
   'Waiting on Requester': 'We need your input',
   'In Review': 'Needs your review',
   'Delivered': 'Delivered',
+  'Revision Requested': 'Changes requested',
 };
 
 const STEPS = ['Received', 'Assigned', 'In progress', 'In review', 'Delivered'];
@@ -31,6 +32,7 @@ const DAY = 86_400_000;
 
 /** "Due Thu 8 Oct · in 2 days", or a red "Overdue" once it has passed. */
 function dueLine(due: string, status: string): { text: string; tone: 'ok' | 'soon' | 'late' | 'done' | 'none' } {
+  if (status === 'Revision Requested') return { text: 'Changes requested: the work continues in a new version', tone: 'done' };
   if (DONE.includes(status)) return { text: status === 'Delivered' ? 'Delivered' : status, tone: 'done' };
   if (!due) return { text: 'Date to be confirmed', tone: 'none' };
   const d = new Date(due);
@@ -203,6 +205,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
             const done = DONE.includes(ticket.status);
             const open = openId === ticket.id;
             const note = accent(ticket);
+            const next = tickets.find(t => t.parent_id === ticket.id);   // the version that took over, if changes were requested
             const due = dueLine(ticket.due_at, ticket.status);
             return (
               <article key={ticket.id} aria-label={`${ticket.number} ${ticket.title}`} className="glass-card animate-fade-in-up"
@@ -235,7 +238,12 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
                         {ticket.status === 'In Review' ? <Eye size={14} aria-hidden="true" /> : <MessageSquare size={14} aria-hidden="true" />} {ticket.status === 'In Review' ? 'Review design' : 'Reply to the team'}
                       </button>
                     )}
-                    {done && (
+                    {next && (
+                      <Link to={`/tickets/${next.id}`} className="btn-primary" style={{ gap: 6, textDecoration: 'none' }}>
+                        Open {next.number}
+                      </Link>
+                    )}
+                    {done && !next && (
                       <button type="button" className="btn-ghost" aria-label={`Request again: ${ticket.title}`} onClick={() => openNewRequest(prefillFromTicket(ticket))} style={{ gap: 6 }}>
                         <RotateCcw size={13} aria-hidden="true" /> Request again
                       </button>

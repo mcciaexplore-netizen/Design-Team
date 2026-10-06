@@ -184,6 +184,18 @@ function isBlank(v: RequestValues): boolean {
     && Object.values(v.details).every(a => (Array.isArray(a) ? a.length === 0 : !a)) && v.links.every(l => !l);
 }
 
+/** Tickets made before the channels were split carry the old bundled names; map them to today's choices. */
+function currentRequirement(old: string, details: Record<string, string | string[]>): { requirement: string; details: Record<string, string | string[]> } {
+  if (old === 'Flyer (Email/Whatsapp)') {
+    return details.channel === 'WhatsApp' ? { requirement: 'WhatsApp creative', details: {} } : { requirement: 'Flyer (Email / Print)', details };
+  }
+  if (old === 'Social Media Post (Insta, LinkedIn, Twitter)') {
+    const first = Array.isArray(details.platforms) ? details.platforms[0] : '';
+    return { requirement: first === 'LinkedIn' ? 'LinkedIn post' : first === 'Twitter' ? 'Twitter / X post' : 'Instagram post', details: {} };
+  }
+  return { requirement: old, details };
+}
+
 /** Answers for "Request again": the earlier request's content, without its dates. */
 export function prefillFromTicket(t: Ticket): RequestPrefill {
   const f = t.type_specific_fields ?? {};
@@ -194,9 +206,10 @@ export function prefillFromTicket(t: Ticket): RequestPrefill {
   for (const [k, v] of Object.entries((f.details && typeof f.details === 'object' ? f.details : {}) as Record<string, unknown>)) {
     details[k] = Array.isArray(v) ? v.map(String) : String(v);
   }
+  const now = currentRequirement(text(f.design_requirement), details);
   return {
-    event_name: text(f.event_name), design_requirement: text(f.design_requirement), other_details: text(f.other_details),
-    num_creatives: String(f.number_of_creatives ?? 1), content: notes, details,
+    event_name: text(f.event_name), design_requirement: now.requirement, other_details: text(f.other_details),
+    num_creatives: String(f.number_of_creatives ?? 1), content: notes, details: now.details,
     links: Array.isArray(f.reference_links) ? f.reference_links.map(String) : [],
   };
 }
