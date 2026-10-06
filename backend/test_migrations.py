@@ -54,3 +54,29 @@ def test_postgres_ddl_generates_without_a_server():
 ])
 def test_database_url_normalisation(given, expected):
     assert _normalise(given) == expected
+
+
+def test_repair_migration_fixes_a_pre_migration_database(sqlite_url):
+    """A database built by the old create_all() had audit_logs.changed_by_id NOT NULL; logging an action with no user
+    (public form, review link, Jira) then crashed. `upgrade head` repairs it."""
+    import sqlite3
+    assert alembic("upgrade", "0005", db_url=sqlite_url).returncode == 0
+    path = sqlite_url.replace("sqlite:///", "")
+    con = sqlite3.connect(path)
+    con.executescript("""
+        ALTER TABLE audit_logs RENAME TO audit_logs_new;
+        CREATE TABLE audit_logs (id INTEGER NOT NULL PRIMARY KEY, ticket_id INTEGER NOT NULL, changed_by_id INTEGER NOT NULL,
+            actor_label VARCHAR, action VARCHAR NOT NULL, details JSON NOT NULL, timestamp DATETIME DEFAULT (CURRENT_TIMESTAMP));
+        DROP TABLE audit_logs_new;
+        DROP INDEX IF EXISTS ix_users_client_org;
+    """)
+    con.commit()
+    assert [c[3] for c in con.execute("PRAGMA table_info(audit_logs)") if c[1] == "changed_by_id"] == [1]   # NOT NULL
+    con.close()
+
+    assert alembic("upgrade", "head", db_url=sqlite_url).returncode == 0
+    con = sqlite3.connect(path)
+    assert [c[3] for c in con.execute("PRAGMA table_info(audit_logs)") if c[1] == "changed_by_id"] == [0]   # nullable now
+    assert any(r[1] == "ix_users_client_org" for r in con.execute("PRAGMA index_list(users)"))
+    con.execute("INSERT INTO audit_logs (ticket_id, changed_by_id, action, details) VALUES (1, NULL, 'x', '{}')")
+    con.close()

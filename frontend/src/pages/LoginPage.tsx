@@ -253,6 +253,10 @@ const LoginPage: React.FC = () => {
             </button>
           </p>
 
+          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-soft)', marginTop: '0.75rem' }}>
+            Need a design but don't have an account? <a className="login-link-btn" href="/request">Submit a request</a>
+          </p>
+
           <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-hint)', marginTop: '1.5rem', lineHeight: 1.6 }}>
             Protected by MCCIA Applied AI Studio.
           </p>

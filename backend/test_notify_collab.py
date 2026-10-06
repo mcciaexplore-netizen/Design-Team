@@ -83,7 +83,8 @@ def test_new_ticket_notifies_leads_and_posts_to_slack_when_enabled(client, monke
     client.put("/api/settings/integrations", json={"slack_webhook": SLACK_URL}, headers=auth(client, "lead@x.com"))
     make_ticket(client, "a@tata.com", "Poster <!channel> & more")
     assert any("Poster" in n for n in notes_for("lead@x.com"))
-    assert notes_for("des@x.com") == []  # designers are not told about every new ticket
+    # designers are not told about every new ticket, only the one the system assigns to them
+    assert notes_for("des@x.com") == ["DF-0001 — Poster <!channel> & more was assigned to you"]
     text = calls[-1][1]["text"]
     assert "&lt;!channel&gt;" in text and "<!channel>" not in text  # user text can't ping the channel
 
@@ -107,9 +108,10 @@ def test_preferences_roundtrip_and_validation(client):
 
 
 def test_muted_event_and_disabled_in_app_suppress_notifications(client):
-    t = make_ticket(client, "a@tata.com")
     lead, des = auth(client, "lead@x.com"), auth(client, "des@x.com")
     client.put("/api/me/preferences", json={"muted_events": ["ticket_assigned"]}, headers=des)
+    t = make_ticket(client, "a@tata.com")  # auto-assigned to the designer, who has muted assignments
+    assert notes_for("des@x.com") == []
     client.patch(f"/api/tickets/{t['id']}", json={"assignee_id": 2}, headers=lead)
     assert notes_for("des@x.com") == []
     client.put("/api/me/preferences", json={"muted_events": [], "in_app_enabled": False}, headers=des)

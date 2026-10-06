@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
+import { DONE_STATUSES } from '../types';
 import { AlertCircle, CheckCircle2, Clock, PauseCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
 import { PRIORITY_STYLE, type Ticket } from '../types';
 
-const DONE = ['Delivered', 'Closed', 'Closed without approval'];
+const DONE = DONE_STATUSES;
 const DAY = 86_400_000;
 const PRIORITY_RANK: Record<string, number> = { Urgent: 0, High: 1, Normal: 2, Low: 3 };
 

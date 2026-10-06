@@ -1,24 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, GitBranch, Tag, CheckSquare, Square } from 'lucide-react';
-import { STATUSES, PRIORITIES, PRIORITY_STYLE } from '../types';
+import { STATUSES, PRIORITIES, PRIORITY_STYLE, DONE_STATUSES } from '../types';
 import { apiJson } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
+import { useNewRequest } from '../contexts/NewRequestContext';
+import { prefillFromTicket } from '../requestForm';
 import AuditTrail from '../components/AuditTrail';
 import CommentsPanel from '../components/CommentsPanel';
 import AnnotatePanel from '../components/AnnotatePanel';
 import FigmaEmbed from '../components/FigmaEmbed';
 import ProofApprovalPanel from '../components/ProofApprovalPanel';
+import CdrPanel from '../components/CdrPanel';
 import TimeTracker from '../components/TimeTracker';
 
-type TabKey = 'overview' | 'figma' | 'proofs' | 'annotate';
+type TabKey = 'overview' | 'figma' | 'proofs' | 'source' | 'annotate';
 
 const TicketDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { tickets, loading, updateTicket, toggleSubtask, refresh } = useTickets();
+  const { openNewRequest } = useNewRequest();
   const ticket = tickets.find(t => t.id === id);
   const isClient = user?.role === 'Client';
   const isLead = user?.role === 'Design Lead';
@@ -69,6 +73,7 @@ const TicketDetailPage: React.FC = () => {
   const TABS: { key: TabKey; label: string; hidden?: boolean }[] = [
     { key: 'overview', label: 'Overview & activity' },
     { key: 'proofs',   label: 'Proofs & approval' },
+    { key: 'source',   label: 'Source files' },
     { key: 'figma',    label: 'Figma' },
     { key: 'annotate', label: 'Annotate', hidden: isClient },
   ];
@@ -116,6 +121,9 @@ const TicketDetailPage: React.FC = () => {
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <span className="badge-blue" style={ps}>{ticket.priority}</span>
             <span className="badge-blue">{ticket.status}</span>
+            {isClient && DONE_STATUSES.includes(ticket.status) && (
+              <button type="button" className="btn-ghost" onClick={() => openNewRequest(prefillFromTicket(ticket))}>Request again</button>
+            )}
           </div>
         </div>
       </div>
@@ -157,6 +165,8 @@ const TicketDetailPage: React.FC = () => {
           )}
 
           {activeTab === 'proofs' && <ProofApprovalPanel ticket={ticket} />}
+
+          {activeTab === 'source' && <CdrPanel ticket={ticket} />}
 
           {activeTab === 'figma' && (
             <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: 10 }}>

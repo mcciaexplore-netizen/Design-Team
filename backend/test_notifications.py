@@ -65,3 +65,19 @@ def test_escalation_ladder(db):
     logs = db.query(NotificationLog).all()
     events = [l.event_type for l in logs]
     assert "OVERDUE_ADMIN" in events
+
+
+def test_muting_sla_alerts_silences_scheduled_warnings(db):
+    ticket = db.query(Ticket).first()
+    designer = db.query(User).filter_by(role=RoleEnum.DESIGNER).first()
+    db.add(UserPreference(user_id=designer.id, in_app_enabled=True, muted_events=["sla_breach"]))
+    db.commit()
+
+    assert notify_user(db, designer, "Due in <6 hrs", "6_HR_WARNING", ticket.id) is True
+    handle_overdue_escalations(db, ticket, working_hours_overdue=1)
+    assert db.query(Notification).filter_by(user_id=designer.id).count() == 0  # nothing delivered
+    assert db.query(NotificationLog).count() == 2  # but logged, so the cron does not retry
+
+    # Other events still come through for the same user
+    notify_user(db, designer, "Auto-closed", "TICKET_AUTO_CLOSED", ticket.id)
+    assert db.query(Notification).filter_by(user_id=designer.id).count() == 1

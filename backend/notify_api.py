@@ -141,7 +141,7 @@ def list_notifications(unread_only: bool = False, limit: int = 50, db: Session =
         models.Notification.user_id == user.id, models.Notification.is_read == False).count()
     return {
         "unread": unread,
-        "items": [{"id": n.id, "content": n.content, "type": n.type, "is_read": n.is_read,
+        "items": [{"id": n.id, "content": n.content, "type": n.type, "ticket_id": n.ticket_id, "is_read": n.is_read,
                    "created_at": as_utc(n.created_at).isoformat() if n.created_at else None} for n in rows],
     }
 

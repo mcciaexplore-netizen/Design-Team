@@ -24,7 +24,8 @@
    alembic upgrade head      # creates the schema (SQLite by default; set DATABASE_URL for PostgreSQL)
    python seed.py
    uvicorn main:app --reload
-   pytest                    # optional: run the backend tests
+   pytest                    # optional: run the backend tests (~45 s)
+   pytest -n 4 --basetemp=.pytest_tmp   # in parallel (~30 s)
    ```
 
 3. **Frontend Setup (Native NPM)**
@@ -38,3 +39,12 @@
 ## Production Deployment (Render)
 This project is configured for 1-click deployment on Render. 
 Simply connect the repository to Render and it will automatically provision the Backend API and the React Static site based on the `render.yaml` blueprint. Make sure to populate the required environment variables in the Render dashboard and configure an external cron service (like cron-job.org) to ping `POST /internal/tick` every 5 minutes with the `X-Cron-Secret` header.
+
+## Browser tests
+`npm run test:e2e` (in `frontend/`) drives real Microsoft Edge through sign-in, the public request form, the client's
+request dialog and proof approval. It starts its own API and temporary database, so it never touches your data. Set
+`E2E_PYTHON` to the Python that has the backend requirements, e.g. `E2E_PYTHON=../.venv/Scripts/python.exe`.
+
+## Optional integrations
+Everything below is off until configured (see `.env.example`): Slack alerts (Settings > Integrations), Jira two-way sync
+(`JIRA_*`), confirmation and reminder email (`SMTP_*`) and a CAPTCHA on the public `/request` form (`TURNSTILE_*`).

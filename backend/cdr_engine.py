@@ -72,3 +72,19 @@ def generate_download_link(db: Session, request_id: int, user_id: int):
         
         return url
     return None
+
+
+def decline_cdr_request(db: Session, request_id: int, approver_id: int):
+    req = db.query(models.CdrRequest).filter_by(id=request_id).first()
+    if req and req.status == models.CdrRequestStatus.REQUESTED:
+        req.status = models.CdrRequestStatus.DECLINED
+        req.approver_id = approver_id
+        db.commit()
+        return req
+    return None
+
+
+def record_download(db: Session, req: models.CdrRequest, user_id: int) -> None:
+    """Audit one download. The file itself is streamed by the API, so no presigned link is involved."""
+    db.add(models.CdrDownloadLog(cdr_request_id=req.id, user_id=user_id))
+    db.commit()

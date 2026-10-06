@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { API_BASE, TOKEN_KEY } from '../api';
+import { API_BASE, TOKEN_KEY, apiJson } from '../api';
 
 /* ─── Types ───────────────────────────────── */
 export type UserRole = 'Design Lead' | 'Designer' | 'Client';
@@ -11,6 +11,7 @@ export interface AuthUser {
   role:   UserRole;
   initials: string;
   color:  string;
+  mustChangePassword: boolean;
 }
 
 interface AuthContextType {
@@ -20,6 +21,7 @@ interface AuthContextType {
   login:           (email: string, password: string) => Promise<void>;
   register:        (input: { fullName: string; email: string; company: string; password: string }) => Promise<void>;
   logout:          () => void;
+  changePassword:  (currentPassword: string, newPassword: string) => Promise<void>;
   error:           string | null;
 }
 
@@ -42,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const startSession = (data: { access_token: string; user: { id: number; full_name: string; email: string; role: string } }) => {
+  const startSession = (data: { access_token: string; user: { id: number; full_name: string; email: string; role: string; must_change_password?: boolean } }) => {
     const u = data.user;
     const role: UserRole = u.role === 'Design Lead' || u.role === 'Client' ? u.role : 'Designer';
     const authUser: AuthUser = {
@@ -52,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role,
       initials: u.full_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
       color:    role === 'Design Lead' ? '#18181b' : role === 'Client' ? '#f97316' : '#8B5CF6',
+      mustChangePassword: !!u.must_change_password,
     };
     localStorage.setItem(TOKEN_KEY, data.access_token);
     localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
@@ -110,6 +113,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    const data = await apiJson<Parameters<typeof startSession>[0]>('/api/auth/change-password', {
+      method: 'POST',
+      json: { current_password: currentPassword, new_password: newPassword },
+    });
+    startSession(data); // the old token is revoked by the server; this swaps in the new one
+  };
+
   const logout = useCallback(() => {
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(TOKEN_KEY);
@@ -123,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [logout]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, logout, error }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, logout, changePassword, error }}>
       {children}
     </AuthContext.Provider>
   );

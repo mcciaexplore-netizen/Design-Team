@@ -11,10 +11,11 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Resp
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+import delivery
 import events
 import models
 from auth import get_current_user, get_ticket_for_user, require_staff
-from common import as_utc, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
+from common import as_utc, assign_to_last_submitter, mark_delivered, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["approvals"])
@@ -49,9 +50,41 @@ def _request_out(r: models.ApprovalRequest, version: Optional[int] = None) -> di
 
 # ── Proof versions (staff upload; anyone with ticket access can view) ────────
 
+def _email_review(ticket: models.Ticket, version: int, link: str) -> None:
+    """Tell the client by email (if SMTP is configured). The link opens the review page: it asks for a name and a
+    confirming click, so a mail scanner opening the link can't approve anything."""
+    if not delivery.email_configured() or not ticket.requester:
+        return
+    body = "\n".join([
+        f"Hi {ticket.requester.full_name},", "",
+        f"The design team has sent version {version} of \"{ticket.title}\" ({ticket.ticket_number}) for your review.", "",
+        "Review it, then approve or tell us what to change:", link, "",
+        "You can also review it any time from your DesignDesk portal.", "", "MCCIA Applied AI Studio",
+    ])
+    delivery.run_in_background(delivery.send_email, ticket.requester.email, f"Design ready for your review: {ticket.ticket_number}", body)
+
+
+def _open_review(db: Session, ticket: models.Ticket, proof: models.ProofVersion, user: models.User, ttl_hours: int):
+    """Put a proof in front of the client: supersede any open request, move the ticket to In Review and return
+    (request, one-time review link). The client reviews it in their portal; the link is for people without an account."""
+    db.query(models.ApprovalRequest).filter(
+        models.ApprovalRequest.ticket_id == ticket.id, models.ApprovalRequest.status == "pending").update({"status": "revoked"})
+    token = secrets.token_urlsafe(32)
+    req = models.ApprovalRequest(ticket_id=ticket.id, proof_version_id=proof.id, token_hash=_hash(token),
+                                 expires_at=_now() + datetime.timedelta(hours=ttl_hours), created_by_id=user.id)
+    db.add(req)
+    if ticket.status not in (models.TicketStatus.IN_REVIEW, models.TicketStatus.DELIVERED):
+        ticket.status = models.TicketStatus.IN_REVIEW
+    db.flush()
+    log_audit(db, ticket.id, user, "Sent for approval", {"proof_version": proof.version, "expires_in_hours": ttl_hours})
+    return req, f"{PUBLIC_APP_URL()}/review/{token}"
+
+
 @router.post("/api/tickets/{ticket_id}/proofs", status_code=201)
 async def upload_proof(ticket_id: int, file: UploadFile = File(...), note: Optional[str] = Form(default=None, max_length=1000),
+                       send_for_approval: bool = Form(default=True),
                        db: Session = Depends(get_db), user: models.User = Depends(require_staff)):
+    """Upload a design version. By default it is sent to the client for approval in the same step."""
     ticket = get_ticket_for_user(db, ticket_id, user)
     data, name, content_type = await read_upload(file)
     key = store_bytes(data, name.rsplit(".", 1)[-1].lower())
@@ -62,9 +95,21 @@ async def upload_proof(ticket_id: int, file: UploadFile = File(...), note: Optio
     db.add(proof)
     db.flush()
     log_audit(db, ticket.id, user, "Uploaded proof", {"version": proof.version, "file_name": name})
+    approval = None
+    if send_for_approval:
+        req, link = _open_review(db, ticket, proof, user, DEFAULT_TTL_HOURS)
+        approval = (req, link)
     db.commit()
     db.refresh(proof)
-    return _proof_out(proof)
+    out = _proof_out(proof)
+    if approval:
+        db.refresh(approval[0])
+        events.emit(db, "approval_requested", ticket, user, {"version": proof.version})
+        _email_review(ticket, proof.version, approval[1])
+        out["approval"] = {**_request_out(approval[0], proof.version), "review_url": approval[1]}
+    else:
+        out["approval"] = None
+    return out
 
 
 @router.get("/api/tickets/{ticket_id}/proofs")
@@ -100,20 +145,11 @@ def create_approval_request(ticket_id: int, body: ApprovalCreate, db: Session = 
     if not proof:
         raise HTTPException(status_code=422, detail="Choose a proof that belongs to this ticket")
     # A new request supersedes any still-open one for this ticket, so only one link is ever live.
-    db.query(models.ApprovalRequest).filter(
-        models.ApprovalRequest.ticket_id == ticket.id, models.ApprovalRequest.status == "pending").update({"status": "revoked"})
-    token = secrets.token_urlsafe(32)
-    req = models.ApprovalRequest(ticket_id=ticket.id, proof_version_id=proof.id, token_hash=_hash(token),
-                                 expires_at=_now() + datetime.timedelta(hours=body.ttl_hours), created_by_id=user.id)
-    db.add(req)
-    if ticket.status not in (models.TicketStatus.IN_REVIEW, models.TicketStatus.DELIVERED):
-        ticket.status = models.TicketStatus.IN_REVIEW
-    db.flush()
-    log_audit(db, ticket.id, user, "Sent for approval", {"proof_version": proof.version, "expires_in_hours": body.ttl_hours})
+    req, link = _open_review(db, ticket, proof, user, body.ttl_hours)
     db.commit()
     db.refresh(req)
-
-    link = f"{PUBLIC_APP_URL()}/review/{token}"
+    events.emit(db, "approval_requested", ticket, user, {"version": proof.version})
+    _email_review(ticket, proof.version, link)
     # The link is returned exactly once; only its hash is stored.
     return {**_request_out(req, proof.version), "review_url": link}
 
@@ -221,13 +257,15 @@ def _apply_decision(db: Session, req: models.ApprovalRequest, body: "Decision", 
 
     ticket = db.query(models.Ticket).filter(models.Ticket.id == req.ticket_id).first()
     proof = db.query(models.ProofVersion).filter(models.ProofVersion.id == req.proof_version_id).first()
+    reassigned = None
     if body.decision == "approve":
         ticket.status = models.TicketStatus.DELIVERED
-        if ticket.delivered_at is None:
-            ticket.delivered_at = _now()
+        mark_delivered(db, ticket)
     else:
         ticket.status = models.TicketStatus.IN_PROGRESS
         ticket.revision_count = (ticket.revision_count or 0) + 1
+        ticket.edit_window_ends_at = None
+        reassigned = assign_to_last_submitter(db, ticket)
 
     log_audit(db, ticket.id, None, "Client approved" if body.decision == "approve" else "Client requested changes",
               {"proof_version": proof.version if proof else None, "comment": (body.comment or "").strip() or None},
@@ -235,6 +273,8 @@ def _apply_decision(db: Session, req: models.ApprovalRequest, body: "Decision", 
     db.commit()
     db.refresh(ticket)
     events.emit(db, "approval_decision", ticket, None, {"decision": new_status, "by": body.name.strip()})
+    if body.decision != "approve" and reassigned:
+        events.emit(db, "ticket_assigned", ticket, None)
     return {"ok": True, "status": new_status}
 
 

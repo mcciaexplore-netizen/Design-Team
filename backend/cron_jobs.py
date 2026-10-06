@@ -3,6 +3,7 @@ import pytz
 import models
 from sqlalchemy.orm import Session
 from notifications import handle_overdue_escalations, notify_user
+import delivery
 import events
 
 def run_all_cron_jobs(db: Session):
@@ -68,7 +69,38 @@ def run_all_cron_jobs(db: Session):
             
     db.commit()
 
-    # 3. Recurring tickets (idempotent per tick)
+    # 3. Waiting on requester: remind them daily (at most three times) until they respond
+    waiting = db.query(models.Ticket).filter(
+        models.Ticket.status == models.TicketStatus.WAITING_ON_REQUESTER, models.Ticket.paused_at != None).all()
+    for ticket in waiting:
+        since = ticket.paused_at if ticket.paused_at.tzinfo else ticket.paused_at.replace(tzinfo=pytz.UTC)
+        day = int((now - since).total_seconds() // 86400)
+        if day < 1 or not ticket.requester:
+            continue
+        reminder = min(day, 3)
+        text = f"{ticket.ticket_number} is waiting for your reply: the design team needs your input to continue."
+        # The wait's start time is part of the key, so a later wait on the same ticket reminds again.
+        if notify_user(db, ticket.requester, text, f"WAITING_REMINDER_{int(since.timestamp())}_{reminder}", ticket.id) is not False and delivery.email_configured():
+            delivery.run_in_background(delivery.send_email, ticket.requester.email, f"Action needed: {ticket.ticket_number}",
+                                       f"Hi {ticket.requester.full_name},\n\n{text}\n\nMCCIA Applied AI Studio")
+    db.commit()
+
+    # 4. Designs waiting for the client's review: remind every two days, at most three times per request
+    pending = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.status == "pending").all()
+    for req in pending:
+        created = req.created_at if req.created_at.tzinfo else req.created_at.replace(tzinfo=pytz.UTC)
+        expires = req.expires_at if req.expires_at.tzinfo else req.expires_at.replace(tzinfo=pytz.UTC)
+        ticket = db.query(models.Ticket).filter(models.Ticket.id == req.ticket_id).first()
+        step = int((now - created).total_seconds() // (2 * 86400))
+        if step < 1 or expires < now or not ticket or ticket.status != models.TicketStatus.IN_REVIEW or not ticket.requester:
+            continue
+        text = f"{ticket.ticket_number} is still waiting for your review. Please approve it or tell us what to change."
+        if notify_user(db, ticket.requester, text, f"REVIEW_REMINDER_{req.id}_{min(step, 3)}", ticket.id) is not False and delivery.email_configured():
+            delivery.run_in_background(delivery.send_email, ticket.requester.email, f"Your review is needed: {ticket.ticket_number}",
+                                       f"Hi {ticket.requester.full_name},\n\n{text}\n\nMCCIA Applied AI Studio")
+    db.commit()
+
+    # 5. Recurring tickets (idempotent per tick)
     from templates_recurring import run_due_rules
     try:
         run_due_rules(db, now)

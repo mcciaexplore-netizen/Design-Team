@@ -1,6 +1,6 @@
 from datetime import timezone
 from typing import Annotated
-from pydantic import AfterValidator, BaseModel, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from models import RoleEnum, TicketPriority, TicketStatus
@@ -27,8 +27,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     created_at: UTCDateTime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Design Type Schemas
 class DesignTypeBase(BaseModel):
@@ -40,10 +39,16 @@ class DesignTypeBase(BaseModel):
 class DesignTypeCreate(DesignTypeBase):
     pass
 
+class DesignTypeUpdate(BaseModel):
+    default_sla_hours: Optional[int] = Field(default=None, ge=1, le=720)
+    default_effort_hours: Optional[float] = Field(default=None, gt=0, le=200)
+    edit_window_hours: Optional[int] = Field(default=None, ge=1, le=336)  # null falls back to the global setting
+
 class DesignTypeResponse(DesignTypeBase):
     id: int
-    class Config:
-        from_attributes = True
+    default_effort_hours: float = 4
+    edit_window_hours: Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)
 
 # Ticket Schemas
 class TicketBase(BaseModel):
@@ -96,14 +101,14 @@ class TicketResponse(TicketBase):
     client_org: Optional[str] = None
     estimate_hours: Optional[float] = None
     comment_count: int = 0
+    external_key: Optional[str] = None
 
     requester: UserResponse
     assignee: Optional[UserResponse]
     design_type: DesignTypeResponse
     subtasks: List['SubtaskResponse'] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TicketCommentBase(BaseModel):
     content: str
@@ -117,8 +122,7 @@ class TicketCommentResponse(TicketCommentBase):
     author_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Pinpoint Comment Schemas
 class PinpointCommentBase(BaseModel):
@@ -135,10 +139,11 @@ class PinpointCommentResponse(PinpointCommentBase):
     id: int
     ticket_id: int
     author_id: int
+    author_name: Optional[str] = None
+    author_role: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Subtask Schemas
 class SubtaskBase(BaseModel):
@@ -157,7 +162,6 @@ class SubtaskResponse(SubtaskBase):
     ticket_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
-TicketResponse.update_forward_refs()
+TicketResponse.model_rebuild()

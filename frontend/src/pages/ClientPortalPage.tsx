@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { DONE_STATUSES } from '../types';
 import { Link } from 'react-router-dom';
-import { Ticket as TicketIcon, CheckCircle, Clock, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
+import { Ticket as TicketIcon, CheckCircle, Clock, ChevronDown, ChevronUp, MessageSquare, Search, X } from 'lucide-react';
 import { useTickets } from '../contexts/TicketsContext';
 import ProofApprovalPanel from '../components/ProofApprovalPanel';
 import CommentsPanel from '../components/CommentsPanel';
+import { useNewRequest } from '../contexts/NewRequestContext';
+import { prefillFromTicket } from '../requestForm';
 
-const DONE = ['Delivered', 'Closed', 'Closed without approval'];
+const DONE = DONE_STATUSES;
 
 const CLIENT_STATUS: Record<string, string> = {
   'New': 'Received',
@@ -25,10 +28,33 @@ function when(due: string, status: string): string {
 
 const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
   const { tickets, loading, error, refresh } = useTickets();
+  const { openNewRequest } = useNewRequest();
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'open' | 'done' | 'all'>('open');
 
-  const shown = tickets.filter(t => (filter === 'all' ? true : filter === 'done' ? DONE.includes(t.status) : !DONE.includes(t.status)));
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('');
+  const [designType, setDesignType] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+
+  const designTypes = useMemo(() => [...new Set(tickets.map(t => t.design_type).filter((d): d is string => !!d))].sort(), [tickets]);
+  const statuses = useMemo(() => [...new Set(tickets.map(t => t.status))], [tickets]);
+
+  const q = query.trim().toLowerCase();
+  const day = (iso: string | undefined) => (iso ? iso.slice(0, 10) : '');
+  const shown = tickets.filter(t => {
+    if (filter === 'done' ? !DONE.includes(t.status) : filter === 'open' ? DONE.includes(t.status) : false) return false;
+    if (status && t.status !== status) return false;
+    if (designType && t.design_type !== designType) return false;
+    const created = day(t.created_at);
+    if (from && (!created || created < from)) return false;
+    if (to && (!created || created > to)) return false;
+    if (q && !`${t.number} ${t.title} ${t.tags.join(' ')} ${t.description ?? ''}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const hasFilters = !!(q || status || designType || from || to);
+  const clearFilters = () => { setQuery(''); setStatus(''); setDesignType(''); setFrom(''); setTo(''); };
   const needsYou = tickets.filter(t => t.status === 'In Review').length;
 
   return (
@@ -54,6 +80,29 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
               style={{ padding: '0.4rem 0.9rem', fontSize: '0.78rem', fontWeight: 700, border: 'none', cursor: 'pointer', background: filter === k ? 'var(--brand-soft)' : 'transparent', color: filter === k ? 'var(--brand)' : '#64748b' }}>{label}</button>
           ))}
         </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: '1rem' }}>
+          <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 180 }}>
+            <Search size={14} aria-hidden="true" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }} />
+            <input className="input-field" aria-label="Search requests" placeholder="Search by number, title or tag" value={query} onChange={e => setQuery(e.target.value)} style={{ width: '100%', paddingLeft: '2rem' }} />
+          </div>
+          <select className="input-field" aria-label="Status" value={status} onChange={e => setStatus(e.target.value)}>
+            <option value="">All statuses</option>
+            {statuses.map(s => <option key={s} value={s}>{CLIENT_STATUS[s] ?? s}</option>)}
+          </select>
+          <select className="input-field" aria-label="Design type" value={designType} onChange={e => setDesignType(e.target.value)}>
+            <option value="">All design types</option>
+            {designTypes.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-soft)' }}>Requested from
+            <input className="input-field" type="date" value={from} max={to || undefined} onChange={e => setFrom(e.target.value)} style={{ display: 'block', marginTop: 3 }} />
+          </label>
+          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-soft)' }}>to
+            <input className="input-field" type="date" value={to} min={from || undefined} onChange={e => setTo(e.target.value)} style={{ display: 'block', marginTop: 3 }} />
+          </label>
+          {hasFilters && <button type="button" className="chip" onClick={clearFilters} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><X size={12} aria-hidden="true" /> Clear filters</button>}
+        </div>
+        <p role="status" aria-live="polite" style={{ fontSize: '0.78rem', color: 'var(--text-soft)', marginBottom: 10 }}>{shown.length} request{shown.length === 1 ? '' : 's'}{hasFilters ? ' match your filters' : ''}</p>
 
         {error && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem', marginBottom: 12 }}>{error} <button type="button" className="chip" onClick={() => void refresh()}>Retry</button></p>}
         {loading && tickets.length === 0 && <p role="status" style={{ color: '#94a3b8' }}>Loading your requests…</p>}
@@ -83,6 +132,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span className={done ? 'badge-green' : reviewing || ticket.status === 'Waiting on Requester' ? 'badge-red' : 'badge-blue'}>{CLIENT_STATUS[ticket.status] ?? ticket.status}</span>
+                    {done && <button type="button" className="chip" aria-label={`Request again: ${ticket.title}`} onClick={() => openNewRequest(prefillFromTicket(ticket))}>Request again</button>}
                     <button type="button" className="chip" aria-expanded={open} onClick={() => setOpenId(open ? null : ticket.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       {open ? <>Hide <ChevronUp size={12} /></> : <>{reviewing ? 'Review' : 'Details'} <ChevronDown size={12} /></>}
                       {(ticket.comment_count ?? 0) > 0 && !open && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: '#64748b' }}><MessageSquare size={10} />{ticket.comment_count}</span>}
@@ -105,8 +155,8 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
               <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-btn)', background: 'rgba(24,24,27,0.06)', border: '1px solid rgba(24,24,27,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: '#18181b' }}>
                 <TicketIcon size={24} />
               </div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A' }}>{filter === 'done' ? 'Nothing completed yet' : 'No active requests'}</h3>
-              <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: 6 }}>{filter === 'done' ? 'Finished designs will appear here.' : 'Start a new request and the design team will pick it up.'}</p>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A' }}>{hasFilters ? 'No requests match your filters' : filter === 'done' ? 'Nothing completed yet' : 'No active requests'}</h3>
+              <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: 6 }}>{hasFilters ? 'Try removing a filter or searching for something else.' : filter === 'done' ? 'Finished designs will appear here.' : 'Start a new request and the design team will pick it up.'}</p>
             </div>
           )}
         </div>

@@ -1,7 +1,9 @@
-"""Outbound delivery: Slack (incoming webhook). Never raises; returns (ok, detail)."""
+"""Outbound delivery: Slack (incoming webhook) and email (SMTP). Never raises; returns (ok, detail)."""
 import logging
 import os
+import smtplib
 import threading
+from email.message import EmailMessage
 from typing import Callable, Optional
 from urllib.parse import urlparse
 
@@ -70,6 +72,61 @@ def send_slack(webhook_url: str, text: str, channel: str = "") -> tuple[bool, st
     if res.status_code == 200:
         return True, "Delivered to Slack"
     return False, f"Slack rejected the message (HTTP {res.status_code}: {res.text[:80]})"
+
+
+# ── Email ────────────────────────────────────────────────────────────────────
+
+def email_configured() -> bool:
+    return bool(os.getenv("SMTP_HOST"))
+
+
+def send_email(to: str, subject: str, body: str) -> tuple[bool, str]:
+    """Send a plain-text email through SMTP_HOST (SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_SSL)."""
+    host = os.getenv("SMTP_HOST")
+    if not host:
+        return False, "Email is not configured"
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user, password = os.getenv("SMTP_USER", ""), os.getenv("SMTP_PASSWORD", "")
+    try:
+        msg = EmailMessage()  # rejects newlines in headers, so user text can't inject extra headers
+        msg["From"] = os.getenv("SMTP_FROM") or user
+        msg["To"] = to
+        msg["Subject"] = subject
+        msg.set_content(body)
+        if os.getenv("SMTP_SSL", "").lower() in ("1", "true", "yes"):
+            server = smtplib.SMTP_SSL(host, port, timeout=10)
+        else:
+            server = smtplib.SMTP(host, port, timeout=10)
+            server.starttls()
+        with server:
+            if user:
+                server.login(user, password)
+            server.send_message(msg)
+        return True, "Sent"
+    except (smtplib.SMTPException, OSError, ValueError) as exc:
+        logger.warning("Email to %s failed: %s", to, exc.__class__.__name__)
+        return False, f"Could not send email: {exc.__class__.__name__}"
+
+
+# ── CAPTCHA (Cloudflare Turnstile) ───────────────────────────────────────────
+
+TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
+
+def turnstile_enabled() -> bool:
+    return bool(os.getenv("TURNSTILE_SECRET_KEY"))
+
+
+def verify_turnstile(token: str, remote_ip: str = "") -> bool:
+    """True if Cloudflare confirms the token. Fails closed: any error counts as a failed check."""
+    secret = os.getenv("TURNSTILE_SECRET_KEY", "")
+    if not secret or not token:
+        return False
+    try:
+        res = httpx.post(TURNSTILE_VERIFY_URL, data={"secret": secret, "response": token, "remoteip": remote_ip}, timeout=6.0)
+        return res.status_code == 200 and bool(res.json().get("success"))
+    except (httpx.HTTPError, ValueError):
+        return False
 
 
 # ── Fire-and-forget ──────────────────────────────────────────────────────────

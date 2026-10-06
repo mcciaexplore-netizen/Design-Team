@@ -120,11 +120,12 @@ def test_designer_cannot_reassign_or_reprioritise_but_lead_can(client):
 def test_client_cannot_self_assign_on_create(client):
     r = client.post(
         "/api/tickets",
-        json={"title": "T", "brief": "b", "design_type_id": 1, "type_specific_fields": {}, "assignee_id": 2},
+        json={"title": "T", "brief": "b", "design_type_id": 1, "type_specific_fields": {}, "assignee_id": 1},
         headers=auth(client, "a@tata.com"),
     )
     assert r.status_code == 201
-    assert r.json()["assignee_id"] is None
+    # The requested assignee (the lead, id 1) is ignored; the system picks a designer (id 2) instead.
+    assert r.json()["assignee_id"] == 2
 
 
 def test_ticket_requester_and_org_come_from_token(client):

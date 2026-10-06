@@ -1,10 +1,12 @@
+import hashlib
+import hmac
 import os
 import secrets
 import datetime
 import logging
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, status, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, Request, status, WebSocket
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -17,16 +19,41 @@ from database import get_db
 
 logger = logging.getLogger(__name__)
 
+def _dev_secret_key() -> str:
+    """Local development only: keep one generated key in a git-ignored file so `uvicorn --reload` restarts
+    don't sign everyone out. Falls back to a per-process key if the file can't be used."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".dev_secret_key")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            key = fh.read().strip()
+        if len(key) >= 32:
+            return key
+    except OSError:
+        pass  # no key file yet
+    key = secrets.token_urlsafe(48)
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(key)
+    except OSError:
+        pass  # read-only checkout: this process still works, sessions just reset on restart
+    return key
+
+
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
-    # Random per process: tokens stop working on restart. Set SECRET_KEY in any real deployment.
-    SECRET_KEY = secrets.token_urlsafe(48)
-    logger.warning("SECRET_KEY is not set; using a temporary key. Sessions reset on restart.")
+    if os.getenv("DATABASE_URL", "sqlite").startswith("sqlite"):
+        SECRET_KEY = _dev_secret_key()
+        logger.info("SECRET_KEY is not set; using the local development key in backend/.dev_secret_key.")
+    else:
+        # Random per process: tokens stop working on restart. Set SECRET_KEY in any real deployment.
+        SECRET_KEY = secrets.token_urlsafe(48)
+        logger.warning("SECRET_KEY is not set; using a temporary key. Sessions reset on restart.")
 
 ALGORITHM = "HS256"
 TOKEN_TTL = datetime.timedelta(hours=int(os.getenv("TOKEN_TTL_HOURS", "12")))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt cost is 12 by default; the test suite lowers it (BCRYPT_ROUNDS) because every login hashes.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=int(os.getenv("BCRYPT_ROUNDS", "12")))
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 STAFF_ROLES = (models.RoleEnum.DESIGNER, models.RoleEnum.DESIGN_LEAD, models.RoleEnum.ADMIN)
@@ -40,9 +67,20 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
+def _password_fingerprint(user: models.User) -> str:
+    """Changes whenever the password changes, so a reset or change signs out every older session."""
+    return hashlib.sha256(f"{SECRET_KEY}:{user.hashed_password}".encode()).hexdigest()[:16]
+
+
+def generate_temp_password() -> str:
+    """Readable temporary password (no look-alike characters) for admin-issued resets."""
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(12))
+
+
 def create_access_token(user: models.User) -> str:
     now = datetime.datetime.now(datetime.timezone.utc)
-    payload = {"sub": str(user.id), "role": user.role.value, "iat": now, "exp": now + TOKEN_TTL}
+    payload = {"sub": str(user.id), "role": user.role.value, "pwf": _password_fingerprint(user), "iat": now, "exp": now + TOKEN_TTL}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -60,11 +98,20 @@ def _user_from_token(token: str, db: Session) -> models.User:
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user or not user.is_active:
         raise credentials_error
+    if not hmac.compare_digest(str(payload.get("pwf", "")), _password_fingerprint(user)):
+        raise credentials_error  # password changed since this token was issued
     return user
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
-    return _user_from_token(token, db)
+# A user holding a temporary password may only change it (and read who they are) until they do.
+_ALLOWED_WHILE_MUST_CHANGE = ("/api/auth/change-password", "/api/auth/me")
+
+
+def get_current_user(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
+    user = _user_from_token(token, db)
+    if user.must_change_password and request.url.path not in _ALLOWED_WHILE_MUST_CHANGE:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You must change your temporary password first.")
+    return user
 
 
 def require_roles(*roles: models.RoleEnum):
@@ -127,6 +174,7 @@ def user_payload(user: models.User) -> dict:
         "full_name": user.full_name,
         "role": frontend_role(user.role),
         "client_org": user.client_org,
+        "must_change_password": bool(user.must_change_password),
     }
 
 
@@ -182,4 +230,23 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+    return {"access_token": create_access_token(user), "token_type": "bearer", "user": user_payload(user)}
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/change-password")
+def change_password(body: ChangePasswordRequest, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not pwd_context.verify(body.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Your current password is incorrect.")
+    if body.new_password == body.current_password:
+        raise HTTPException(status_code=400, detail="Choose a password different from the current one.")
+    user.hashed_password = hash_password(body.new_password)
+    user.must_change_password = False
+    db.commit()
+    db.refresh(user)
+    # The old token is now invalid (password fingerprint changed), so hand back a fresh one.
     return {"access_token": create_access_token(user), "token_type": "bearer", "user": user_payload(user)}

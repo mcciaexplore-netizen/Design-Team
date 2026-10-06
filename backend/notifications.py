@@ -6,15 +6,19 @@ class NotificationChannel:
 
 class InAppChannel(NotificationChannel):
     def send(self, db, user, content, event_type, ticket_id=None):
-        notif = Notification(user_id=user.id, content=content, type=event_type)
+        notif = Notification(user_id=user.id, content=content, type=event_type, ticket_id=ticket_id)
         db.add(notif)
 
-class SlackWebhookChannel(NotificationChannel):
-    def send(self, db, user, content, event_type, ticket_id=None):
-        # Slack posts go to one shared channel, not per user; see events.post_slack_event.
-        pass
+CHANNELS = [InAppChannel()]
 
-CHANNELS = [InAppChannel(), SlackWebhookChannel()]
+def mute_key(event_type):
+    """Map a scheduled-job event to the user-facing preference that controls it.
+    Due-soon warnings and overdue escalations are all SLA alerts, so muting 'sla_breach' silences them."""
+    if event_type == "6_HR_WARNING" or event_type.startswith("OVERDUE_"):
+        return "sla_breach"
+    if event_type.startswith("REVIEW_REMINDER_"):
+        return "approval_requested"
+    return event_type
 
 def notify_user(db, user, content, event_type, ticket_id=None):
     # Deduplication check
@@ -26,9 +30,10 @@ def notify_user(db, user, content, event_type, ticket_id=None):
     prefs = db.query(UserPreference).filter_by(user_id=user.id).first()
 
     in_app_enabled = prefs.in_app_enabled if prefs else True
+    muted = bool(prefs and mute_key(event_type) in (prefs.muted_events or []))
 
-    # Send through channels
-    if in_app_enabled:
+    # Send through channels (a muted event is still logged below so it is not retried every cron tick)
+    if in_app_enabled and not muted:
         CHANNELS[0].send(db, user, content, event_type, ticket_id)
 
     if ticket_id:

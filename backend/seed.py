@@ -40,89 +40,111 @@ def ensure_admin(db: Session):
     print(f"Created admin account {email}.")
 
 
-def seed():
-    migrate()
-    if not os.getenv("DATABASE_URL", "sqlite").startswith("sqlite") and not (os.getenv("SEED_STAFF_PASSWORD") and os.getenv("SEED_CLIENT_PASSWORD")):
-        print("Refusing to seed a non-SQLite database with default passwords. Set SEED_STAFF_PASSWORD and SEED_CLIENT_PASSWORD.")
-        return
-    db: Session = SessionLocal()
+def _truthy(v: str | None) -> bool:
+    return (v or "").strip().lower() in ("1", "true", "yes", "on")
 
-    # Check if the demo data already exists (the admin account alone must not count as "seeded")
-    if db.query(models.DesignType).first():
-        ensure_admin(db)
-        print("Database already seeded.")
-        return
-        
-    print("Seeding database...")
-    
-    # Users
+
+def demo_enabled() -> bool:
+    """Demo accounts and tickets are for local dev and a separate demo deployment only.
+    Default: on for SQLite (dev/tests), off for any real database unless SEED_DEMO_DATA=true."""
+    flag = os.getenv("SEED_DEMO_DATA")
+    if flag is not None:
+        return _truthy(flag)
+    return os.getenv("DATABASE_URL", "sqlite").startswith("sqlite")
+
+
+def ensure_design_types(db: Session) -> dict[str, models.DesignType]:
+    """Reference data every environment needs (ticket creation requires a design type)."""
+    if not db.query(models.DesignType).first():
+        db.add_all([
+            models.DesignType(
+                name="Banner",
+                default_sla_hours=24,
+                required_fields=[
+                    {"name": "platform", "label": "Platform", "type": "select", "options": ["Web", "Mobile"]},
+                    {"name": "copy_text", "label": "Copy Text", "type": "text"},
+                ],
+            ),
+            models.DesignType(
+                name="Social Post",
+                default_sla_hours=48,
+                required_fields=[
+                    {"name": "platform", "label": "Social Platform", "type": "select", "options": ["Instagram", "LinkedIn", "Twitter"]},
+                    {"name": "brand_assets", "label": "Brand Assets Link", "type": "string"},
+                ],
+            ),
+        ])
+        db.commit()
+        print("Created default design types.")
+    return {d.name: d for d in db.query(models.DesignType).all()}
+
+
+def seed_demo(db: Session, types: dict[str, models.DesignType]):
+    """Demo staff/client accounts plus two sample tickets. Never run against production."""
+    staff_pw = os.getenv("SEED_STAFF_PASSWORD", "mccia123")
+    client_pw = os.getenv("SEED_CLIENT_PASSWORD", "client123")
     users = [
-        models.User(email="lead@mccia.in", full_name="Priya Sharma", role=models.RoleEnum.DESIGN_LEAD, hashed_password=pwd_context.hash(os.getenv("SEED_STAFF_PASSWORD", "mccia123"))),
-        models.User(email="alice@mccia.in", full_name="Alice Fernandez", role=models.RoleEnum.DESIGNER, hashed_password=pwd_context.hash(os.getenv("SEED_STAFF_PASSWORD", "mccia123"))),
-        models.User(email="bob@mccia.in", full_name="Bob Mehta", role=models.RoleEnum.DESIGNER, hashed_password=pwd_context.hash(os.getenv("SEED_STAFF_PASSWORD", "mccia123"))),
-        models.User(email="client@tata.com", full_name="Client (TATA)", role=models.RoleEnum.REQUESTER, client_org="TATA", hashed_password=pwd_context.hash(os.getenv("SEED_CLIENT_PASSWORD", "client123"))),
-        models.User(email="client@acme.com", full_name="Client (ACME)", role=models.RoleEnum.REQUESTER, client_org="ACME", hashed_password=pwd_context.hash(os.getenv("SEED_CLIENT_PASSWORD", "client123"))),
+        models.User(email="lead@mccia.in", full_name="Priya Sharma", role=models.RoleEnum.DESIGN_LEAD, hashed_password=pwd_context.hash(staff_pw)),
+        models.User(email="alice@mccia.in", full_name="Alice Fernandez", role=models.RoleEnum.DESIGNER, hashed_password=pwd_context.hash(staff_pw)),
+        models.User(email="bob@mccia.in", full_name="Bob Mehta", role=models.RoleEnum.DESIGNER, hashed_password=pwd_context.hash(staff_pw)),
+        models.User(email="client@tata.com", full_name="Client (TATA)", role=models.RoleEnum.REQUESTER, client_org="TATA", hashed_password=pwd_context.hash(client_pw)),
+        models.User(email="client@acme.com", full_name="Client (ACME)", role=models.RoleEnum.REQUESTER, client_org="ACME", hashed_password=pwd_context.hash(client_pw)),
     ]
     existing = {e for (e,) in db.query(models.User.email).all()}
     db.add_all([u for u in users if u.email not in existing])
     db.commit()
-    ensure_admin(db)
     users = [db.query(models.User).filter_by(email=u.email).one() for u in users]
-    
-    # Design Types
-    dt_banner = models.DesignType(
-        name="Banner",
-        default_sla_hours=24,
-        required_fields=[
-            {"name": "size", "label": "Banner Size (e.g., 1024x768)", "type": "string"},
-            {"name": "platform", "label": "Platform", "type": "select", "options": ["Web", "Mobile"]},
-            {"name": "copy_text", "label": "Copy Text", "type": "text"}
-        ]
-    )
-    dt_social = models.DesignType(
-        name="Social Post",
-        default_sla_hours=48,
-        required_fields=[
-            {"name": "platform", "label": "Social Platform", "type": "select", "options": ["Instagram", "LinkedIn", "Twitter"]},
-            {"name": "brand_assets", "label": "Brand Assets Link", "type": "string"}
-        ]
-    )
-    db.add_all([dt_banner, dt_social])
+
+    if db.query(models.Ticket).first():
+        return
+    dt_banner, dt_social = types["Banner"], types["Social Post"]
+    db.add_all([
+        models.Ticket(
+            ticket_number="DF-0001",
+            title="Spring Sale Homepage Banner",
+            brief="We need a vibrant banner for the upcoming spring sale. It should feature floral patterns and our brand colors.",
+            design_type_id=dt_banner.id,
+            type_specific_fields={"size": "1920x1080", "platform": "Web", "copy_text": "Spring Into Savings! Up to 50% Off."},
+            priority=models.TicketPriority.NORMAL,
+            status=models.TicketStatus.NEW,
+            requester_id=users[3].id,
+            client_org="TATA",
+            tags=["Marketing", "Spring2026"],
+        ),
+        models.Ticket(
+            ticket_number="DF-0002",
+            title="ACME Launch Social Post",
+            brief="Announcement post for the ACME product launch.",
+            design_type_id=dt_social.id,
+            type_specific_fields={"platform": "LinkedIn", "brand_assets": "https://example.com/acme"},
+            priority=models.TicketPriority.NORMAL,
+            status=models.TicketStatus.NEW,
+            requester_id=users[4].id,
+            client_org="ACME",
+            tags=["Launch"],
+        ),
+    ])
     db.commit()
-    
-    # Ticket
-    ticket1 = models.Ticket(
-        ticket_number="DF-0001",
-        title="Spring Sale Homepage Banner",
-        brief="We need a vibrant banner for the upcoming spring sale. It should feature floral patterns and our brand colors.",
-        design_type_id=dt_banner.id,
-        type_specific_fields={
-            "size": "1920x1080",
-            "platform": "Web",
-            "copy_text": "Spring Into Savings! Up to 50% Off."
-        },
-        priority=models.TicketPriority.NORMAL,
-        status=models.TicketStatus.NEW,
-        requester_id=users[3].id,
-        client_org="TATA",
-        tags=["Marketing", "Spring2026"]
-    )
-    ticket2 = models.Ticket(
-        ticket_number="DF-0002",
-        title="ACME Launch Social Post",
-        brief="Announcement post for the ACME product launch.",
-        design_type_id=dt_social.id,
-        type_specific_fields={"platform": "LinkedIn", "brand_assets": "https://example.com/acme"},
-        priority=models.TicketPriority.NORMAL,
-        status=models.TicketStatus.NEW,
-        requester_id=users[4].id,
-        client_org="ACME",
-        tags=["Launch"]
-    )
-    db.add_all([ticket1, ticket2])
-    db.commit()
-    
-    print("Database seeding completed.")
+    print("Seeded demo accounts and sample tickets.")
+
+
+def seed():
+    migrate()
+    db: Session = SessionLocal()
+    try:
+        types = ensure_design_types(db)
+        ensure_admin(db)
+        if not demo_enabled():
+            print("Demo data skipped (SEED_DEMO_DATA is not enabled for this database).")
+            return
+        sqlite = os.getenv("DATABASE_URL", "sqlite").startswith("sqlite")
+        if not sqlite and not (os.getenv("SEED_STAFF_PASSWORD") and os.getenv("SEED_CLIENT_PASSWORD")):
+            print("Refusing to seed demo accounts with default passwords. Set SEED_STAFF_PASSWORD and SEED_CLIENT_PASSWORD.")
+            return
+        seed_demo(db, types)
+    finally:
+        db.close()
+
 
 if __name__ == "__main__":
     seed()

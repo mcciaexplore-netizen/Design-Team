@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 import events
 import models
 from auth import LEAD_ROLES, get_current_user, require_staff
-from common import log_audit
+from common import log_audit, track_waiting
 from database import get_db
 
 router = APIRouter(tags=["views"])
@@ -146,6 +146,7 @@ def bulk_update(body: BulkAction, db: Session = Depends(get_db), user: models.Us
         changes = {}
         if body.status and t.status != body.status:
             changes["status"] = {"from": t.status.value, "to": body.status.value}
+            track_waiting(t, t.status, body.status)
             t.status = body.status
             if body.status == models.TicketStatus.DELIVERED and t.delivered_at is None:
                 t.delivered_at = datetime.datetime.now(pytz.utc)

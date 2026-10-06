@@ -36,13 +36,49 @@ def log_audit(db: Session, ticket_id: int, user: Optional[models.User], action: 
     ))
 
 
+# ── Delivery ─────────────────────────────────────────────────────────────────
+
+def mark_delivered(db: Session, ticket: models.Ticket) -> None:
+    """Stamp a ticket as delivered and open its edit window; the cron tick auto-closes it when the window ends."""
+    now = datetime.datetime.now(pytz.utc)
+    if ticket.delivered_at is None:
+        ticket.delivered_at = now
+    if ticket.edit_window_ends_at is None:
+        settings = db.query(models.SystemSettings).first()
+        own = ticket.design_type.edit_window_hours if ticket.design_type else None
+        hours = own or (settings.edit_window_hours if settings else 12)
+        ticket.edit_window_ends_at = now + datetime.timedelta(hours=hours)
+
+
+def track_waiting(ticket: models.Ticket, old: models.TicketStatus, new: models.TicketStatus) -> None:
+    """While a ticket waits on the requester its clock is paused; record when that started and how long it lasted."""
+    now = datetime.datetime.now(pytz.utc)
+    if new == models.TicketStatus.WAITING_ON_REQUESTER and old != new:
+        ticket.paused_at = now
+    elif old == models.TicketStatus.WAITING_ON_REQUESTER and new != old and ticket.paused_at:
+        ticket.total_paused_seconds = (ticket.total_paused_seconds or 0) + int((now - as_utc(ticket.paused_at)).total_seconds())
+        ticket.paused_at = None
+
+
+def assign_to_last_submitter(db: Session, ticket: models.Ticket) -> Optional[models.User]:
+    """Route rework to whoever submitted the latest proof. Returns the user if the assignee changed. Caller commits."""
+    proof = db.query(models.ProofVersion).filter(models.ProofVersion.ticket_id == ticket.id)         .order_by(models.ProofVersion.version.desc()).first()
+    user = db.query(models.User).filter(models.User.id == proof.created_by_id).first() if proof else None
+    if not user or not user.is_active or user.role == models.RoleEnum.REQUESTER or ticket.assignee_id == user.id:
+        return None
+    ticket.assignee_id = user.id
+    return user
+
+
 # ── File storage ─────────────────────────────────────────────────────────────
 
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "10")) * 1024 * 1024
+# Source files (CDR, PSD, AI...) are routinely larger than proofs and attachments.
+MAX_CDR_BYTES = int(os.getenv("MAX_CDR_UPLOAD_MB", "50")) * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {
     "png", "jpg", "jpeg", "gif", "webp", "pdf", "txt", "csv",
-    "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip", "psd", "ai", "fig",
+    "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip", "psd", "ai", "fig", "cdr", "eps", "indd",
 }
 # PDFs are downloaded, not shown inline: the sandbox CSP we send stops browsers' built-in PDF viewers.
 INLINE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
@@ -73,15 +109,16 @@ def safe_filename(name: str) -> str:
     return base[:120]
 
 
-async def read_upload(file: UploadFile) -> tuple[bytes, str, str]:
+async def read_upload(file: UploadFile, max_bytes: Optional[int] = None) -> tuple[bytes, str, str]:
     """Validate an upload and return (data, safe_name, content_type). Raises HTTPException on bad input."""
+    limit = max_bytes or MAX_UPLOAD_BYTES
     name = safe_filename(file.filename or "")
     ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=415, detail=f"File type .{ext or '?'} is not allowed")
-    data = await file.read(MAX_UPLOAD_BYTES + 1)
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail=f"File is larger than {MAX_UPLOAD_BYTES // (1024 * 1024)} MB")
+    data = await file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(status_code=413, detail=f"File is larger than {limit // (1024 * 1024)} MB")
     if not data:
         raise HTTPException(status_code=400, detail="File is empty")
     magic = _MAGIC.get(ext)

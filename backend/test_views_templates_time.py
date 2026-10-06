@@ -110,7 +110,7 @@ def test_bulk_validation_and_permissions(client):
 def test_bulk_writes_audit_entries(client):
     t = make_ticket(client, "a@tata.com")["id"]
     lead = auth(client, "lead@x.com")
-    client.post("/api/tickets/bulk", json={"ticket_ids": [t], "status": "Assigned"}, headers=lead)
+    client.post("/api/tickets/bulk", json={"ticket_ids": [t], "status": "In Progress"}, headers=lead)
     trail = client.get(f"/api/tickets/{t}/audit", headers=lead).json()
     assert [a["action"] for a in trail] == ["Created", "Bulk update"] and trail[1]["actor"] == "Lead"
 

@@ -20,6 +20,7 @@ export interface Ticket {
   priority:           string;
   assignee:           string;
   due_at:             string;
+  created_at?:        string;
   timer_started_at:   string | null;
   time_spent_seconds: number;
   subtasks:           Subtask[];
@@ -50,6 +51,9 @@ export const STATUSES = [
   'New', 'Assigned', 'In Progress',
   'Waiting on Requester', 'In Review', 'Delivered', 'Closed',
 ];
+
+/** Statuses that mean the work is finished (hidden from open-work lists). */
+export const DONE_STATUSES = ['Delivered', 'Closed', 'Closed without approval', 'Revision Requested'];
 
 export const PRIORITIES = ['Urgent', 'High', 'Normal', 'Low'];
 

@@ -73,11 +73,12 @@ def test_request_returns_link_once_and_stores_only_a_hash(client):
     t, proof, req, token = setup_review(client)
     assert len(token) >= 40 and req["status"] == "pending" and req["proof_version"] == 1
     db = TestingSessionLocal()
-    row = db.query(models.ApprovalRequest).first()
+    row = db.query(models.ApprovalRequest).filter_by(id=req["id"]).first()
     assert row.token_hash == hashlib.sha256(token.encode()).hexdigest() and token not in str(row.__dict__)
     db.close()
     listing = client.get(f"/api/tickets/{t['id']}/approval-requests", headers=auth(client, "a@tata.com")).json()
-    assert len(listing) == 1 and "review_url" not in listing[0] and token not in str(listing)
+    # Uploading already sent the design for review; the manual request superseded that first one.
+    assert sorted(x["status"] for x in listing) == ["pending", "revoked"] and all("review_url" not in x for x in listing) and token not in str(listing)
     ticket = [x for x in client.get("/api/tickets", headers=auth(client, "lead@x.com")).json() if x["id"] == t["id"]][0]
     assert ticket["status"] == "In Review"
 
@@ -209,7 +210,7 @@ def test_audit_trail_is_ordered_scoped_and_hides_internals_from_clients(client):
     client.post(f"/api/tickets/{t['id']}/time", json={"seconds": 600}, headers=des)
     staff_view = client.get(f"/api/tickets/{t['id']}/audit", headers=lead).json()
     assert [a["action"] for a in staff_view] == ["Created", "Updated", "Commented", "Logged time"]
-    assert staff_view[1]["details"]["status"] == {"from": "New", "to": "In Progress"}
+    assert staff_view[1]["details"]["status"] == {"from": "Assigned", "to": "In Progress"}
     client_view = client.get(f"/api/tickets/{t['id']}/audit", headers=cl).json()
     assert [a["action"] for a in client_view] == ["Created", "Updated", "Commented", "Logged time"]
     assert all(a["details"] == {} for a in client_view)

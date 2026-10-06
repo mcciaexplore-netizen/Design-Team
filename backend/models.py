@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, Float, String, Boolean, ForeignKey, DateTime, Enum, JSON, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, false
 import enum
 from database import Base
 
@@ -25,6 +25,7 @@ class TicketStatus(str, enum.Enum):
     DELIVERED = "Delivered"
     CLOSED = "Closed"
     CLOSED_WITHOUT_APPROVAL = "Closed without approval"
+    REVISION_REQUESTED = "Revision Requested" # Superseded by a newer versioned ticket after the client asked for changes
 
 # Replaces hardcoded TicketStatus enum for custom pipelines
 class WorkflowStage(Base):
@@ -71,6 +72,7 @@ class User(Base):
     daily_capacity_hours = Column(Integer, default=8, nullable=False)
     client_org = Column(String, nullable=True, index=True) # Set for client (Requester) users; scopes ticket access
     is_active = Column(Boolean, default=True, nullable=False)
+    must_change_password = Column(Boolean, default=False, nullable=False, server_default=false()) # Set when an admin issues a temporary password
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class DesignType(Base):
@@ -82,6 +84,7 @@ class DesignType(Base):
     default_effort_hours = Column(Float, default=4, nullable=False) # Hands-on effort estimate, used for workload planning
     required_fields = Column(JSON, nullable=False) # List of required field definitions
     is_active = Column(Boolean, default=True)
+    edit_window_hours = Column(Integer, nullable=True) # Overrides SystemSettings.edit_window_hours for this type
 
 class Ticket(Base):
     __tablename__ = "tickets"
@@ -116,6 +119,7 @@ class Ticket(Base):
     reason_for_change = Column(Text, nullable=True) # If this is a child ticket
     revision_category = Column(String, nullable=True) # "Missing Asset", "Scope Change", "Design Error"
     flagged_for_reassignment = Column(Boolean, default=False, nullable=False)
+    external_key = Column(String, nullable=True, index=True) # Linked Jira issue key, e.g. DES-42
 
     requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     requester = relationship("User", foreign_keys=[requester_id])
@@ -239,6 +243,7 @@ class Notification(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     content = Column(String, nullable=False)
     type = Column(String, nullable=False) # e.g. 'ASSIGNED', 'WARNING'
+    ticket_id = Column(Integer, ForeignKey("tickets.id"), nullable=True) # The request this is about, so it can be opened
     is_read = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -430,3 +435,11 @@ class ApprovalRequest(Base):
     decision_comment = Column(Text, nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class RateLimitHit(Base):
+    """One row per rate-limited request, so limits hold across restarts and several server instances."""
+    __tablename__ = "rate_limit_hits"
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)

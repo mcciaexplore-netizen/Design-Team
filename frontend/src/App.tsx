@@ -7,18 +7,24 @@ import TicketDetailPage from './pages/TicketDetailPage';
 import TicketCreateModal from './components/TicketCreateModal';
 import CommandPalette from './components/CommandPalette';
 import LoginPage from './pages/LoginPage';
+import ForcePasswordChangePage from './pages/ForcePasswordChangePage';
 import SettingsPage from './pages/SettingsPage';
 import MyTasksPage from './pages/MyTasksPage';
 import WorkloadPage from './pages/WorkloadPage';
 import ReviewPage from './pages/ReviewPage';
+import RequestFormPage from './pages/RequestFormPage';
+import TrackPage from './pages/TrackPage';
+const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 import { AuthProvider, useAuth, type UserRole } from './contexts/AuthContext';
 import { TicketsProvider, useTickets } from './contexts/TicketsContext';
 import { ToastContainer, useToast } from './components/Toast';
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense, type ReactNode } from 'react';
 import { useTicketSocket } from './hooks/useTicketSocket';
+import { NewRequestContext } from './contexts/NewRequestContext';
+import type { RequestPrefill } from './requestForm';
 import {
   LayoutDashboard, BarChart3, Plus, Users, Zap, LogOut, Search,
-  ChevronRight, Settings, Gauge, ListChecks, type LucideIcon,
+  ChevronRight, Settings, Gauge, ListChecks, CalendarDays, type LucideIcon,
 } from 'lucide-react';
 
 interface NavItem { to: string; label: string; icon: LucideIcon; roles: UserRole[] }
@@ -30,6 +36,7 @@ const NAV_GROUPS: NavGroup[] = [
     { to: '/my-tasks', label: 'My Tasks',     icon: ListChecks,      roles: STAFF },
     { to: '/',         label: 'Kanban Board', icon: LayoutDashboard, roles: STAFF },
     { to: '/workload', label: 'Workload',     icon: Gauge,           roles: STAFF },
+    { to: '/calendar', label: 'Calendar',     icon: CalendarDays,    roles: ['Design Lead', 'Designer', 'Client'] },
   ] },
   { title: 'Insights', items: [
     { to: '/dashboard', label: 'Performance', icon: BarChart3, roles: ['Design Lead'] },
@@ -47,6 +54,7 @@ const PAGE_TITLES: [string, string][] = [
   ['/my-tasks',      'My tasks'],
   ['/dashboard',     'Performance'],
   ['/workload',      'Team workload'],
+  ['/calendar',      'Calendar'],
   ['/tickets',       'Ticket'],
   ['/settings',      'Settings'],
   ['/',              'Board'],
@@ -56,8 +64,9 @@ const PAGE_SUBTITLES: Record<string, string> = {
   '/':              'Drag tickets between stages to keep work moving',
   '/dashboard':     'The last 30 days of delivery and this week’s load',
   '/workload':      'Who has capacity, and who is about to fall behind',
+  '/calendar':      'Deadlines and SLA windows at a glance',
   '/client-portal': 'Track requests and review designs',
-  '/settings':      'Notifications and integrations',
+  '/settings':      'Notifications, password and team',
 };
 
 function titleFor(pathname: string): string {
@@ -162,13 +171,16 @@ function RequireRole({ roles, children }: { roles: UserRole[]; children: ReactNo
 
 function AppShell() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [prefill, setPrefill] = useState<RequestPrefill | null>(null);   // set by "Request again"
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const isClient = user?.role === 'Client';
   const pageTitle = titleFor(location.pathname);
   const subtitle = PAGE_SUBTITLES[location.pathname];
   const { toasts, addToast, removeToast } = useToast();
   const { refresh } = useTickets();
+  const openNewRequest = useCallback((answers?: RequestPrefill) => { setPrefill(answers ?? null); setIsCreateModalOpen(true); }, []);
 
   const handleSocketMessage = useCallback((msg: import('./hooks/useTicketSocket').SocketMessage) => {
     void refresh();
@@ -191,30 +203,36 @@ function AppShell() {
         setIsCommandPaletteOpen(true);
       } else if (!e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'c' || e.key === 'C')) {
         e.preventDefault();
-        setIsCreateModalOpen(true);
+        openNewRequest();
       } else if (e.key === 'Escape') {
         setIsCommandPaletteOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [openNewRequest]);
 
   const home = user?.role === 'Client' ? '/client-portal' : user?.role === 'Designer' ? '/my-tasks' : '/';
 
   return (
+    <NewRequestContext.Provider value={{ openNewRequest }}>
     <div className="app-shell flex h-screen font-body">
       <a href="#main-content" className="skip-link">Skip to content</a>
-      <Sidebar onNewTicket={() => setIsCreateModalOpen(true)} />
+      {/* Clients get a focused page: their requests and notifications, nothing else. */}
+      {!isClient && <Sidebar onNewTicket={() => openNewRequest()} />}
 
       <main className="flex-1 flex flex-col relative z-0 min-w-0">
         <header className="app-header h-16 flex items-center px-8 justify-between sticky top-0 z-20">
-          <div className="app-header-title">
-            <h2 className="font-heading font-bold" style={{ fontSize: 'clamp(1.1rem, 2vw, 1.35rem)', letterSpacing: '-0.02em', color: 'var(--text-strong)' }}>{pageTitle}</h2>
-            {subtitle && <p className="app-header-subtitle">{subtitle}</p>}
+          <div className="app-header-title" style={isClient ? { display: 'flex', alignItems: 'center', gap: 14 } : undefined}>
+            {isClient && <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 36, objectFit: 'contain' }} />}
+            <div>
+              <h2 className="font-heading font-bold" style={{ fontSize: 'clamp(1.1rem, 2vw, 1.35rem)', letterSpacing: '-0.02em', color: 'var(--text-strong)' }}>{pageTitle}</h2>
+              {subtitle && <p className="app-header-subtitle">{subtitle}</p>}
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
+            {!isClient && (<>
             <button type="button" className="app-header-search" onClick={() => setIsCommandPaletteOpen(true)} aria-label="Search the workspace" title="Search (Ctrl+K)">
               <Search size={15} />
               <span>Search anything…</span>
@@ -222,9 +240,10 @@ function AppShell() {
             </button>
 
             <div style={{ width: 1, height: 24, background: 'var(--border-soft)' }} />
+            </>)}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><NotificationBell /></div>
 
-            <button type="button" className="app-header-create btn-primary" onClick={() => setIsCreateModalOpen(true)} aria-label={user?.role === 'Client' ? 'New request' : 'New ticket'} style={{ gap: '0.4rem' }}>
+            <button type="button" className="app-header-create btn-primary" onClick={() => openNewRequest()} aria-label={user?.role === 'Client' ? 'New request' : 'New ticket'} style={{ gap: '0.4rem' }}>
               <Plus size={14} strokeWidth={2.5} />
               <span>{user?.role === 'Client' ? 'New request' : 'New ticket'}</span>
             </button>
@@ -236,17 +255,24 @@ function AppShell() {
                 </div>
               </div>
             )}
+            {isClient && (
+              <>
+                <Link to="/settings" aria-label="Settings" title="Settings" className="app-header-search" style={{ padding: '0.45rem', minWidth: 0 }}><Settings size={16} /></Link>
+                <button type="button" className="btn-ghost" onClick={logout} style={{ gap: '0.4rem' }}><LogOut size={14} /> Sign out</button>
+              </>
+            )}
           </div>
         </header>
 
         <div id="main-content" tabIndex={-1} className="app-content flex-1 overflow-auto px-8 py-7 relative">
-          <div className="h-full animate-fade-in-up">
+          <div className="h-full animate-fade-in-up" style={isClient ? { maxWidth: 980, margin: '0 auto', width: '100%' } : undefined}>
             <Routes>
               <Route path="/" element={<RequireRole roles={STAFF}><KanbanBoard /></RequireRole>} />
               <Route path="/my-tasks" element={<RequireRole roles={STAFF}><MyTasksPage /></RequireRole>} />
               <Route path="/workload" element={<RequireRole roles={STAFF}><WorkloadPage /></RequireRole>} />
               <Route path="/dashboard" element={<RequireRole roles={['Design Lead']}><Dashboard /></RequireRole>} />
-              <Route path="/client-portal" element={<ClientPortalPage onNewRequest={() => setIsCreateModalOpen(true)} />} />
+              <Route path="/calendar" element={isClient ? <Navigate to="/client-portal" replace /> : <Suspense fallback={<p role="status" style={{ color: 'var(--text-hint)' }}>Loading calendar…</p>}><CalendarPage /></Suspense>} />
+              <Route path="/client-portal" element={<ClientPortalPage onNewRequest={() => openNewRequest()} />} />
               <Route path="/tickets/:id" element={<TicketDetailPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={home} replace />} />
@@ -254,11 +280,12 @@ function AppShell() {
           </div>
         </div>
 
-        <TicketCreateModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
-        <CommandPalette    isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
+        <TicketCreateModal isOpen={isCreateModalOpen} prefill={prefill} onClose={() => setIsCreateModalOpen(false)} />
+        <CommandPalette    isOpen={isCommandPaletteOpen && !isClient} onClose={() => setIsCommandPaletteOpen(false)} />
         <ToastContainer    toasts={toasts} onRemove={removeToast} />
       </main>
     </div>
+    </NewRequestContext.Provider>
   );
 }
 
@@ -273,7 +300,7 @@ function App() {
 }
 
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
   /* The client review link works without signing in. */
@@ -283,6 +310,12 @@ function AppContent() {
         <Route path="/review/:token" element={<ReviewPage />} />
       </Routes>
     );
+  }
+
+  /* So does the design request form. */
+  if (location.pathname === '/request') return <RequestFormPage />;
+  if (location.pathname.startsWith('/track/')) {
+    return <Routes><Route path="/track/:token" element={<TrackPage />} /></Routes>;
   }
 
   if (isLoading) {
@@ -297,6 +330,7 @@ function AppContent() {
   }
 
   if (!isAuthenticated) return <LoginPage />;
+  if (user?.mustChangePassword) return <ForcePasswordChangePage />;
 
   return (
     <TicketsProvider>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AtSign, FileText, MessageSquare, Paperclip, Send, X } from 'lucide-react';
+import { AtSign, CheckCircle2, FileText, MapPin, MessageSquare, Paperclip, RotateCcw, Send, X } from 'lucide-react';
 import { apiJson, authFetch, downloadFile } from '../api';
 import { useTickets } from '../contexts/TicketsContext';
 
@@ -10,6 +10,25 @@ interface Comment {
   author: { id: number; full_name: string; role: string | null };
   mentions: { id: number; full_name: string }[];
   attachments: Attachment[];
+}
+
+/** Everything said or done on a request, in time order: comments, designs sent, marked spots and client decisions. */
+type ThreadItem =
+  | ({ kind: 'comment'; at: string | null } & Comment)
+  | { kind: 'design_sent'; id: string; at: string | null; by: string; version: number | null }
+  | { kind: 'decision'; id: string; at: string | null; by: string; decision: 'approved' | 'changes_requested'; version: number | null; comment: string | null }
+  | { kind: 'pin'; id: number; at: string | null; by: string; role: string | null; version: number | null; content: string; is_resolved: boolean };
+
+const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '');
+
+function EventRow({ icon, tone, children, at }: { icon: React.ReactNode; tone: string; children: React.ReactNode; at: string | null }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '0.35rem 0.5rem', fontSize: '0.78rem', color: '#475569' }}>
+      <span aria-hidden="true" style={{ color: tone, marginTop: 2, flexShrink: 0 }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{children}</div>
+      {at && <time dateTime={at} style={{ fontSize: '0.65rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>{when(at)}</time>}
+    </div>
+  );
 }
 
 const MAX_MB = 10;
@@ -33,7 +52,7 @@ function MentionText({ text, names }: { text: string; names: string[] }) {
 
 export default function CommentsPanel({ ticketId, compact = false }: { ticketId: string; compact?: boolean }) {
   const { refresh } = useTickets();
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [items, setItems] = useState<ThreadItem[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -50,7 +69,7 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
 
   const load = useCallback(async () => {
     try {
-      setComments(await apiJson<Comment[]>(`/api/tickets/${ticketId}/comments`));
+      setItems(await apiJson<ThreadItem[]>(`/api/tickets/${ticketId}/thread`));
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Could not load comments.');
@@ -60,7 +79,7 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
   }, [ticketId]);
 
   useEffect(() => {
-    setLoading(true); setComments([]); setText(''); setMentioned([]); setFiles([]); setNotice(null);
+    setLoading(true); setItems([]); setText(''); setMentioned([]); setFiles([]); setNotice(null);
     void load();
     apiJson<Person[]>(`/api/tickets/${ticketId}/mentionable`).then(setPeople).catch(() => setPeople([]));
     const id = setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 20_000);
@@ -76,6 +95,7 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
   const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setText(value);
+    if (value.trim()) setNotice(n => (n?.kind === 'error' && n.text.startsWith('Write a comment') ? null : n));
     const caret = e.target.selectionStart ?? value.length;
     const before = value.slice(0, caret);
     const m = /(^|\s)@([\w .'-]{0,30})$/.exec(before);
@@ -123,7 +143,8 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
 
   const submit = async () => {
     const content = text.trim();
-    if (!content || busy) return;
+    if (busy) return;
+    if (!content) { setNotice({ kind: 'error', text: 'Write a comment first, then press Post.' }); areaRef.current?.focus(); return; }
     setBusy(true); setNotice(null);
     try {
       // Only send mentions whose @Name is still in the text.
@@ -160,18 +181,45 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
   return (
     <section aria-label="Comments">
       <h3 className="section-label" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
-        <MessageSquare size={11} /> Comments ({comments.length})
+        <MessageSquare size={11} /> Conversation ({items.length})
       </h3>
 
       {loading && <p role="status" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Loading comments…</p>}
       {loadError && <p role="alert" style={{ fontSize: '0.78rem', color: '#b91c1c' }}>{loadError} <button type="button" className="chip" onClick={() => void load()}>Retry</button></p>}
-      {!loading && !loadError && comments.length === 0 && (
-        <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: 10 }}>No comments yet. Start the conversation — use @ to mention a teammate.</p>
+      {!loading && !loadError && items.length === 0 && (
+        <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: 10 }}>Nothing here yet. Start the conversation — use @ to mention a teammate.</p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, maxHeight: compact ? 260 : 420, overflowY: 'auto' }}>
-        {comments.map(c => (
-          <div key={c.id} style={{ background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 8, padding: '0.625rem 0.75rem' }}>
+        {items.map(item => {
+          if (item.kind === 'design_sent') {
+            return (
+              <EventRow key={item.id} icon={<Send size={13} />} tone="#2563eb" at={item.at}>
+                <strong>{item.by}</strong> sent {item.version ? `version ${item.version}` : 'a design'} for review
+              </EventRow>
+            );
+          }
+          if (item.kind === 'pin') {
+            return (
+              <EventRow key={`pin-${item.id}`} icon={<MapPin size={13} />} tone={item.is_resolved ? '#059669' : '#dc2626'} at={item.at}>
+                <strong>{item.by}</strong> marked a spot{item.version ? ` on version ${item.version}` : ''}: <span style={{ textDecoration: item.is_resolved ? 'line-through' : 'none' }}>{item.content}</span>{item.is_resolved && <span style={{ color: '#059669' }}> · done</span>}
+              </EventRow>
+            );
+          }
+          if (item.kind === 'decision') {
+            const ok = item.decision === 'approved';
+            return (
+              <div key={item.id} style={{ background: ok ? 'rgba(16,185,129,0.07)' : 'rgba(245,158,11,0.09)', border: `1px solid ${ok ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.3)'}`, borderRadius: 8, padding: '0.5rem 0.75rem' }}>
+                <EventRow icon={ok ? <CheckCircle2 size={14} /> : <RotateCcw size={14} />} tone={ok ? '#059669' : '#b45309'} at={item.at}>
+                  <strong>{item.by}</strong> {ok ? 'approved' : 'asked for changes on'} {item.version ? `version ${item.version}` : 'the design'}
+                </EventRow>
+                {item.comment && <p style={{ fontSize: '0.82rem', color: '#334155', padding: '0 0.5rem 0.25rem 1.8rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{item.comment}</p>}
+              </div>
+            );
+          }
+          const c = item;
+          return (
+          <div key={`c-${c.id}`} style={{ background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 8, padding: '0.625rem 0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#18181b' }}>
                 {c.author.full_name}{c.author.role === 'Requester' && <span style={{ color: '#94a3b8', fontWeight: 600 }}> · client</span>}
@@ -191,7 +239,8 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div style={{ position: 'relative' }}>
@@ -248,7 +297,7 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
           </button>
           <span style={{ fontSize: '0.68rem', color: '#94a3b8', marginLeft: 8 }}>Up to 5 files, {MAX_MB} MB each</span>
         </div>
-        <button type="button" className="btn-primary" style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem' }} onClick={() => void submit()} disabled={!text.trim() || busy}>
+        <button type="button" className="btn-primary" style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem' }} onClick={() => void submit()} disabled={busy}>
           <Send size={12} /> {busy ? 'Posting…' : 'Post'}
         </button>
       </div>

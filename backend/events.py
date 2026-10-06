@@ -16,6 +16,7 @@ EVENT_LABELS = {
     "ticket_moved": "A ticket I raised changes stage",
     "comment_added": "Someone comments on my ticket",
     "mention": "I am @mentioned",
+    "approval_requested": "A design is sent to me for review",
     "approval_decision": "A client approves or requests changes",
     "ticket_created": "A new ticket is created (leads)",
     "sla_breach": "A ticket breaches its SLA",
@@ -27,13 +28,13 @@ def slack_escape(text: str) -> str:
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def notify(db: Session, user: models.User, content: str, event: str) -> None:
+def notify(db: Session, user: models.User, content: str, event: str, ticket: Optional[models.Ticket] = None) -> None:
     """Deliver one notification to one user according to their preferences. Caller commits."""
     prefs = db.query(models.UserPreference).filter(models.UserPreference.user_id == user.id).first()
     if prefs and event in (prefs.muted_events or []):
         return
     if prefs is None or prefs.in_app_enabled:
-        db.add(models.Notification(user_id=user.id, content=content, type=event))
+        db.add(models.Notification(user_id=user.id, content=content, type=event, ticket_id=ticket.id if ticket else None))
 
 
 def post_slack_event(db: Session, kind: str, text: str) -> None:
@@ -62,7 +63,7 @@ def _broadcast(event: str, ticket: models.Ticket, actor_name: str, extra: dict) 
         realtime.publish({"type": "comment_added", **base}, ticket)
     elif event == "sla_breach":
         realtime.publish({"type": "sla_breach", **base}, ticket)
-    elif event in ("ticket_assigned", "approval_decision"):
+    elif event in ("ticket_assigned", "approval_decision", "approval_requested"):
         realtime.publish({"type": "ticket_updated", **base}, ticket)
 
 
@@ -77,27 +78,36 @@ def emit(db: Session, event: str, ticket: models.Ticket, actor: Optional[models.
         if event == "ticket_created":
             for lead in _leads(db):
                 if lead.id != actor_id:
-                    notify(db, lead, f"{actor_name} created {ref}", event)
+                    notify(db, lead, f"{actor_name} created {ref}", event, ticket)
             post_slack_event(db, "new", f":inbox_tray: *New ticket* {slack_escape(ref)} ({ticket.priority.value}) from {slack_escape(actor_name)}")
 
         elif event == "ticket_assigned":
             if ticket.assignee and ticket.assignee.id != actor_id:
-                notify(db, ticket.assignee, f"{actor_name} assigned you {ref}", event)
+                who = f"{ref} was assigned to you" if extra.get("auto") else f"{actor_name} assigned you {ref}"
+                notify(db, ticket.assignee, who, event, ticket)
 
         elif event == "ticket_moved":
             to = extra.get("to", ticket.status.value)
             if ticket.requester and ticket.requester.id != actor_id and to in ("In Review", "Delivered", "Closed"):
-                notify(db, ticket.requester, f"{ref} moved to {to}", event)
+                notify(db, ticket.requester, f"{ref} moved to {to}", event, ticket)
 
         elif event == "comment_added":
             for person in {ticket.assignee, ticket.requester}:
                 if person and person.id != actor_id:
-                    notify(db, person, f"{actor_name} commented on {ref}: {extra.get('excerpt', '')}", event)
+                    notify(db, person, f"{actor_name} commented on {ref}: {extra.get('excerpt', '')}", event, ticket)
 
         elif event == "mention":
             for user in extra.get("users", []):
                 if user.id != actor_id:
-                    notify(db, user, f"{actor_name} mentioned you on {ref}: {extra.get('excerpt', '')}", "mention")
+                    notify(db, user, f"{actor_name} mentioned you on {ref}: {extra.get('excerpt', '')}", "mention", ticket)
+
+        elif event == "approval_requested":
+            if ticket.requester and ticket.requester.id != actor_id:
+                version = extra.get("version", 1)
+                if version > 1:
+                    notify(db, ticket.requester, f"{actor_name} finished the changes on {ref}: version {version} is ready for your review", event, ticket)
+                else:
+                    notify(db, ticket.requester, f"{actor_name} sent a design for your review: {ref}", event, ticket)
 
         elif event == "approval_decision":
             verb = "approved" if extra.get("decision") == "approved" else "requested changes on"
@@ -106,13 +116,13 @@ def emit(db: Session, event: str, ticket: models.Ticket, actor: Optional[models.
             if ticket.assignee:
                 targets[ticket.assignee.id] = ticket.assignee
             for user in targets.values():
-                notify(db, user, msg, event)
+                notify(db, user, msg, event, ticket)
             post_slack_event(db, "escalate" if extra.get("decision") != "approved" else "new", f":white_check_mark: {slack_escape(msg)}")
 
         elif event == "sla_breach":
             msg = f"SLA breached: {ref}"
             for lead in _leads(db):
-                notify(db, lead, msg, event)
+                notify(db, lead, msg, event, ticket)
             post_slack_event(db, "breach", f":warning: *SLA breach* {slack_escape(ref)}")
 
         db.commit()

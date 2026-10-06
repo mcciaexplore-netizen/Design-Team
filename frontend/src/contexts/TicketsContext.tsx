@@ -10,6 +10,8 @@ export interface DesignType {
   id: number;
   name: string;
   default_sla_hours: number;
+  default_effort_hours?: number;
+  edit_window_hours?: number | null;
   required_fields: { name: string; label: string; type: string; options?: string[] }[];
 }
 
@@ -18,7 +20,7 @@ interface ApiTicket {
   tags: string[]; figma_url: string | null; assignee_id: number | null; requester_id: number;
   assignee: ApiUser | null; requester: ApiUser; design_type: DesignType;
   type_specific_fields: Record<string, unknown>;
-  due_at: string | null; is_overdue: boolean; is_locked: boolean; parent_id: number | null; version_number: number;
+  created_at?: string; due_at: string | null; is_overdue: boolean; is_locked: boolean; parent_id: number | null; version_number: number;
   reason_for_change: string | null; revision_count: number; client_org: string | null; estimate_hours: number | null;
   timer_started_at: string | null; time_spent_seconds: number; comment_count?: number;
   subtasks: { id: number; title: string; is_completed: boolean }[];
@@ -60,6 +62,7 @@ export function mapTicket(b: ApiTicket, previous?: Ticket): Ticket {
     requester_name: b.requester?.full_name,
     client_org: b.client_org,
     due_at: b.due_at ?? '',
+    created_at: b.created_at,
     timer_started_at: b.timer_started_at,
     time_spent_seconds: b.time_spent_seconds,
     subtasks: (b.subtasks ?? []) as Subtask[],

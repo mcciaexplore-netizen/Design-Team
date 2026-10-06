@@ -17,7 +17,8 @@ from database import get_db
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 IST = pytz.timezone("Asia/Kolkata")
-DONE = {models.TicketStatus.DELIVERED, models.TicketStatus.CLOSED, models.TicketStatus.CLOSED_WITHOUT_APPROVAL}
+DONE = {models.TicketStatus.DELIVERED, models.TicketStatus.CLOSED, models.TicketStatus.CLOSED_WITHOUT_APPROVAL,
+        models.TicketStatus.REVISION_REQUESTED}
 UNASSIGNED_ORG = "(No organisation)"
 
 
@@ -74,6 +75,8 @@ def build_report(db: Session, date_from=None, date_to=None, client_org: Optional
     weeks: Dict[datetime.date, dict] = defaultdict(lambda: {"due": 0, "on_time": 0, "late": 0, "overdue_open": 0})
     clients: Dict[str, dict] = defaultdict(lambda: {"tickets": 0, "revisions": 0, "with_3plus": 0, "delivered": 0, "on_time": 0,
                                                     "turnaround_hours": [], "hours_logged": 0.0})
+    types: Dict[str, dict] = defaultdict(lambda: {"tickets": 0, "revisions": 0, "delivered": 0, "on_time": 0,
+                                                  "turnaround_hours": [], "hours_logged": 0.0})
     categories: Dict[str, int] = defaultdict(int)
     delivered_total = on_time_total = 0
     turnarounds: List[float] = []
@@ -89,13 +92,20 @@ def build_report(db: Session, date_from=None, date_to=None, client_org: Optional
             c["with_3plus"] += rev >= 3
         if t.revision_category:
             categories[t.revision_category] += 1
+        ty = types[t.design_type.name if t.design_type else "(Unknown)"]
+        ty["tickets"] += 1
+        ty["hours_logged"] += hours_by_ticket[t.id]
+        if t.parent_id is None:
+            ty["revisions"] += revisions_of(t)
 
         done_at, due = _completed_at(t), as_utc(t.due_at)
         if done_at:
             c["delivered"] += 1
+            ty["delivered"] += 1
             delivered_total += 1
             hrs = (done_at - as_utc(t.created_at)).total_seconds() / 3600
             c["turnaround_hours"].append(hrs)
+            ty["turnaround_hours"].append(hrs)
             turnarounds.append(hrs)
         if due:
             w = weeks[_week_start(due)]
@@ -104,6 +114,7 @@ def build_report(db: Session, date_from=None, date_to=None, client_org: Optional
                 if done_at <= due:
                     w["on_time"] += 1
                     c["on_time"] += 1
+                    ty["on_time"] += 1
                     on_time_total += 1
                 else:
                     w["late"] += 1
@@ -137,6 +148,14 @@ def build_report(db: Session, date_from=None, date_to=None, client_org: Optional
              "hours_logged": round(c["hours_logged"], 1)}
             for org, c in clients.items()
         ], key=lambda r: (-r["revisions"], r["client"])),
+        "by_design_type": sorted([
+            {"design_type": name, "tickets": v["tickets"], "revisions": v["revisions"],
+             "avg_revisions": round(v["revisions"] / max(1, v["tickets"]), 2), "delivered": v["delivered"],
+             "on_time_rate_pct": pct(v["on_time"], v["delivered"]),
+             "avg_turnaround_hours": round(sum(v["turnaround_hours"]) / len(v["turnaround_hours"]), 1) if v["turnaround_hours"] else None,
+             "hours_logged": round(v["hours_logged"], 1)}
+            for name, v in types.items()
+        ], key=lambda r: (-r["tickets"], r["design_type"])),
         "revision_categories": sorted([{"category": k, "count": v} for k, v in categories.items()], key=lambda r: -r["count"]),
         "_tickets": tickets, "_hours": hours_by_ticket, "_revs": revisions_of, "_done": _completed_at,
     }
@@ -170,7 +189,7 @@ def _csv_response(name: str, header: List[str], rows: List[list]) -> Response:
 
 
 @router.get("/export.csv")
-def export_csv(report: str = Query(default="tickets", pattern="^(tickets|sla|clients)$"),
+def export_csv(report: str = Query(default="tickets", pattern="^(tickets|sla|clients|design_types)$"),
                date_from: Optional[datetime.date] = Query(default=None, alias="from"),
                date_to: Optional[datetime.date] = Query(default=None, alias="to"),
                client_org: Optional[str] = Query(default=None, max_length=80),
@@ -180,6 +199,12 @@ def export_csv(report: str = Query(default="tickets", pattern="^(tickets|sla|cli
     if report == "sla":
         return _csv_response(name, ["Week starting", "Due", "On time", "Late", "Overdue & open", "On-time rate %"],
                              [[w["week_start"], w["due"], w["on_time"], w["late"], w["overdue_open"], w["on_time_rate_pct"] if w["on_time_rate_pct"] is not None else ""] for w in r["sla_trend"]])
+    if report == "design_types":
+        return _csv_response(name, ["Design type", "Tickets", "Revisions", "Avg revisions", "Delivered", "On-time rate %",
+                                    "Avg turnaround (h)", "Hours logged"],
+                             [[csv_safe(d["design_type"]), d["tickets"], d["revisions"], d["avg_revisions"], d["delivered"],
+                               d["on_time_rate_pct"] if d["on_time_rate_pct"] is not None else "",
+                               d["avg_turnaround_hours"] if d["avg_turnaround_hours"] is not None else "", d["hours_logged"]] for d in r["by_design_type"]])
     if report == "clients":
         return _csv_response(name, ["Client", "Tickets", "Revisions", "Avg revisions", "Tickets with 3+ revisions", "Delivered",
                                     "On-time rate %", "Avg turnaround (h)", "Hours logged"],

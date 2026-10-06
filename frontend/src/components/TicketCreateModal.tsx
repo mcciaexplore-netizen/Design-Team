@@ -5,6 +5,8 @@ import { apiJson, authFetch } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets, type DesignType } from '../contexts/TicketsContext';
 import FigmaEmbed from './FigmaEmbed';
+import ClientRequestForm from './ClientRequestForm';
+import type { RequestPrefill } from '../requestForm';
 
 const PRIORITIES: { value: string; color: string }[] = [
   { value: 'Low', color: '#059669' }, { value: 'Normal', color: '#27272a' },
@@ -18,14 +20,13 @@ const ALLOWED = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'csv', 'doc'
 const sectionTitle: React.CSSProperties = { fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', marginBottom: '0.5rem', display: 'block' };
 const fmtSize = (n: number) => (n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
-interface Props { isOpen: boolean; onClose: () => void }
+interface Props { isOpen: boolean; onClose: () => void; prefill?: RequestPrefill | null }
 
-const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
+const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { designTypes, staff, createTicket, updateTicket, addSubtask, refresh } = useTickets();
+  const { designTypes, createTicket, addSubtask, refresh } = useTickets();
   const isStaff = user?.role === 'Design Lead' || user?.role === 'Designer';
-  const isLead = user?.role === 'Design Lead';
 
   const [typeId, setTypeId] = useState<number | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -41,9 +42,8 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
-  const [assigneeId, setAssigneeId] = useState('');
-  const [estimate, setEstimate] = useState('');
   const [dragging, setDragging] = useState(false);
+  const [blank, setBlank] = useState(false);   // "Create another" starts empty even if the dialog was opened with a prefill
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,11 +56,11 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   const reset = useCallback(() => {
     setTypeId(null); setFields({}); setTitle(''); setBrief(''); setPriority('Normal'); setDeadline(''); setLink(''); setLinkInfo(null);
-    setShowPreview(false); setTags([]); setCustomTag(''); setFiles([]); setSubtasks([]); setNewSubtask(''); setAssigneeId(''); setEstimate('');
+    setShowPreview(false); setTags([]); setCustomTag(''); setFiles([]); setSubtasks([]); setNewSubtask('');
     setBusy(false); setError(null); setFileNotes([]); setDone(null);
   }, []);
 
-  useEffect(() => { if (isOpen) { reset(); setTimeout(() => titleRef.current?.focus(), 50); } }, [isOpen, reset]);
+  useEffect(() => { if (isOpen) { reset(); setBlank(false); setTimeout(() => titleRef.current?.focus(), 50); } }, [isOpen, reset]);
 
   const dirty = !!(title || brief || link || files.length || Object.values(fields).some(Boolean));
 
@@ -120,8 +120,6 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
     for (const f of type.required_fields) {
       if (!fields[f.name]?.trim()) { setError(`Please fill in “${f.label}”.`); return; }
     }
-    const est = estimate.trim() === '' ? null : Number(estimate);
-    if (est !== null && (!Number.isFinite(est) || est < 0 || est > 200)) { setError('Estimate must be between 0 and 200 hours.'); return; }
 
     const extra: Record<string, unknown> = { ...fields };
     if (deadline) extra.requested_deadline = deadline;
@@ -137,7 +135,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
     try {
       const created = await createTicket({
         title: title.trim(), brief: brief.trim(), design_type_id: type.id, priority, tags,
-        type_specific_fields: extra, figma_url: figma, ...(isStaff ? { estimate_hours: est } : {}),
+        type_specific_fields: extra, figma_url: figma,
       });
       const warnings: string[] = [];
 
@@ -155,9 +153,6 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
         for (const s of subtasks) {
           try { await addSubtask(created.id, s); } catch { warnings.push(`Subtask “${s}” was not added`); }
         }
-      }
-      if (isLead && assigneeId) {
-        try { await updateTicket(created.id, { assignee_id: Number(assigneeId) }); } catch { warnings.push('The assignee could not be set'); }
       }
       await refresh();
       setDone({ id: created.id, number: created.number, warnings });
@@ -200,10 +195,12 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
             )}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
               <button type="button" className="btn-primary" onClick={() => { onClose(); navigate(`/tickets/${done.id}`); }}>Open ticket</button>
-              <button type="button" className="btn-ghost" onClick={reset}>Create another</button>
+              <button type="button" className="btn-ghost" onClick={() => { reset(); setBlank(true); }}>Create another</button>
               <button type="button" className="btn-ghost" onClick={onClose}>Close</button>
             </div>
           </div>
+        ) : !isStaff ? (
+          <ClientRequestForm prefill={blank ? null : prefill} onCancel={onClose} onCreated={t => setDone({ id: t.id, number: t.number, warnings: [] })} />
         ) : (
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }} noValidate>
             <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.35rem' }}>
@@ -323,24 +320,6 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   </ul>
                 )}
               </div>
-
-              {isStaff && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
-                  {isLead && (
-                    <div>
-                      <label htmlFor="nt-assignee" style={sectionTitle}>Assign to</label>
-                      <select id="nt-assignee" className="input-field" value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
-                        <option value="">Unassigned</option>
-                        {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  <div>
-                    <label htmlFor="nt-est" style={sectionTitle}>Estimate (hours)</label>
-                    <input id="nt-est" className="input-field" inputMode="decimal" placeholder="Uses the design type default" value={estimate} onChange={e => setEstimate(e.target.value)} />
-                  </div>
-                </div>
-              )}
 
               {isStaff && (
                 <div>

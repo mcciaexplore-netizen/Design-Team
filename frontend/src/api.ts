@@ -76,6 +76,18 @@ export async function publicJson<T>(path: string, init: RequestInit & { json?: u
   return res.json() as Promise<T>;
 }
 
+/** Public multipart POST (the design request form): no token, no sign-out on 401. */
+export async function publicForm<T>(path: string, body: FormData): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { method: 'POST', body });
+  } catch {
+    throw new ApiError('Cannot reach the server. Check your connection.', 0);
+  }
+  if (!res.ok) throw new ApiError(await errorMessage(res), res.status);
+  return res.json() as Promise<T>;
+}
+
 /** Download an authenticated file (CSV, PDF, attachment) by fetching it as a blob and saving it. */
 export async function downloadFile(path: string, fallbackName: string): Promise<void> {
   const res = await authFetch(path);

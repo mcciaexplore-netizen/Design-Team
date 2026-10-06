@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Bell, CheckCircle2, MessageSquare, Save, Send } from 'lucide-react';
 import { apiJson } from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import ChangePasswordForm from '../components/ChangePasswordForm';
+import UsersAdmin from '../components/UsersAdmin';
+import DesignTypesAdmin from '../components/DesignTypesAdmin';
 
 const SECTION_LABEL: React.CSSProperties = { fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', marginBottom: 2 };
 const FIELD_LABEL: React.CSSProperties = { fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: 6 };
@@ -192,24 +195,42 @@ function MyNotificationsTab() {
   );
 }
 
+function AccountTab() {
+  return (
+    <section className="glass-card" style={{ padding: '1.5rem' }} aria-labelledby="pw-h">
+      <h2 id="pw-h" style={{ ...SECTION_LABEL, marginBottom: 14 }}>Change password</h2>
+      <ChangePasswordForm />
+    </section>
+  );
+}
+
+type TabKey = 'me' | 'account' | 'users' | 'types' | 'integrations';
+
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
   const isLead = user?.role === 'Design Lead';
-  const [tab, setTab] = useState<'me' | 'integrations'>('me');
+  const [tab, setTab] = useState<TabKey>('me');
+  const tabs: [TabKey, string][] = [
+    ['me', 'My notifications'],
+    ['account', 'Password'],
+    ...(isLead ? [['users', 'Users'], ['types', 'Design types'], ['integrations', 'Integrations & alerts']] as [TabKey, string][] : []),
+  ];
 
   return (
-    <div style={{ maxWidth: 720, paddingBottom: '3rem' }}>
-      {isLead && (
-        <div role="tablist" aria-label="Settings sections" style={{ display: 'inline-flex', background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 'var(--radius-md)', padding: 4, marginBottom: '1.25rem' }}>
-          {([['me', 'My notifications'], ['integrations', 'Integrations & alerts']] as const).map(([key, label]) => (
-            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
-              style={{ padding: '0.45rem 1rem', borderRadius: 8, border: 'none', cursor: 'pointer', background: tab === key ? 'white' : 'transparent', boxShadow: tab === key ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', color: tab === key ? '#18181b' : '#64748B', fontSize: '0.8rem', fontWeight: 700 }}>
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-      {tab === 'integrations' && isLead ? <IntegrationsTab /> : <MyNotificationsTab />}
+    <div style={{ maxWidth: tab === 'users' ? 900 : 720, paddingBottom: '3rem' }}>
+      <div role="tablist" aria-label="Settings sections" style={{ display: 'inline-flex', flexWrap: 'wrap', background: '#F8FAFC', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', padding: 4, marginBottom: '1.25rem' }}>
+        {tabs.map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
+            style={{ padding: '0.45rem 1rem', borderRadius: 8, border: 'none', cursor: 'pointer', background: tab === key ? 'white' : 'transparent', boxShadow: tab === key ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', color: tab === key ? '#18181b' : 'var(--text-hint)', fontSize: '0.8rem', fontWeight: 700 }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'account' ? <AccountTab />
+        : tab === 'users' && isLead ? <UsersAdmin />
+        : tab === 'types' && isLead ? <DesignTypesAdmin />
+        : tab === 'integrations' && isLead ? <IntegrationsTab />
+        : <MyNotificationsTab />}
     </div>
   );
 };

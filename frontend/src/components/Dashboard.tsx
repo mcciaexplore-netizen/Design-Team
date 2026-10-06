@@ -4,14 +4,18 @@ import {
 } from 'recharts';
 import { AlertTriangle, CheckCircle2, Clock, Inbox } from 'lucide-react';
 import { apiJson } from '../api';
-import { STATUSES } from '../types';
+import { DONE_STATUSES, STATUSES } from '../types';
 import { useTickets } from '../contexts/TicketsContext';
 import ForecastingWidget from './ForecastingWidget';
+import ReportsExport from './ReportsExport';
+import BreakdownTable, { type BreakdownRow } from './BreakdownTable';
 
 interface Summary {
   range: { from: string; to: string };
   kpis: { tickets_created: number; tickets_delivered: number; on_time_rate_pct: number | null; avg_turnaround_hours: number | null; avg_revisions_per_ticket: number | null; hours_logged: number };
   sla_trend: { week_start: string; on_time: number; late: number; overdue_open: number }[];
+  by_design_type: BreakdownRow[];
+  by_client: BreakdownRow[];
 }
 interface Workload { designers: { designer_id: number; designer_name: string; capacity_hours: number; planned_hours: number }[] }
 
@@ -57,7 +61,7 @@ const Dashboard = () => {
     [tickets],
   );
   const overdueOpen = useMemo(
-    () => tickets.filter(t => t.due_at && new Date(t.due_at).getTime() < Date.now() && !['Delivered', 'Closed', 'Closed without approval'].includes(t.status)).length,
+    () => tickets.filter(t => t.due_at && new Date(t.due_at).getTime() < Date.now() && !DONE_STATUSES.includes(t.status)).length,
     [tickets],
   );
 
@@ -147,6 +151,9 @@ const Dashboard = () => {
             </div>
             <ForecastingWidget />
           </div>
+
+          <BreakdownTable byDesignType={summary?.by_design_type ?? []} byClient={summary?.by_client ?? []} />
+          <ReportsExport />
         </>
       )}
     </div>

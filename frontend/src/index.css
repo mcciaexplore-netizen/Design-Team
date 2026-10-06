@@ -1044,3 +1044,12 @@ select.input-field { cursor: pointer; }
 /* Header user chip: the sidebar already shows the full profile on desktop */
 .app-header-user { display: none; align-items: center; }
 @media (max-width: 767px) { .app-header-user { display: flex; } }
+
+/* Mobile bottom bar: section headings have no room there */
+@media (max-width: 767px) { .sidebar-section-title { display: none; } }
+@media (max-width: 767px) {
+  /* Leads have 7 destinations: let the bar scroll sideways instead of clipping the last ones */
+  .app-side-nav { overflow-x: auto; justify-content: flex-start; scrollbar-width: none; }
+  .app-side-nav::-webkit-scrollbar { display: none; }
+  .app-nav-link { flex: 1 0 68px; }
+}

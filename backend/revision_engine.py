@@ -1,4 +1,5 @@
 import models
+from common import assign_to_last_submitter
 from copy import deepcopy
 
 def request_changes(db, ticket, reason=""):
@@ -10,6 +11,7 @@ def request_changes(db, ticket, reason=""):
         ticket.status = models.TicketStatus.IN_PROGRESS
         ticket.revision_count += 1
         ticket.edit_window_ends_at = None
+        assign_to_last_submitter(db, ticket)
         
         audit = models.AuditLog(
             ticket_id=ticket.id,
@@ -36,6 +38,8 @@ def request_changes(db, ticket, reason=""):
             parent_id=ticket.id,
             version_number=new_version,
             reason_for_change=reason,
+            client_org=ticket.client_org,
+            assignee_id=ticket.assignee_id,
             ticket_number=f"{base_number}-v{new_version}"
         )
         db.add(new_ticket)

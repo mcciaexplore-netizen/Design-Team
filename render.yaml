@@ -25,15 +25,35 @@ services:
         generateValue: true
       - key: ALLOWED_ORIGINS
         sync: false # the frontend URL, e.g. https://designflow-web.onrender.com
-      - key: SEED_STAFF_PASSWORD
-        generateValue: true # shown in the Render dashboard; used for lead/designer demo accounts
-      - key: SEED_CLIENT_PASSWORD
-        generateValue: true
+      # Production keeps demo accounts/tickets OUT. Only a separate demo deployment sets SEED_DEMO_DATA=true
+      # (and then SEED_STAFF_PASSWORD / SEED_CLIENT_PASSWORD). See DEPLOY.md.
+      - key: SEED_DEMO_DATA
+        value: "false"
       - key: ADMIN_EMAIL
         value: mcciaexplore@gmail.com # promoted to Design Lead (admin) on every deploy
       - key: ADMIN_PASSWORD
-        sync: false # only used to create the account if it does not exist yet
+        sync: false # only used to create the account if it does not exist yet; the admin then adds everyone else in Settings > Users
       - key: JIRA_WEBHOOK_SECRET
+        sync: false
+      - key: JIRA_BASE_URL
+        sync: false # optional: https://your-domain.atlassian.net
+      - key: JIRA_EMAIL
+        sync: false
+      - key: JIRA_API_TOKEN
+        sync: false
+      - key: SMTP_HOST
+        sync: false # optional: enables confirmation and reminder emails
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: TURNSTILE_SITE_KEY
+        sync: false # optional: CAPTCHA on the public request form
+      - key: TURNSTILE_SECRET_KEY
         sync: false
       - key: PUBLIC_APP_URL
         sync: false # the frontend URL; used in client review links
