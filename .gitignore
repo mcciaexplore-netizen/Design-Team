@@ -10,3 +10,11 @@ dist/
 backend/uploads/
 _*.db
 _smoke*
+
+# Local database backups
+*.db.bak
+*.db.backup
+*.db.pre-*
+.dev_secret_key
+.pytest_tmp/
+.pytest_tmp_*/
