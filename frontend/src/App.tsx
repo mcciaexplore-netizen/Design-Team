@@ -17,6 +17,7 @@ const ReviewPage = lazy(() => import('./pages/ReviewPage'));
 const RequestFormPage = lazy(() => import('./pages/RequestFormPage'));
 const TrackPage = lazy(() => import('./pages/TrackPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
+const CampaignsPage = lazy(() => import('./pages/CampaignsPage'));
 
 const PageLoading = () => <p role="status" style={{ color: 'var(--text-hint)', padding: '1rem' }}>Loading…</p>;
 import { AuthProvider, useAuth, type UserRole } from './contexts/AuthContext';
@@ -28,7 +29,7 @@ import { NewRequestContext } from './contexts/NewRequestContext';
 import type { RequestPrefill } from './requestForm';
 import {
   LayoutDashboard, BarChart3, Plus, Users, Zap, LogOut, Search,
-  ChevronRight, Settings, Gauge, ListChecks, CalendarDays, type LucideIcon,
+  ChevronRight, Settings, Gauge, ListChecks, CalendarDays, Megaphone, type LucideIcon,
 } from 'lucide-react';
 
 interface NavItem { to: string; label: string; icon: LucideIcon; roles: UserRole[] }
@@ -47,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
   ] },
   { title: 'Portals', items: [
     { to: '/client-portal', label: 'Client Portal', icon: Users, roles: ['Design Lead', 'Designer', 'Client'] },
+    { to: '/campaigns', label: 'Campaigns', icon: Megaphone, roles: ['Design Lead', 'Designer', 'Client'] },
   ] },
   { title: 'Account', items: [
     { to: '/settings', label: 'Settings', icon: Settings, roles: ['Design Lead', 'Designer', 'Client'] },
@@ -59,7 +61,8 @@ const PAGE_TITLES: [string, string][] = [
   ['/dashboard',     'Performance'],
   ['/workload',      'Team workload'],
   ['/calendar',      'Calendar'],
-  ['/tickets',       'Ticket'],
+  ['/campaigns',     'Campaigns'],
+  ['/tickets',      'Ticket'],
   ['/settings',      'Settings'],
   ['/',              'Board'],
 ];
@@ -285,7 +288,8 @@ function AppShell() {
               <Route path="/dashboard" element={<RequireRole roles={['Design Lead']}><Dashboard /></RequireRole>} />
               <Route path="/calendar" element={isClient ? <Navigate to="/client-portal" replace /> : <CalendarPage />} />
               <Route path="/client-portal" element={<ClientPortalPage onNewRequest={() => openNewRequest()} />} />
-              <Route path="/tickets/:id" element={<TicketDetailPage />} />
+              <Route path="/campaigns" element={<CampaignsPage />} />
+              <Route path="/tickets/:id"element={<TicketDetailPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={home} replace />} />
             </Routes>

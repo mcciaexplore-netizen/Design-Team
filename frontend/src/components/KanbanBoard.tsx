@@ -76,14 +76,22 @@ const KanbanBoard = () => {
 
   /* ── Computed ── */
   const visible = useMemo(() => tickets.filter(t => ticketMatches(t, filters, myId, now)), [tickets, filters, myId, Math.floor(now / 30_000)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Person columns are keyed by account, not by display name: two people can share a name, and grouping by name
+  // would merge them and assign work to the wrong account. Same-named accounts are told apart by their email.
   const assigneeColumns = useMemo(() => {
-    const names = ['Unassigned', ...staff.map(s => s.name)];
-    for (const t of tickets) if (t.assignee && !names.includes(t.assignee)) names.push(t.assignee);
-    return names;
+    const sameName = new Map<string, number>();
+    for (const s of staff) sameName.set(s.name, (sameName.get(s.name) ?? 0) + 1);
+    const cols = [{ key: 'unassigned', label: 'Unassigned' },
+      ...staff.map(s => ({ key: `u:${s.id}`, label: (sameName.get(s.name) ?? 0) > 1 ? `${s.name} (${s.email})` : s.name }))];
+    // Someone no longer on the team list (e.g. deactivated) who still holds tickets keeps a column.
+    for (const t of tickets) {
+      if (t.assignee_id && !cols.some(c => c.key === `u:${t.assignee_id}`)) cols.push({ key: `u:${t.assignee_id}`, label: t.assignee || 'Former team member' });
+    }
+    return cols;
   }, [staff, tickets]);
 
-  const getGroupKey = (t: Ticket) => (groupBy === 'assignee' ? (t.assignee || 'Unassigned') : t.status);
-  const groupings = groupBy === 'assignee' ? assigneeColumns : STATUSES;
+  const getGroupKey = (t: Ticket) => (groupBy === 'assignee' ? (t.assignee_id ? `u:${t.assignee_id}` : 'unassigned') : t.status);
+  const groupings = groupBy === 'assignee' ? assigneeColumns : STATUSES.map(st => ({ key: st, label: st }));
 
   const filtersActive = !sameFilters(filters, EMPTY_FILTERS);
   const currentSaved = savedViews.find(v => `s:${v.id}` === activeView);
@@ -172,9 +180,11 @@ const KanbanBoard = () => {
     if (!ticket || getGroupKey(ticket) === targetCol) return;
     if (groupBy === 'assignee' && !isLead) { addToast('Only a Design Lead can reassign tickets.', 'warning'); return; }
 
-    const patch: Partial<Ticket> = groupBy === 'status' ? { status: targetCol } : { assignee: targetCol === 'Unassigned' ? '' : targetCol };
+    const targetLabel = groupings.find(c => c.key === targetCol)?.label ?? targetCol;
+    const patch: Partial<Ticket> = groupBy === 'status' ? { status: targetCol }
+      : { assignee_id: targetCol === 'unassigned' ? null : Number(targetCol.slice(2)) };
     updateTicket(ticketId, patch)
-      .then(() => addToast(`${ticket.number} moved to "${targetCol}"`, 'success'))
+      .then(() => addToast(`${ticket.number} moved to "${targetLabel}"`, 'success'))
       .catch(e => fail(e, 'Could not move the ticket.'));
   };
 
@@ -192,13 +202,13 @@ const KanbanBoard = () => {
   /* ── Render board column list ── */
   const renderBoardColumns = () =>
     groupings.map(group => {
-      const colTickets = visible.filter(t => getGroupKey(t) === group);
+      const colTickets = visible.filter(t => getGroupKey(t) === group.key);
       return (
         <DroppableColumn
-          key={group} id={group} label={group}
+          key={group.key} id={group.key} label={group.label}
           count={colTickets.length}
-          wipLimit={groupBy === 'status' ? wipLimits[group] : undefined}
-          isOver={overColId === group}
+          wipLimit={groupBy === 'status' ? wipLimits[group.key] : undefined}
+          isOver={overColId === group.key}
         >
           {colTickets.map(ticket => (
             <DraggableTicket

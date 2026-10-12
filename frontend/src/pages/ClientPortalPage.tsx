@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ChevronDown, ChevronUp, Eye, MessageSquare, Plus, RotateCcw, Search, SlidersHorizontal, Ticket as TicketIcon, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Eye, Megaphone, MessageSquare, Plus, RotateCcw, Search, SlidersHorizontal, Ticket as TicketIcon, X } from 'lucide-react';
 import { DONE_STATUSES, type Ticket } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
@@ -138,9 +138,14 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
             </h1>
             <p style={{ fontSize: '0.86rem', color: '#64748B', marginTop: 6 }}>Track progress, review designs and talk to the design team.</p>
           </div>
-          <button type="button" className="btn-primary" style={{ fontSize: '0.86rem', padding: '0.6rem 1.1rem', gap: 6 }} onClick={onNewRequest}>
-            <Plus size={15} aria-hidden="true" /> New request
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Link to="/campaigns" className="btn-ghost" style={{ fontSize: '0.86rem', padding: '0.6rem 1.1rem', gap: 6, textDecoration: 'none' }}>
+              <Megaphone size={15} aria-hidden="true" /> Campaigns &amp; posts
+            </Link>
+            <button type="button" className="btn-primary" style={{ fontSize: '0.86rem', padding: '0.6rem 1.1rem', gap: 6 }} onClick={onNewRequest}>
+              <Plus size={15} aria-hidden="true" /> New request
+            </button>
+          </div>
         </div>
 
         {/* Tabs with counts, search, and the rarely-needed filters tucked away */}

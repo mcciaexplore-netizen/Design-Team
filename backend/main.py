@@ -8,7 +8,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-import approvals, auth, cdr_api, collab, forecasting, integrations, live, notify_api, reports, request_form
+import approvals, auth, campaigns_api, cdr_api, collab, forecasting, integrations, live, notify_api, reports, request_form
 import revisions_api, templates_recurring, thread, tickets_api, timetracking, tracking, users_admin, views_bulk
 from auth import require_staff
 from database import get_db
@@ -55,7 +55,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (auth, users_admin, tickets_api, revisions_api, notify_api, collab, views_bulk, templates_recurring,
+for module in (auth, campaigns_api, users_admin, tickets_api, revisions_api, notify_api, collab, views_bulk, templates_recurring,
                timetracking, approvals, reports, request_form, cdr_api, tracking, thread, live):
     app.include_router(module.router)
 app.include_router(forecasting.router, dependencies=[Depends(require_staff)])

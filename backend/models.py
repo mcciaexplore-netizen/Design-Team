@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, Boolean, ForeignKey, DateTime, Enum, JSON, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, String, Boolean, ForeignKey, Date, DateTime, Enum, JSON, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, false
 import enum
@@ -443,3 +443,33 @@ class RateLimitHit(Base):
     id = Column(Integer, primary_key=True, index=True)
     key = Column(String, nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+
+
+class Campaign(Base):
+    """A client's marketing campaign: a named date range that their social posts hang off."""
+    __tablename__ = "campaigns"
+    id = Column(Integer, primary_key=True, index=True)
+    owner_key = Column(String, nullable=False, index=True)  # client_org, or "user:<id>" for a client with no organisation
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    color = Column(String, nullable=False, default="#2563eb")
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SocialPost(Base):
+    """A post the client made (or plans to make) themselves. It never goes through the design team."""
+    __tablename__ = "social_posts"
+    id = Column(Integer, primary_key=True, index=True)
+    owner_key = Column(String, nullable=False, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=True, index=True)
+    platform = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    post_url = Column(String, nullable=True)
+    post_date = Column(Date, nullable=False)
+    status = Column(String, nullable=False, default="Posted")  # Planned | Posted
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
