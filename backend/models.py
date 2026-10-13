@@ -472,4 +472,7 @@ class SocialPost(Base):
     post_date = Column(Date, nullable=False)
     status = Column(String, nullable=False, default="Posted")  # Planned | Posted
     notes = Column(Text, nullable=True)
+    image_key = Column(String, nullable=True)  # the uploaded post image, in file storage
+    image_name = Column(String, nullable=True)
+    image_type = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
