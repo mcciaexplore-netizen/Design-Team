@@ -62,7 +62,7 @@ export default function DesignTypesAdmin() {
                 <td style={{ padding: '8px' }}><input aria-label={`${r.name} edit window hours`} className="input-field" inputMode="numeric" placeholder="Default" value={r.window} onChange={e => patch(r.id, { window: e.target.value })} style={{ width: 90 }} /></td>
                 <td style={{ padding: '8px', whiteSpace: 'nowrap' }}>
                   <button type="button" className="btn-primary" disabled={r.saving} onClick={() => void save(r)}><Save size={13} /> {r.saving ? 'Saving…' : 'Save'}</button>
-                  {r.note && <span role="status" style={{ marginLeft: 8, fontSize: '0.75rem', color: r.note.ok ? '#047857' : '#b91c1c' }}>{r.note.text}</span>}
+                  {r.note && <span role="status" style={{ marginLeft: 8, fontSize: '0.75rem', color: r.note.ok ? '#059669' : '#b91c1c' }}>{r.note.text}</span>}
                 </td>
               </tr>
             ))}

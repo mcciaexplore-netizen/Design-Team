@@ -74,9 +74,9 @@ export function TicketCard({
       onClick={onSingleClick}
       style={{
         background:     isDragging ? 'rgba(255, 255, 255, 1)' : undefined,
-        border:         isSelected ? '1px solid #52525b' : isDragging ? '1px solid rgba(24,24,27,0.4)' : undefined,
+        border:         isSelected ? '1px solid #475569' : isDragging ? '1px solid rgba(0,63,138,0.4)' : undefined,
         padding:        '1rem',
-        boxShadow:      isDragging ? '0 24px 48px rgba(24,24,27,0.1)' : isSelected ? '0 0 0 2px rgba(24,24,27,0.3)' : undefined,
+        boxShadow:      isDragging ? '0 24px 48px rgba(0,63,138,0.1)' : isSelected ? '0 0 0 2px rgba(0,63,138,0.3)' : undefined,
         transform:      isDragging ? 'rotate(2deg) scale(1.03)' : 'none',
         cursor:         isDragging ? 'grabbing' : 'grab',
         transition:     isDragging ? 'none' : 'box-shadow 0.2s, border-color 0.2s, transform 0.15s',
@@ -109,7 +109,7 @@ export function TicketCard({
             onClick={e => { e.stopPropagation(); onDuplicate(); }}
             title="Duplicate Ticket"
             style={{ color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 2, marginRight: 2 }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#18181b'}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#003F8A'}
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#94a3b8'}
           >
             <Copy size={13} />
@@ -147,7 +147,7 @@ export function TicketCard({
       {ticket.tags?.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: '0.5rem' }}>
           {ticket.tags.map(tag => (
-            <span key={tag} style={{ fontSize: '0.62rem', fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(24,24,27,0.07)', border: '1px solid rgba(24,24,27,0.18)', color: '#7c3aed', fontFamily: 'var(--font-body)' }}>
+            <span key={tag} style={{ fontSize: '0.62rem', fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(0,63,138,0.07)', border: '1px solid rgba(0,63,138,0.18)', color: '#8B5CF6', fontFamily: 'var(--font-body)' }}>
               {tag}
             </span>
           ))}
@@ -185,7 +185,7 @@ export function TicketCard({
               {fmtElapsed(elapsed, null)}
             </span>
           ) : elapsed > 0 ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(24,24,27,0.04)', border: '1px solid rgba(24,24,27,0.08)', borderRadius: 6, padding: '2px 8px', fontSize: '0.65rem', fontWeight: 600, color: '#64748B' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(0,63,138,0.04)', border: '1px solid rgba(0,63,138,0.08)', borderRadius: 6, padding: '2px 8px', fontSize: '0.65rem', fontWeight: 600, color: '#64748B' }}>
               {fmtElapsed(elapsed, null)}
             </span>
           ) : null}

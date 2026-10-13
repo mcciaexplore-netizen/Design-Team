@@ -44,11 +44,11 @@ function dueLine(due: string, status: string): { text: string; tone: 'ok' | 'soo
   return { text: `Due ${nice} · in ${days} days`, tone: 'ok' };
 }
 
-const TONE: Record<string, string> = { ok: '#475569', soon: '#b45309', late: '#b91c1c', done: '#047857', none: '#94a3b8' };
+const TONE: Record<string, string> = { ok: '#475569', soon: '#b45309', late: '#b91c1c', done: '#059669', none: '#94a3b8' };
 
 /** The one thing the client most likely wants to do next, per request. */
 function accent(t: Ticket): { color: string; label: string } | null {
-  if (t.status === 'In Review') return { color: '#2563eb', label: 'Your review is needed' };
+  if (t.status === 'In Review') return { color: '#0056B3', label: 'Your review is needed' };
   if (t.status === 'Waiting on Requester') return { color: '#d97706', label: 'We need your reply' };
   return null;
 }
@@ -61,7 +61,7 @@ function Progress({ status }: { status: string }) {
         const reached = i <= current;
         return (
           <li key={step} className="portal-step" aria-current={i === current ? 'step' : undefined} style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ height: 5, borderRadius: 99, background: reached ? (i === 4 ? '#059669' : '#18181b') : '#E2E8F0', opacity: i === current && i !== 4 ? 1 : reached ? 0.85 : 1 }} />
+            <div style={{ height: 5, borderRadius: 99, background: reached ? (i === 4 ? '#059669' : '#003F8A') : '#E2E8F0', opacity: i === current && i !== 4 ? 1 : reached ? 0.85 : 1 }} />
             <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 6, fontSize: '0.66rem', fontWeight: i === current ? 800 : 600, color: reached ? '#0F172A' : '#94a3b8', whiteSpace: 'nowrap' }}>
               {i < current && <Check size={10} aria-hidden="true" style={{ color: '#059669', flexShrink: 0 }} />}
               <span className="portal-step-text" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{step}</span>
@@ -154,7 +154,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
             {tabs.map(([k, label, n]) => (
               <button key={k} type="button" aria-pressed={filter === k} onClick={() => setFilter(k)}
                 style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', flexShrink: 0,
-                         background: filter === k ? '#18181b' : 'transparent', color: filter === k ? 'white' : '#64748b' }}>
+                         background: filter === k ? '#003F8A' : 'transparent', color: filter === k ? 'white' : '#64748b' }}>
                 {label}
                 <span aria-label={`${n} request${n === 1 ? '' : 's'}`} style={{ fontSize: '0.68rem', fontWeight: 800, borderRadius: 99, padding: '0 6px', minWidth: 18, textAlign: 'center',
                   background: filter === k ? 'rgba(255,255,255,0.2)' : '#F1F5F9', color: filter === k ? 'white' : '#64748b' }}>{n}</span>
@@ -168,7 +168,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
           </div>
 
           <button type="button" className="btn-ghost" aria-expanded={showFilters} aria-controls="portal-filters" onClick={() => setShowFilters(v => !v)} style={{ gap: 6 }}>
-            <SlidersHorizontal size={14} aria-hidden="true" /> Filters{advanced > 0 && <span style={{ background: '#18181b', color: 'white', borderRadius: 99, fontSize: '0.66rem', fontWeight: 800, padding: '0 6px' }}>{advanced}</span>}
+            <SlidersHorizontal size={14} aria-hidden="true" /> Filters{advanced > 0 && <span style={{ background: '#003F8A', color: 'white', borderRadius: 99, fontSize: '0.66rem', fontWeight: 800, padding: '0 6px' }}>{advanced}</span>}
           </button>
         </div>
 
@@ -214,7 +214,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
             const due = dueLine(ticket.due_at, ticket.status);
             return (
               <article key={ticket.id} aria-label={`${ticket.number} ${ticket.title}`} className="glass-card animate-fade-in-up"
-                style={{ overflow: 'hidden', animationDelay: `${i * 50}ms`, animationFillMode: 'both', padding: 0, borderLeft: `4px solid ${note?.color ?? (done ? '#10B981' : 'rgba(24,24,27,0.18)')}` }}>
+                style={{ overflow: 'hidden', animationDelay: `${i * 50}ms`, animationFillMode: 'both', padding: 0, borderLeft: `4px solid ${note?.color ?? (done ? '#10B981' : 'rgba(0,63,138,0.18)')}` }}>
                 <div style={{ padding: '1.1rem 1.3rem 1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                     <div style={{ minWidth: 0, flex: '1 1 320px' }}>
@@ -272,7 +272,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
 
           {!loading && shown.length === 0 && (
             <div className="glass-card" style={{ textAlign: 'center', padding: '3.5rem 2rem', border: '2px dashed rgba(226,232,240,0.85)' }}>
-              <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-btn)', background: 'rgba(24,24,27,0.06)', border: '1px solid rgba(24,24,27,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: '#18181b' }}>
+              <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-btn)', background: 'rgba(0,63,138,0.06)', border: '1px solid rgba(0,63,138,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: '#003F8A' }}>
                 <TicketIcon size={24} aria-hidden="true" />
               </div>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A' }}>

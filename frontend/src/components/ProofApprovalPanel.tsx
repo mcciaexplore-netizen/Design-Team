@@ -200,11 +200,11 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
           The team continues on a new version: <Link to={`/tickets/${nextVersion.id}`} style={{ fontWeight: 800 }}>{nextVersion.ticket_number}</Link>
         </p>
       )}
-      {info && <p role="status" style={{ fontSize: '0.8rem', color: '#047857', background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>{info}</p>}
+      {info && <p role="status" style={{ fontSize: '0.8rem', color: '#059669', background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>{info}</p>}
 
       {/* Client decision (signed-in portal) */}
       {isClient && pending && latest && (
-        <div className="glass-card" style={{ padding: '1.1rem', borderColor: 'rgba(24,24,27,0.25)' }}>
+        <div className="glass-card" style={{ padding: '1.1rem', borderColor: 'rgba(0,63,138,0.25)' }}>
           <p style={{ fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0F172A', marginBottom: 4 }}>Your review is needed</p>
           <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 10 }}>Please review version {pending.proof_version ?? latest.version} below, then approve it or tell us what to change. You can click the design to mark exactly where.</p>
           {!deciding ? (
@@ -235,7 +235,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
             <input id="proof-note" className="input-field" maxLength={1000} value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Updated logo size" />
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', width: '100%' }}>
-            <input type="checkbox" checked={sendNow} onChange={e => setSendNow(e.target.checked)} style={{ accentColor: '#18181b' }} />
+            <input type="checkbox" checked={sendNow} onChange={e => setSendNow(e.target.checked)} style={{ accentColor: '#003F8A' }} />
             Send to the client for approval when uploaded
           </label>
           <input ref={fileRef} type="file" hidden aria-label="Choose proof file" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.zip,.psd,.ai" onChange={e => void upload(e.target.files?.[0])} />
@@ -246,7 +246,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
       {/* One-time link */}
       {created && (
         <div className="glass-card" style={{ padding: '1rem', borderColor: 'rgba(16,185,129,0.35)' }}>
-          <p style={{ fontWeight: 800, color: '#047857', fontSize: '0.85rem', marginBottom: 4 }}><Link2 size={13} style={{ display: 'inline', marginRight: 5 }} />Review link</p>
+          <p style={{ fontWeight: 800, color: '#059669', fontSize: '0.85rem', marginBottom: 4 }}><Link2 size={13} style={{ display: 'inline', marginRight: 5 }} />Review link</p>
           <p style={{ fontSize: '0.74rem', color: '#64748b', marginBottom: 8 }}>The client can review in their portal. This link is only for people without an account. For security it is shown once — if you lose it, create a new one.</p>
           <div style={{ display: 'flex', gap: 6 }}>
             <input className="input-field" readOnly aria-label="Review link" value={created.review_url} onFocus={e => e.currentTarget.select()} style={{ fontSize: '0.76rem' }} />
@@ -349,7 +349,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
             {requests.map(r => {
               const st = STATUS_LABEL[r.status];
               return (
-                <li key={r.id} style={{ fontSize: '0.78rem', color: '#475569', borderLeft: '2px solid rgba(24,24,27,0.2)', paddingLeft: 10 }}>
+                <li key={r.id} style={{ fontSize: '0.78rem', color: '#475569', borderLeft: '2px solid rgba(0,63,138,0.2)', paddingLeft: 10 }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                     <span className={st.cls}>{st.text}</span>
                     <strong>Version {r.proof_version ?? '?'}</strong>

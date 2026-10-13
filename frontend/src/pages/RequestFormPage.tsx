@@ -10,7 +10,7 @@ import { buildBody, type RequestFormOptions } from '../requestForm';
 export default function RequestFormPage() {
   const { options, error: loadError } = useRequestFormOptions();
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #f4f4f5)', padding: '2rem 1rem' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #F8FAFC)', padding: '2rem 1rem' }}>
       <main style={{ maxWidth: 640, margin: '0 auto' }}>
         <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 44, marginBottom: 16 }} />
         <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-strong)' }}>Request for Creative / Graphic Design work</h1>

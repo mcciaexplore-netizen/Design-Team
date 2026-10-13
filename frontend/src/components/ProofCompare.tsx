@@ -59,12 +59,12 @@ function Slider({ a, b }: { a: ProofLite; b: ProofLite }) {
       <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 3', maxHeight: 460, background: 'white', overflow: 'hidden', borderRadius: 8 }}>
         <img src={ua.url} alt={`Version ${a.version}`} style={layer} />
         <img src={ub.url} alt={`Version ${b.version}`} style={{ ...layer, clipPath: `inset(0 ${100 - pos}% 0 0)` }} />
-        <div aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: `${pos}%`, width: 2, background: '#18181b', boxShadow: '0 0 0 1px white' }} />
-        <span style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(24,24,27,0.8)', color: 'white', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>v{b.version}</span>
-        <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(24,24,27,0.8)', color: 'white', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>v{a.version}</span>
+        <div aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: `${pos}%`, width: 2, background: '#003F8A', boxShadow: '0 0 0 1px white' }} />
+        <span style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,63,138,0.8)', color: 'white', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>v{b.version}</span>
+        <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,63,138,0.8)', color: 'white', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>v{a.version}</span>
       </div>
       <label htmlFor="cmp-slider" className="section-label" style={{ display: 'block', margin: '10px 0 4px' }}>Drag to compare: version {b.version} on the left, version {a.version} on the right</label>
-      <input id="cmp-slider" type="range" min={0} max={100} value={pos} onChange={e => setPos(Number(e.target.value))} style={{ width: '100%', accentColor: '#18181b' }} />
+      <input id="cmp-slider" type="range" min={0} max={100} value={pos} onChange={e => setPos(Number(e.target.value))} style={{ width: '100%', accentColor: '#003F8A' }} />
     </div>
   );
 }
@@ -157,7 +157,7 @@ export function RevisionTimeline({ proofs, requests }: { proofs: ProofLite[]; re
       <h3 className="section-label" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}><History size={13} aria-hidden="true" /> Revision history</h3>
       <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {events.map((e, i) => (
-          <li key={i} style={{ borderLeft: '2px solid rgba(24,24,27,0.2)', paddingLeft: 10, fontSize: '0.8rem', color: 'var(--text-soft)' }}>
+          <li key={i} style={{ borderLeft: '2px solid rgba(0,63,138,0.2)', paddingLeft: 10, fontSize: '0.8rem', color: 'var(--text-soft)' }}>
             <div><strong style={{ color: 'var(--text-strong)' }}>{e.title}</strong> <span style={{ color: 'var(--text-hint)' }}>· {fmt(e.at)}</span></div>
             {e.detail && <div style={{ fontStyle: 'italic', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{e.detail}</div>}
           </li>

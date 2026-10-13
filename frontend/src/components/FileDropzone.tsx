@@ -38,7 +38,7 @@ export default function FileDropzone({ id, files, notes, maxFiles, maxMb, onAdd,
       <div
         onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
         onDrop={e => { e.preventDefault(); setDragging(false); onAdd(Array.from(e.dataTransfer.files)); }}
-        style={{ border: `2px dashed ${dragging ? '#18181b' : 'rgba(203,213,225,0.9)'}`, background: dragging ? 'var(--brand-soft)' : '#F8FAFC', borderRadius: 12, padding: '0.9rem', textAlign: 'center' }}>
+        style={{ border: `2px dashed ${dragging ? '#003F8A' : 'rgba(203,213,225,0.9)'}`, background: dragging ? 'var(--brand-soft)' : '#F8FAFC', borderRadius: 12, padding: '0.9rem', textAlign: 'center' }}>
         <input id={id} ref={input} type="file" multiple hidden aria-describedby={notes.length ? `${id}-notes` : undefined}
           onChange={e => { onAdd(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
         <p style={{ fontSize: '0.8rem', color: '#64748b' }}>

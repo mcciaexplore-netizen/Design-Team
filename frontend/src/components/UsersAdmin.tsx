@@ -170,7 +170,7 @@ export default function UsersAdmin() {
                     <p style={{ fontSize: '0.78rem', color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}{u.client_org ? ` · ${u.client_org}` : ''}</p>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span className="badge-green" style={{ background: u.role === 'Design Lead' ? 'rgba(24,24,27,0.08)' : undefined, color: u.role === 'Design Lead' ? 'var(--text-strong)' : undefined }}>{u.role}</span>
+                    <span className="badge-green" style={{ background: u.role === 'Design Lead' ? 'rgba(0,63,138,0.08)' : undefined, color: u.role === 'Design Lead' ? 'var(--text-strong)' : undefined }}>{u.role}</span>
                     {!u.is_active && <span className="badge-red">Deactivated</span>}
                     {u.must_change_password && u.is_active && <span className="badge-red" title="Has not yet replaced the temporary password">Temp password</span>}
                   </div>

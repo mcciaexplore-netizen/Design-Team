@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email:    u.email,
       role,
       initials: u.full_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
-      color:    role === 'Design Lead' ? '#18181b' : role === 'Client' ? '#f97316' : '#8B5CF6',
+      color:    role === 'Design Lead' ? '#003F8A' : role === 'Client' ? '#f97316' : '#8B5CF6',
       mustChangePassword: !!u.must_change_password,
     };
     localStorage.setItem(TOKEN_KEY, data.access_token);

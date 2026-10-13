@@ -74,7 +74,7 @@ export default function PinnableImage({ proofId, name, pins, canAdd, canToggle, 
             role={canAdd ? 'button' : undefined} tabIndex={canAdd ? 0 : undefined} aria-label={canAdd ? `Design: ${name}. Click to mark a spot that needs changing.` : undefined}
             style={{ display: 'block', maxWidth: '100%', maxHeight: 420, objectFit: 'contain', cursor: canAdd ? 'crosshair' : 'default' }} />
           {pins.map((p, i) => marker(i + 1, p.x, p.y, p.resolved ? '#059669' : '#dc2626'))}
-          {draft && marker(pins.length + 1, draft.x, draft.y, '#2563eb', true)}
+          {draft && marker(pins.length + 1, draft.x, draft.y, '#0056B3', true)}
         </div>
       </div>
       {canAdd && !draft && <p style={{ fontSize: '0.74rem', color: '#64748b', textAlign: 'center', marginTop: 6 }}>Click the design to mark a spot that needs changing.</p>}

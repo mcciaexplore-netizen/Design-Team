@@ -10,13 +10,13 @@ interface Feed { unread: number; items: Item[] }
 
 const TYPE_CONFIG: Record<string, { icon: typeof Info; color: string; bg: string; border: string }> = {
   sla_breach:        { icon: AlertTriangle, color: '#EF4444', bg: 'rgba(239,68,68,0.07)',  border: 'rgba(239,68,68,0.15)' },
-  mention:           { icon: AtSign,        color: '#7c3aed', bg: 'rgba(124,58,237,0.07)', border: 'rgba(124,58,237,0.15)' },
-  comment_added:     { icon: MessageSquare, color: '#18181b', bg: 'rgba(24,24,27,0.06)',   border: 'rgba(24,24,27,0.12)' },
-  ticket_assigned:   { icon: UserPlus,      color: '#18181b', bg: 'rgba(24,24,27,0.06)',   border: 'rgba(24,24,27,0.12)' },
+  mention:           { icon: AtSign,        color: '#8B5CF6', bg: 'rgba(124,58,237,0.07)', border: 'rgba(124,58,237,0.15)' },
+  comment_added:     { icon: MessageSquare, color: '#003F8A', bg: 'rgba(0,63,138,0.06)',   border: 'rgba(0,63,138,0.12)' },
+  ticket_assigned:   { icon: UserPlus,      color: '#003F8A', bg: 'rgba(0,63,138,0.06)',   border: 'rgba(0,63,138,0.12)' },
   approval_decision: { icon: CheckCircle2,  color: '#059669', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.15)' },
-  approval_requested: { icon: Eye,          color: '#2563eb', bg: 'rgba(37,99,235,0.08)',  border: 'rgba(37,99,235,0.18)' },
+  approval_requested: { icon: Eye,          color: '#0056B3', bg: 'rgba(37,99,235,0.08)',  border: 'rgba(37,99,235,0.18)' },
 };
-const DEFAULT_CFG = { icon: Info, color: '#18181b', bg: 'rgba(24,24,27,0.06)', border: 'rgba(24,24,27,0.12)' };
+const DEFAULT_CFG = { icon: Info, color: '#003F8A', bg: 'rgba(0,63,138,0.06)', border: 'rgba(0,63,138,0.12)' };
 
 function ago(iso: string | null): string {
   if (!iso) return '';
@@ -108,15 +108,15 @@ const NotificationBell = () => {
 
       {isOpen && (
         <div className="animate-fade-in-up" role="dialog" aria-label="Notifications"
-          style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 340, maxWidth: 'calc(100vw - 1.5rem)', background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(16px)', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 'var(--radius-lg)', boxShadow: '0 20px 40px rgba(24,24,27,0.1)', zIndex: 50, overflow: 'hidden' }}>
+          style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 340, maxWidth: 'calc(100vw - 1.5rem)', background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(16px)', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 'var(--radius-lg)', boxShadow: '0 20px 40px rgba(0,63,138,0.1)', zIndex: 50, overflow: 'hidden' }}>
           <div style={{ padding: '0.875rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(226,232,240,0.85)', background: '#F8FAFC' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Bell size={14} style={{ color: '#18181b' }} />
+              <Bell size={14} style={{ color: '#003F8A' }} />
               <h3 style={{ fontSize: '0.82rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A' }}>Notifications</h3>
               {feed.unread > 0 && <span className="badge-red">{feed.unread} new</span>}
             </div>
             <button type="button" onClick={() => void markAllRead()} disabled={feed.unread === 0}
-              style={{ fontSize: '0.72rem', fontWeight: 700, color: feed.unread ? '#18181b' : '#94a3b8', background: 'none', border: 'none', cursor: feed.unread ? 'pointer' : 'default' }}>
+              style={{ fontSize: '0.72rem', fontWeight: 700, color: feed.unread ? '#003F8A' : '#94a3b8', background: 'none', border: 'none', cursor: feed.unread ? 'pointer' : 'default' }}>
               Mark all read
             </button>
           </div>
@@ -138,7 +138,7 @@ const NotificationBell = () => {
                     <p style={{ fontSize: '0.8rem', color: '#0F172A', lineHeight: 1.5, fontWeight: n.is_read ? 400 : 600, overflowWrap: 'anywhere' }}>{n.content}</p>
                     <p style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: 3 }}>{ago(n.created_at)}</p>
                   </div>
-                  {!n.is_read && <span aria-label="Unread" style={{ width: 7, height: 7, borderRadius: 99, background: '#18181b', flexShrink: 0, marginTop: 6 }} />}
+                  {!n.is_read && <span aria-label="Unread" style={{ width: 7, height: 7, borderRadius: 99, background: '#003F8A', flexShrink: 0, marginTop: 6 }} />}
                 </button>
                 {n.type === 'approval_requested' && n.ticket_id && user?.role === 'Client' && (
                   <div style={{ padding: '0 1rem 0.8rem 3.4rem', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -149,7 +149,7 @@ const NotificationBell = () => {
                       </button>
                     )}
                     <button type="button" className="chip" onClick={() => open(n)}>Review first</button>
-                    {approval[n.id]?.text && <span role="status" style={{ fontSize: '0.74rem', fontWeight: 600, color: approval[n.id]?.ok ? '#047857' : '#b91c1c' }}>{approval[n.id]?.text}</span>}
+                    {approval[n.id]?.text && <span role="status" style={{ fontSize: '0.74rem', fontWeight: 600, color: approval[n.id]?.ok ? '#059669' : '#b91c1c' }}>{approval[n.id]?.text}</span>}
                   </div>
                 )}
                 </div>

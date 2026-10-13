@@ -8,6 +8,7 @@ import { DONE_STATUSES, STATUSES } from '../types';
 import { useTickets } from '../contexts/TicketsContext';
 import ForecastingWidget from './ForecastingWidget';
 import ReportsExport from './ReportsExport';
+import CountUp from './CountUp';
 import BreakdownTable, { type BreakdownRow } from './BreakdownTable';
 
 interface Summary {
@@ -23,12 +24,12 @@ const tooltipStyle = { borderRadius: 10, border: '1px solid rgba(226,232,240,0.9
 const fmtHours = (h: number | null) => (h === null ? '—' : h >= 48 ? `${(h / 24).toFixed(1)} d` : `${h} h`);
 const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short' });
 
-function Stat({ label, value, sub, icon: Icon, tone = '#18181b' }: { label: string; value: string; sub: string; icon: typeof Clock; tone?: string }) {
+function Stat({ label, value, sub, icon: Icon, tone = '#003F8A' }: { label: string; value: string; sub: string; icon: typeof Clock; tone?: string }) {
   return (
     <div className="glass-card dashboard-stat-card" style={{ padding: '1.25rem' }}>
       <div className="dashboard-stat-icon"><div className="icon-tile" style={{ color: tone }}><Icon size={18} /></div></div>
       <p className="section-label dashboard-stat-label">{label}</p>
-      <p className="kpi-number dashboard-stat-number" style={{ color: tone }}>{value}</p>
+      <p className="kpi-number dashboard-stat-number" style={{ color: tone }}><CountUp value={value} /></p>
       <p className="dashboard-stat-trend" style={{ color: '#64748b' }}>{sub}</p>
     </div>
   );
@@ -122,7 +123,7 @@ const Dashboard = () => {
                       <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="stage" width={120} tick={{ fontSize: 11 }} />
                       <Tooltip contentStyle={tooltipStyle} />
-                      <Bar dataKey="tickets" fill="#18181b" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="tickets" fill="#003F8A" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

@@ -21,7 +21,7 @@ function cell(day: Day): { bg: string; fg: string; text: string; label: string }
   const text = `${day.planned}h`;
   if (pct > 1) return { bg: 'rgba(239,68,68,0.16)', fg: '#b91c1c', text, label: 'Over capacity' };
   if (pct >= 0.8) return { bg: 'rgba(245,158,11,0.18)', fg: '#92400e', text, label: 'Nearly full' };
-  if (pct > 0) return { bg: 'rgba(16,185,129,0.14)', fg: '#047857', text, label: 'Comfortable' };
+  if (pct > 0) return { bg: 'rgba(16,185,129,0.14)', fg: '#059669', text, label: 'Comfortable' };
   return { bg: '#f8fafc', fg: '#94a3b8', text: '–', label: 'Free' };
 }
 
@@ -61,7 +61,7 @@ export default function WorkloadPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
             <div className="glass-card" style={{ padding: '1rem' }}>
               <p className="section-label">Overloaded people</p>
-              <p style={{ fontSize: '1.7rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: data.overloaded_count ? '#dc2626' : '#047857' }}>{data.overloaded_count}</p>
+              <p style={{ fontSize: '1.7rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: data.overloaded_count ? '#dc2626' : '#059669' }}>{data.overloaded_count}</p>
               <p style={{ fontSize: '0.72rem', color: '#64748b' }}>{data.overloaded_count ? 'Work due exceeds available hours' : 'Everyone can meet their deadlines'}</p>
             </div>
             <div className="glass-card" style={{ padding: '1rem' }}>
@@ -81,7 +81,7 @@ export default function WorkloadPage() {
                   <div className="icon-tile" style={{ width: 32, height: 32 }}><Users size={14} /></div>
                   <h3 style={{ fontSize: '0.92rem', fontWeight: 800, fontFamily: 'var(--font-body)' }}>{d.designer_name}</h3>
                   <span style={{ fontSize: '0.74rem', color: '#64748b' }}>{d.open_tickets} open · {d.logged_hours_prev_7_days}h logged last week</span>
-                  <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', fontWeight: 800, color: d.is_overloaded ? '#dc2626' : '#047857' }}>
+                  <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', fontWeight: 800, color: d.is_overloaded ? '#dc2626' : '#059669' }}>
                     {d.is_overloaded ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}
                     {d.planned_hours}h planned / {d.capacity_hours}h available ({d.utilization_pct}%)
                   </span>

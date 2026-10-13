@@ -9,7 +9,7 @@ interface Campaign { id: number; name: string; description: string | null; color
 interface Post { id: number; campaign_id: number | null; platform: string; title: string; post_url: string | null; post_date: string; status: 'Planned' | 'Posted'; notes: string | null; has_image: boolean }
 
 const PLATFORMS = ['Instagram', 'Facebook', 'LinkedIn', 'WhatsApp', 'X', 'YouTube', 'Other'];
-const COLORS = ['#2563eb', '#e11d48', '#059669', '#d97706', '#7c3aed', '#0891b2'];
+const COLORS = ['#0056B3', '#EF4444', '#059669', '#d97706', '#8B5CF6', '#0891b2'];
 const DAY = 86_400_000;
 const PX_PER_DAY = 16;
 const LABEL_W = 170;
@@ -60,7 +60,7 @@ function Timeline({ campaigns, posts, deadlines }: { campaigns: Campaign[]; post
   ];
   const loose = posts.filter(p => p.campaign_id === null);
   if (loose.length) rows.push({ key: 'loose', label: 'Not in a campaign', color: '#64748b', dots: loose.map(p => ({ id: `p${p.id}`, date: p.post_date, title: `${p.platform}: ${p.title}`, planned: p.status === 'Planned' })) });
-  if (deadlines.length) rows.push({ key: 'design', label: 'Design requests (due)', color: '#18181b', dots: deadlines.map(d => ({ id: d.id, date: d.date, title: d.label, planned: false })) });
+  if (deadlines.length) rows.push({ key: 'design', label: 'Design requests (due)', color: '#003F8A', dots: deadlines.map(d => ({ id: d.id, date: d.date, title: d.label, planned: false })) });
 
   return (
     <div role="region" aria-label="Campaign timeline" tabIndex={0} style={{ overflowX: 'auto', background: 'white', border: '1px solid rgba(226,232,240,0.9)', borderRadius: 12 }}>
@@ -238,7 +238,7 @@ const CampaignsPage = () => {
       <div role="group" aria-label="View" style={{ display: 'inline-flex', border: '1px solid rgba(226,232,240,0.9)', borderRadius: 10, background: 'white', marginBottom: 12 }}>
         {([['timeline', 'Timeline'], ['posts', `Posts (${posts.length})`]] as const).map(([k, label]) => (
           <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}
-            style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer', background: tab === k ? '#18181b' : 'transparent', color: tab === k ? 'white' : '#64748b', borderRadius: 9 }}>{label}</button>
+            style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer', background: tab === k ? '#003F8A' : 'transparent', color: tab === k ? 'white' : '#64748b', borderRadius: 9 }}>{label}</button>
         ))}
       </div>
 

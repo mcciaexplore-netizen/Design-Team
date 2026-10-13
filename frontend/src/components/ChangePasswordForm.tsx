@@ -46,7 +46,7 @@ export default function ChangePasswordForm({ onDone, submitLabel = 'Change passw
         {mismatch && <p style={{ fontSize: '0.75rem', color: 'var(--danger-text)', marginTop: 5 }}>Passwords do not match.</p>}
       </div>
       {result && (
-        <p role={result.ok ? 'status' : 'alert'} style={{ fontSize: '0.82rem', fontWeight: 600, color: result.ok ? '#047857' : 'var(--danger-text)' }}>{result.text}</p>
+        <p role={result.ok ? 'status' : 'alert'} style={{ fontSize: '0.82rem', fontWeight: 600, color: result.ok ? '#059669' : 'var(--danger-text)' }}>{result.text}</p>
       )}
       <div>
         <button type="submit" className="btn-primary" disabled={busy || mismatch}><KeyRound size={14} aria-hidden="true" /> {busy ? 'Saving…' : submitLabel}</button>

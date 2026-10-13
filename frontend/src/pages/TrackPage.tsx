@@ -23,7 +23,7 @@ export default function TrackPage() {
   }, [token]);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #f4f4f5)', padding: '2rem 1rem' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #F8FAFC)', padding: '2rem 1rem' }}>
       <main style={{ maxWidth: 640, margin: '0 auto' }}>
         <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 44, marginBottom: 16 }} />
         {error && <p role="alert" style={{ color: '#b91c1c' }}>{error}</p>}
@@ -42,7 +42,7 @@ export default function TrackPage() {
                 return (
                   <li key={step} aria-current={current ? 'step' : undefined}
                     style={{ flex: '1 1 90px', textAlign: 'center', fontSize: '0.72rem', fontWeight: 700, padding: '0.5rem 0.25rem', borderRadius: 8,
-                             background: current ? '#18181b' : done ? 'rgba(16,185,129,0.12)' : '#F1F5F9', color: current ? 'white' : done ? '#047857' : '#94a3b8' }}>
+                             background: current ? '#003F8A' : done ? 'rgba(16,185,129,0.12)' : '#F1F5F9', color: current ? 'white' : done ? '#059669' : '#94a3b8' }}>
                     {done && <Check size={12} aria-hidden="true" style={{ marginRight: 3, verticalAlign: '-1px' }} />}{step}
                   </li>
                 );

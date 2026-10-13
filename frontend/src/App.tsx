@@ -134,7 +134,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
 
       <div className="app-user-area">
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--brand-soft)', border: '1px solid rgba(24,24,27,0.1)', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--brand-soft)', border: '1px solid rgba(0,63,138,0.1)', marginBottom: 8 }}>
             <div style={{ width: 32, height: 32, borderRadius: '99px', background: user.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800, color: 'white', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
               {user.initials}
             </div>
@@ -153,7 +153,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
         </button>
       </div>
 
-      <div className="app-brand-footer mt-3 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(24,24,27,0.03)', border: '1px solid rgba(24,24,27,0.07)' }}>
+      <div className="app-brand-footer mt-3 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(0,63,138,0.03)', border: '1px solid rgba(0,63,138,0.07)' }}>
         <div className="flex items-center gap-2">
           <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Zap size={13} color="white" />
@@ -339,7 +339,7 @@ function AppContent() {
 
   if (isLoading) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#18181b' }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#003F8A' }}>
         <div style={{ textAlign: 'center', color: 'white' }}>
           <div className="app-spinner" role="status" aria-label="Loading" />
           <p style={{ fontSize: '0.9rem', fontFamily: 'var(--font-body)', opacity: 0.7, marginTop: 14 }}>Loading MCCIA Studio…</p>
