@@ -3,6 +3,7 @@ import { AlertTriangle, Bell, CheckCircle2, MessageSquare, Save, Send } from 'lu
 import { apiJson } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordForm from '../components/ChangePasswordForm';
+import { useReveal } from '../hooks/useReveal';
 import UsersAdmin from '../components/UsersAdmin';
 import DesignTypesAdmin from '../components/DesignTypesAdmin';
 
@@ -210,6 +211,7 @@ const SettingsPage: React.FC = () => {
   const { user } = useAuth();
   const isLead = user?.role === 'Design Lead';
   const [tab, setTab] = useState<TabKey>('me');
+  const revealRef = useReveal<HTMLDivElement>(tab);
   const tabs: [TabKey, string][] = [
     ['me', 'My notifications'],
     ['account', 'Password'],
@@ -217,7 +219,7 @@ const SettingsPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ maxWidth: tab === 'users' ? 900 : 720, paddingBottom: '3rem' }}>
+    <div ref={revealRef} style={{ maxWidth: tab === 'users' ? 900 : 720, paddingBottom: '3rem' }}>
       <div role="tablist" aria-label="Settings sections" style={{ display: 'inline-flex', flexWrap: 'wrap', background: '#F8FAFC', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-md)', padding: 4, marginBottom: '1.25rem' }}>
         {tabs.map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}

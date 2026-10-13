@@ -7,6 +7,7 @@ export interface Toast {
   id:      string;
   message: string;
   type:    ToastType;
+  leaving?: boolean;
 }
 
 interface ToastItemProps {
@@ -27,7 +28,7 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
 
   return (
     <div
-      className="animate-fade-in-up"
+      className={toast.leaving ? 'toast-out' : 'animate-fade-in-up'}
       style={{
         display:        'flex',
         alignItems:     'center',
@@ -95,7 +96,8 @@ export function useToast() {
   }, []);
 
   const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    setToasts(prev => prev.map(t => (t.id === id ? { ...t, leaving: true } : t)));   // play the exit, then drop it
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 280);
   }, []);
 
   return { toasts, addToast, removeToast };

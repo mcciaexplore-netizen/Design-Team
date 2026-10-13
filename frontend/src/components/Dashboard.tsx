@@ -9,6 +9,7 @@ import { useTickets } from '../contexts/TicketsContext';
 import ForecastingWidget from './ForecastingWidget';
 import ReportsExport from './ReportsExport';
 import CountUp from './CountUp';
+import GridBackground from './GridBackground';
 import BreakdownTable, { type BreakdownRow } from './BreakdownTable';
 
 interface Summary {
@@ -72,7 +73,8 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-page">
-      <div className="dashboard-intro">
+      <div className="dashboard-intro dashboard-hero">
+        <GridBackground />
         <h1>Performance at a glance</h1>
         <p>The last 30 days of delivery, plus what's on the team's plate this week.</p>
       </div>

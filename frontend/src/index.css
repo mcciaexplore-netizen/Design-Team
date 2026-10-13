@@ -921,3 +921,21 @@ select.input-field { cursor: pointer; }
 .dashboard-kpis > :nth-child(2), .dashboard-chart-grid > :nth-child(2) { animation-delay: 80ms; }
 .dashboard-kpis > :nth-child(3) { animation-delay: 160ms; }
 .dashboard-kpis > :nth-child(4) { animation-delay: 240ms; }
+
+/* ── Scroll reveal (useReveal): children fade up as they enter the viewport ── */
+.reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+.reveal.reveal-in { opacity: 1; transform: none; }
+
+/* ── Dashboard header with the drifting grid behind it ── */
+.dashboard-hero {
+  position: relative; overflow: hidden; padding: 1.5rem 1.75rem;
+  background: rgba(255,255,255,0.6); border: 1px solid var(--surface-border); border-radius: var(--radius-lg);
+}
+.dashboard-hero > :not(canvas) { position: relative; }
+
+/* ── Action feedback: toast exit, row collapse on delete ── */
+.toast-out { animation: toastOut 0.28s var(--ease) both; }
+@keyframes toastOut { to { opacity: 0; transform: translateX(24px); } }
+.glass-card.collapsible { max-height: 400px; overflow: hidden; transition: max-height 0.3s var(--ease), opacity 0.3s var(--ease), transform 0.3s var(--ease), padding 0.3s var(--ease), margin 0.3s var(--ease), border-color 0.3s var(--ease), box-shadow 0.3s var(--ease); }
+.glass-card.collapsible.removing { max-height: 0; opacity: 0; padding-top: 0 !important; padding-bottom: 0 !important; margin: 0; border-width: 0; transform: translateX(16px); }
+.btn-primary:disabled .app-spinner { border-color: rgba(255,255,255,0.35); border-top-color: #fff; }

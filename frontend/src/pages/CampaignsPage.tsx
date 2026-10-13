@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ExternalLink, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { apiJson, authFetch, fetchBlobUrl } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
+import { useReveal } from '../hooks/useReveal';
+import { ToastContainer, useToast } from '../components/Toast';
 
 interface Campaign { id: number; name: string; description: string | null; color: string; start_date: string; end_date: string; post_count: number }
 interface Post { id: number; campaign_id: number | null; platform: string; title: string; post_url: string | null; post_date: string; status: 'Planned' | 'Posted'; notes: string | null; has_image: boolean }
@@ -112,6 +114,10 @@ const CampaignsPage = () => {
   const [cDraft, setCDraft] = useState<CampaignDraft | null>(null);
   const [pDraft, setPDraft] = useState<PostDraft | null>(null);
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const { toasts, addToast, removeToast } = useToast();
+  const campaignListRef = useReveal<HTMLUListElement>(`${tab}:${campaigns.length}:${loading}`);
+  const postListRef = useReveal<HTMLUListElement>(`${tab}:${posts.length}:${campaignFilter}:${platformFilter}:${loading}`);
 
   const load = useCallback(async () => {
     try {
@@ -126,9 +132,9 @@ const CampaignsPage = () => {
   const nameOf = (id: number | null) => campaigns.find(c => c.id === id);
   const shownPosts = posts.filter(p => (!campaignFilter || String(p.campaign_id ?? 'none') === campaignFilter) && (!platformFilter || p.platform === platformFilter));
 
-  const run = async (fn: () => Promise<unknown>, close: () => void) => {
+  const run = async (fn: () => Promise<unknown>, close: () => void, done?: string) => {
     setSaving(true); setError('');
-    try { await fn(); close(); await load(); }
+    try { await fn(); close(); await load(); if (done) addToast(done); }
     catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong'); }
     finally { setSaving(false); }
   };
@@ -137,7 +143,7 @@ const CampaignsPage = () => {
     e.preventDefault();
     if (!cDraft) return;
     const { id, ...json } = cDraft;
-    void run(() => apiJson(id ? `/api/campaigns/${id}` : '/api/campaigns', { method: id ? 'PUT' : 'POST', json: { ...json, description: json.description || null } }), () => setCDraft(null));
+    void run(() => apiJson(id ? `/api/campaigns/${id}` : '/api/campaigns', { method: id ? 'PUT' : 'POST', json: { ...json, description: json.description || null } }), () => setCDraft(null), id ? 'Campaign saved' : 'Campaign added');
   };
   const savePost = (e: FormEvent) => {
     e.preventDefault();
@@ -154,10 +160,12 @@ const CampaignsPage = () => {
       } else if (removeImage && hasImage) {
         await apiJson(`/api/social-posts/${saved.id}/image`, { method: 'DELETE' });
       }
-    }, () => setPDraft(null));
+    }, () => setPDraft(null), id ? 'Post saved' : 'Post logged');
   };
   const remove = (path: string, what: string) => {
-    if (window.confirm(`Delete ${what}?`)) void run(() => apiJson(path, { method: 'DELETE' }), () => undefined);
+    if (!window.confirm(`Delete ${what}?`)) return;
+    setRemoving(path);                                   // collapse the row first, then delete it
+    window.setTimeout(() => { void run(() => apiJson(path, { method: 'DELETE' }), () => undefined, 'Deleted').finally(() => setRemoving(null)); }, 320);
   };
 
   const newCampaign = () => setCDraft({ name: '', description: '', color: COLORS[campaigns.length % COLORS.length], start_date: today(), end_date: today() });
@@ -198,7 +206,7 @@ const CampaignsPage = () => {
           </Field>
           <div style={{ gridColumn: '1 / -1' }}><Field label="Notes (optional)"><textarea className="input-field" maxLength={1000} rows={2} value={cDraft.description} onChange={e => setCDraft({ ...cDraft, description: e.target.value })} style={{ width: '100%' }} /></Field></div>
           <div style={{ display: 'flex', gap: 8, gridColumn: '1 / -1' }}>
-            <button type="submit" className="btn-primary" disabled={saving}>{cDraft.id ? 'Save changes' : 'Add campaign'}</button>
+            <button type="submit" className="btn-primary" disabled={saving}>{saving ? <span className="app-spinner app-spinner--sm" aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}{cDraft.id ? 'Save changes' : 'Add campaign'}</button>
             <button type="button" className="btn-ghost" onClick={() => setCDraft(null)}>Cancel</button>
           </div>
         </form>
@@ -229,7 +237,7 @@ const CampaignsPage = () => {
           </div>
           <div style={{ gridColumn: '1 / -1' }}><Field label="Notes (optional)"><textarea className="input-field" maxLength={1000} rows={2} value={pDraft.notes} onChange={e => setPDraft({ ...pDraft, notes: e.target.value })} style={{ width: '100%' }} /></Field></div>
           <div style={{ display: 'flex', gap: 8, gridColumn: '1 / -1' }}>
-            <button type="submit" className="btn-primary" disabled={saving}>{pDraft.id ? 'Save changes' : 'Save post'}</button>
+            <button type="submit" className="btn-primary" disabled={saving}>{saving ? <span className="app-spinner app-spinner--sm" aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}{pDraft.id ? 'Save changes' : 'Save post'}</button>
             <button type="button" className="btn-ghost" onClick={() => setPDraft(null)}>Cancel</button>
           </div>
         </form>
@@ -250,9 +258,9 @@ const CampaignsPage = () => {
           : <>
               <Timeline campaigns={campaigns} posts={posts} deadlines={isClient ? deadlines : []} />
               {campaigns.length > 0 && (
-                <ul style={{ listStyle: 'none', padding: 0, margin: '14px 0 0', display: 'grid', gap: 8 }}>
+                <ul ref={campaignListRef} style={{ listStyle: 'none', padding: 0, margin: '14px 0 0', display: 'grid', gap: 8 }}>
                   {campaigns.map(c => (
-                    <li key={c.id} className="glass-card" style={{ padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderLeft: `4px solid ${c.color}` }}>
+                    <li key={c.id} className={`glass-card collapsible${removing === `/api/campaigns/${c.id}` ? ' removing' : ''}`} style={{ padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderLeft: `4px solid ${c.color}` }}>
                       <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                         <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0F172A' }}>{c.name}</p>
                         <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{fmt(c.start_date)} to {fmt(c.end_date)} · {c.post_count} post{c.post_count === 1 ? '' : 's'}{c.description ? ` · ${c.description}` : ''}</p>
@@ -282,11 +290,11 @@ const CampaignsPage = () => {
           </div>
           {shownPosts.length === 0
             ? <Empty text={posts.length === 0 ? (isClient ? 'No posts recorded yet. Use "Log a post" after you publish something.' : 'No posts recorded yet.') : 'No posts match these filters.'} />
-            : <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
+            : <ul ref={postListRef} style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
                 {shownPosts.map(p => {
                   const c = nameOf(p.campaign_id);
                   return (
-                    <li key={p.id} className="glass-card" style={{ padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderLeft: `4px solid ${c?.color ?? '#cbd5e1'}` }}>
+                    <li key={p.id} className={`glass-card collapsible${removing === `/api/social-posts/${p.id}` ? ' removing' : ''}`} style={{ padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderLeft: `4px solid ${c?.color ?? '#cbd5e1'}` }}>
                       {p.has_image && <PostImage id={p.id} title={p.title} />}
                       <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                         <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0F172A', overflowWrap: 'anywhere' }}>{p.title}</p>
@@ -303,6 +311,7 @@ const CampaignsPage = () => {
               </ul>}
         </>
       )}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 };

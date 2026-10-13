@@ -4,6 +4,7 @@ import { Check, ChevronDown, ChevronUp, Eye, Megaphone, MessageSquare, Plus, Rot
 import { DONE_STATUSES, type Ticket } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
+import { useReveal } from '../hooks/useReveal';
 import ProofApprovalPanel from '../components/ProofApprovalPanel';
 import CommentsPanel from '../components/CommentsPanel';
 import { useNewRequest } from '../contexts/NewRequestContext';
@@ -80,6 +81,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'review' | 'open' | 'done' | 'all'>('open');
   const [showFilters, setShowFilters] = useState(false);
+  const listRef = useReveal<HTMLDivElement>(`${filter}:${tickets.length}`);
 
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
@@ -205,16 +207,16 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
         {error && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem', marginBottom: 12 }}>{error} <button type="button" className="chip" onClick={() => void refresh()}>Retry</button></p>}
         {loading && tickets.length === 0 && <p role="status" style={{ color: '#94a3b8' }}>Loading your requests…</p>}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', marginTop: 4 }}>
-          {shown.map((ticket, i) => {
+        <div ref={listRef} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', marginTop: 4 }}>
+          {shown.map(ticket => {
             const done = DONE.includes(ticket.status);
             const open = openId === ticket.id;
             const note = accent(ticket);
             const next = tickets.find(t => t.parent_id === ticket.id);   // the version that took over, if changes were requested
             const due = dueLine(ticket.due_at, ticket.status);
             return (
-              <article key={ticket.id} aria-label={`${ticket.number} ${ticket.title}`} className="glass-card animate-fade-in-up"
-                style={{ overflow: 'hidden', animationDelay: `${i * 50}ms`, animationFillMode: 'both', padding: 0, borderLeft: `4px solid ${note?.color ?? (done ? '#10B981' : 'rgba(0,63,138,0.18)')}` }}>
+              <article key={ticket.id} aria-label={`${ticket.number} ${ticket.title}`} className="glass-card"
+                style={{ overflow: 'hidden', padding: 0, borderLeft: `4px solid ${note?.color ?? (done ? '#10B981' : 'rgba(0,63,138,0.18)')}` }}>
                 <div style={{ padding: '1.1rem 1.3rem 1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                     <div style={{ minWidth: 0, flex: '1 1 320px' }}>

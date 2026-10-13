@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import GridBackground from '../components/GridBackground';
 import { Eye, EyeOff, Zap, LogIn, ArrowRight, RotateCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -58,6 +59,7 @@ const LoginPage: React.FC = () => {
 
       {/* ── Left Panel: Brand (hidden on narrow screens) ── */}
       <div className="login-brand">
+        <GridBackground stroke="rgba(255,255,255,0.06)" fill="rgba(255,255,255,0.08)" />
         <div style={{ position: 'absolute', top: '-10%',  left: '-10%', width: 400, height: 400, borderRadius: '50%', background: 'rgba(16,185,129,0.08)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: '40%', right: '5%',   width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
 
