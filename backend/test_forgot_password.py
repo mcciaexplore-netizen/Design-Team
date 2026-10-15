@@ -92,3 +92,14 @@ def test_temporary_password_can_be_changed_when_mounted_under_api(client):
                json={"current_password": "secret-pw", "new_password": "my-own-pw-1"})
     assert r.status_code == 200, r.text
     assert r.json()["user"]["must_change_password"] is False
+
+
+def test_links_use_the_vercel_domain_when_public_app_url_is_unset(monkeypatch):
+    import common
+    from tracking import tracking_url
+    monkeypatch.delenv("PUBLIC_APP_URL", raising=False)
+    monkeypatch.setenv("VERCEL_PROJECT_PRODUCTION_URL", "design-team.example.vercel.app")
+    assert common.app_url() == "https://design-team.example.vercel.app"
+    assert tracking_url("DF-0004").startswith("https://design-team.example.vercel.app/track/DF-0004.")
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://studio.mccia.in/")
+    assert common.app_url() == "https://studio.mccia.in"

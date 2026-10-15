@@ -234,6 +234,14 @@ def next_ticket_number(db: Session) -> str:
     return f"DF-{(last.id + 1 if last else 1):04d}"
 
 
+def app_url() -> str:
+    """The site's public address, for links in emails, review and tracking pages: PUBLIC_APP_URL, else on Vercel the
+    project's production domain. Never taken from the request, so a forged Host/Origin can't redirect a link."""
+    url = os.getenv("PUBLIC_APP_URL") or (
+        f"https://{os.environ['VERCEL_PROJECT_PRODUCTION_URL']}" if os.getenv("VERCEL_PROJECT_PRODUCTION_URL") else "")
+    return (url or "http://localhost:5173").rstrip("/")
+
+
 def as_utc(dt: Optional[datetime.datetime]) -> Optional[datetime.datetime]:
     """SQLite returns naive datetimes; treat them as UTC."""
     if dt is None:

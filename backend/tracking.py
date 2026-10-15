@@ -1,14 +1,13 @@
 """Public ticket tracking: a signed link lets a requester follow their request without logging in."""
 import hashlib
 import hmac
-import os
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 import models
 from auth import SECRET_KEY
-from common import as_utc
+from common import app_url, as_utc
 from database import get_db
 
 router = APIRouter(tags=["tracking"])
@@ -30,7 +29,7 @@ def tracking_token(ticket_number: str) -> str:
 
 
 def tracking_url(ticket_number: str) -> str:
-    return f"{os.getenv('PUBLIC_APP_URL', 'http://localhost:5173').rstrip('/')}/track/{tracking_token(ticket_number)}"
+    return f"{app_url()}/track/{tracking_token(ticket_number)}"
 
 
 def _ticket_for(token: str, db: Session) -> models.Ticket:

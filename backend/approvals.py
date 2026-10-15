@@ -1,7 +1,6 @@
 """Versioned proofs, shareable approve / request-changes links, and the ticket audit trail."""
 import datetime
 import hashlib
-import os
 import secrets
 import time
 from typing import Literal, Optional
@@ -16,7 +15,7 @@ import events
 import revision_engine
 import models
 from auth import get_current_user, get_ticket_for_user, require_staff
-from common import as_utc, ensure_changes_allowed, mark_delivered, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
+from common import app_url, as_utc, ensure_changes_allowed, mark_delivered, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["approvals"])
@@ -24,7 +23,6 @@ router = APIRouter(tags=["approvals"])
 # The client has two days to approve or ask for changes; after that the cron tick closes the ticket.
 DEFAULT_TTL_HOURS = 2 * 24
 MAX_TTL_HOURS = 2 * 24
-PUBLIC_APP_URL = lambda: os.getenv("PUBLIC_APP_URL", "http://localhost:5173").rstrip("/")
 
 
 def _hash(token: str) -> str:
@@ -79,7 +77,7 @@ def _open_review(db: Session, ticket: models.Ticket, proof: models.ProofVersion,
         ticket.status = models.TicketStatus.IN_REVIEW
     db.flush()
     log_audit(db, ticket.id, user, "Sent for approval", {"proof_version": proof.version, "expires_in_hours": ttl_hours})
-    return req, f"{PUBLIC_APP_URL()}/review/{token}"
+    return req, f"{app_url()}/review/{token}"
 
 
 @router.post("/api/tickets/{ticket_id}/proofs", status_code=201)

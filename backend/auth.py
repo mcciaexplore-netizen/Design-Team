@@ -14,7 +14,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 import models
-from common import Email
+from common import Email, app_url
 from database import get_db
 
 logger = logging.getLogger(__name__)
@@ -264,13 +264,6 @@ RESET_TTL = datetime.timedelta(minutes=30)
 RESET_SENT = "If that email has an account, a reset link is on its way. It works once, for 30 minutes."
 
 
-def _app_url() -> str:
-    """Where reset links point. Never taken from the request, so a forged Host/Origin can't redirect the link."""
-    url = os.getenv("PUBLIC_APP_URL") or (
-        f"https://{os.environ['VERCEL_PROJECT_PRODUCTION_URL']}" if os.getenv("VERCEL_PROJECT_PRODUCTION_URL") else "")
-    return (url or "http://localhost:5173").rstrip("/")
-
-
 def create_reset_token(user: models.User) -> str:
     """Bound to the current password, so it stops working once used (or once the password changes some other way)."""
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -294,7 +287,7 @@ def forgot_password(body: ForgotPasswordRequest, request: Request, db: Session =
     ratelimit.check(db, f"forgot-email:{email}", 3, 3600)
     user = db.query(models.User).filter(models.User.email == email).first()
     if user and user.is_active:
-        link = f"{_app_url()}/reset-password?token={create_reset_token(user)}"
+        link = f"{app_url()}/reset-password?token={create_reset_token(user)}"
         delivery.run_in_background(delivery.send_email, user.email, "Reset your MCCIA DesignDesk password", (
             f"Hi {user.full_name},\n\n"
             "Someone asked to reset the password for your MCCIA DesignDesk account. To choose a new one, open:\n\n"
