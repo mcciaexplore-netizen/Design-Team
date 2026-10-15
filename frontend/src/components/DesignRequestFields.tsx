@@ -110,19 +110,14 @@ function QuestionField({ q, form, prefix }: { q: Question; form: RequestForm; pr
   );
 }
 
-/** Standard turnaround for the chosen design, and a warning when the requested date is earlier than that. */
+/** A warning when the requested date is earlier than the usual turnaround for the chosen design. */
 function EstimateNote({ requirement, deliveryDate }: { requirement: string; deliveryDate: string }) {
   const estimate = useEstimate(requirement, deliveryDate);
-  if (!estimate) return null;
+  if (!estimate?.rush) return null;
   return (
-    <div role="status" style={{ fontSize: '0.82rem', color: '#475569' }}>
-      <p>Standard turnaround: ready by <strong>{shortDate(estimate.standard_ready_by)}</strong></p>
-      {estimate.rush && (
-        <p style={{ marginTop: 6, color: '#92400e', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '0.45rem 0.7rem' }}>
-          You asked for {shortDate(deliveryDate)}, earlier than usual. This will be marked {estimate.priority} and may not be possible.
-        </p>
-      )}
-    </div>
+    <p role="status" style={{ fontSize: '0.82rem', color: '#92400e', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '0.45rem 0.7rem' }}>
+      You asked for {shortDate(deliveryDate)}, earlier than usual. This will be marked {estimate.priority} and may not be possible.
+    </p>
   );
 }
 

@@ -177,12 +177,11 @@ test('several files can be added, previewed and removed, and bad files are rejec
   await expect(list.getByText('dropped.txt')).toBeVisible();
 });
 
-test('the due date is shown before submitting, with a warning when it is earlier than usual', async ({ page }) => {
+test('a date earlier than the usual turnaround shows a warning', async ({ page }) => {
   await page.goto('/request');
-  await expect(page.getByText('Standard turnaround')).toHaveCount(0);
   await radio(page, 'Directory').check();
-  await expect(page.getByText(/Standard turnaround: ready by \w{3} \d{1,2} \w{3}/)).toBeVisible();
   await expect(page.getByText('earlier than usual')).toHaveCount(0);
+  await expect(page.getByText('Standard turnaround')).toHaveCount(0);   // only the warning is ever shown
 
   const tomorrow = dateInDays(1);
   await page.getByLabel('Expected delivery date *').fill(tomorrow);
@@ -190,7 +189,6 @@ test('the due date is shown before submitting, with a warning when it is earlier
 
   await page.getByLabel('Expected delivery date *').fill(dateInDays(90));
   await expect(page.getByText('earlier than usual')).toHaveCount(0);
-  await expect(page.getByText(/Standard turnaround/)).toBeVisible();
 });
 
 test('a half-filled form is saved as a draft, restored on the next visit and can be discarded', async ({ page }) => {
