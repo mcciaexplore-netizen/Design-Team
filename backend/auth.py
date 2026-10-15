@@ -95,6 +95,8 @@ def _user_from_token(token: str, db: Session) -> models.User:
         user_id = int(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
         raise credentials_error
+    if payload.get("purpose"):
+        raise credentials_error  # a password-reset link is not a session
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user or not user.is_active:
         raise credentials_error
@@ -250,3 +252,73 @@ def change_password(body: ChangePasswordRequest, user: models.User = Depends(get
     db.refresh(user)
     # The old token is now invalid (password fingerprint changed), so hand back a fresh one.
     return {"access_token": create_access_token(user), "token_type": "bearer", "user": user_payload(user)}
+
+
+# ── Forgot password ──────────────────────────────────────────────────────────
+
+RESET_TTL = datetime.timedelta(minutes=30)
+RESET_SENT = "If that email has an account, a reset link is on its way. It works once, for 30 minutes."
+
+
+def _app_url() -> str:
+    """Where reset links point. Never taken from the request, so a forged Host/Origin can't redirect the link."""
+    url = os.getenv("PUBLIC_APP_URL") or (
+        f"https://{os.environ['VERCEL_PROJECT_PRODUCTION_URL']}" if os.getenv("VERCEL_PROJECT_PRODUCTION_URL") else "")
+    return (url or "http://localhost:5173").rstrip("/")
+
+
+def create_reset_token(user: models.User) -> str:
+    """Bound to the current password, so it stops working once used (or once the password changes some other way)."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    payload = {"sub": str(user.id), "purpose": "reset", "pwf": _password_fingerprint(user), "iat": now, "exp": now + RESET_TTL}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+
+
+@router.post("/forgot-password")
+def forgot_password(body: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    """Email a reset link. The answer is the same whether or not the account exists (no account discovery)."""
+    import delivery
+    import ratelimit
+    if not delivery.email_configured():
+        raise HTTPException(status_code=503, detail="Password reset by email is not set up yet. Ask your Design Lead to reset it.")
+    email = body.email.strip().lower()
+    ratelimit.check(db, f"forgot-ip:{ratelimit.client_ip(request)}", 10, 3600)
+    ratelimit.check(db, f"forgot-email:{email}", 3, 3600)
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user and user.is_active:
+        link = f"{_app_url()}/reset-password?token={create_reset_token(user)}"
+        delivery.run_in_background(delivery.send_email, user.email, "Reset your MCCIA DesignDesk password", (
+            f"Hi {user.full_name},\n\n"
+            "Someone asked to reset the password for your MCCIA DesignDesk account. To choose a new one, open:\n\n"
+            f"{link}\n\n"
+            "The link works once, for 30 minutes. If you didn't ask for this, ignore this email; your password stays the same.\n"
+        ))
+    return {"detail": RESET_SENT}
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=2000)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/reset-password")
+def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
+    invalid = HTTPException(status_code=400, detail="This reset link is invalid or has expired. Ask for a new one.")
+    try:
+        payload = jwt.decode(body.token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = int(payload["sub"])
+    except (jwt.PyJWTError, KeyError, ValueError):
+        raise invalid
+    if payload.get("purpose") != "reset":
+        raise invalid
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user or not user.is_active or not hmac.compare_digest(str(payload.get("pwf", "")), _password_fingerprint(user)):
+        raise invalid
+    user.hashed_password = hash_password(body.new_password)
+    user.must_change_password = False
+    db.commit()  # the new password changes the fingerprint: this link and every existing session stop working
+    return {"detail": "Your password has been changed. You can sign in now."}

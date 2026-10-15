@@ -208,8 +208,8 @@ const LoginPage: React.FC = () => {
                 </button>
               </div>
               {!signup && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-hint)', marginTop: 6 }}>
-                  Forgot your password? Ask your Design Lead to reset it.
+                <p style={{ fontSize: '0.78rem', marginTop: 6 }}>
+                  <a className="login-link-btn" href="/forgot-password">Forgot your password?</a>
                 </p>
               )}
             </div>

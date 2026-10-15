@@ -74,3 +74,11 @@ Or deactivate them from **Settings > Users**.
 Set `ADMIN_RESET_PASSWORD` (with `ADMIN_EMAIL`) in the hosting environment and redeploy. On start the API makes it
 that account's temporary password (creating or reactivating the account), and asks for a new password at sign-in.
 Each value is applied once, so a later restart does not undo the new password; still, delete the variable afterwards.
+
+## Forgot password (email)
+
+"Forgot your password?" on the sign-in page emails a reset link that works once, for 30 minutes. It needs SMTP:
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`. With Gmail: host `smtp.gmail.com`, port `587`,
+user = the Gmail address, password = a Google **App Password** (Google Account > Security > 2-Step Verification >
+App passwords; the normal Gmail password does not work). Links point at `PUBLIC_APP_URL` (on Vercel, the production
+domain if that is unset). Without SMTP the page says to ask the Design Lead instead.
