@@ -19,7 +19,7 @@ import ratelimit
 from auth import get_current_user
 from common import MAX_UPLOAD_BYTES, compute_due_at, log_audit, next_ticket_number, read_upload, store_bytes
 from database import get_db
-from tracking import tracking_url
+from tracking import my_requests_url, tracking_url
 
 router = APIRouter(tags=["request-form"])
 
@@ -349,6 +349,9 @@ def _send_confirmation(requester: models.User, tickets: list, f: "RequestFields"
         "Follow progress any time, no login needed:" if len(tickets) == 1 else
         f"It has been split into {len(tickets)} tickets, one per design. Follow each one any time, no login needed:",
         *lines,
+        "",
+        "See all your requests in one place (this link works for 30 days):",
+        my_requests_url(requester),
         "",
         "MCCIA Applied AI Studio",
     ])

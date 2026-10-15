@@ -19,6 +19,7 @@ export default function RequestFormPage() {
         <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-strong)' }}>Request for Creative / Graphic Design work</h1>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-soft)', margin: '6px 0 20px' }}>
           Fill in the form and attach the circular or file. Please submit a separate request for each recurring creative.
+          {' '}Already sent some? <a className="login-link-btn" href="/my-requests">See all your requests</a>
         </p>
         {loadError && <p role="alert" style={{ color: '#b91c1c' }}>{loadError}</p>}
         {options && <RequestFormBody options={options} />}
