@@ -70,3 +70,9 @@ WHERE email IN ('lead@mccia.in','alice@mccia.in','bob@mccia.in','client@tata.com
 ```
 
 Or deactivate them from **Settings > Users**.
+
+## Admin locked out
+
+Set `ADMIN_RESET_PASSWORD` (with `ADMIN_EMAIL`) in the hosting environment and redeploy. On start the API makes it
+that account's temporary password (creating or reactivating the account), and asks for a new password at sign-in.
+Each value is applied once, so a later restart does not undo the new password; still, delete the variable afterwards.

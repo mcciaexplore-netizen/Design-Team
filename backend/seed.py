@@ -40,6 +40,37 @@ def ensure_admin(db: Session):
     print(f"Created admin account {email}.")
 
 
+RESET_MARKER = "admin_password_reset"
+
+
+def reset_admin_password(db: Session):
+    """Recovery for a locked-out admin: ADMIN_RESET_PASSWORD becomes ADMIN_EMAIL's temporary password (the account is
+    created or reactivated if needed). Each value is applied once, so a password the admin picks afterwards is not
+    overwritten on the next start; the admin must replace it at sign-in."""
+    email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    password = os.getenv("ADMIN_RESET_PASSWORD", "")
+    if not email or not password:
+        return
+    marker = db.query(models.AppSetting).filter(models.AppSetting.key == RESET_MARKER).first()
+    if marker and marker.value and pwd_context.verify(password, marker.value.get("hash", "")):
+        return
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        user = models.User(email=email, full_name=os.getenv("ADMIN_NAME", "MCCIA Admin"), role=models.RoleEnum.DESIGN_LEAD)
+        db.add(user)
+    user.hashed_password = pwd_context.hash(password)
+    user.is_active = True
+    user.must_change_password = True
+    user.role, user.client_org = models.RoleEnum.DESIGN_LEAD, None
+    value = {"hash": pwd_context.hash(password)}
+    if marker:
+        marker.value = value
+    else:
+        db.add(models.AppSetting(key=RESET_MARKER, value=value))
+    db.commit()
+    print(f"Reset the password for {email}; remove ADMIN_RESET_PASSWORD now.")
+
+
 def _truthy(v: str | None) -> bool:
     return (v or "").strip().lower() in ("1", "true", "yes", "on")
 
@@ -134,6 +165,7 @@ def seed():
     try:
         types = ensure_design_types(db)
         ensure_admin(db)
+        reset_admin_password(db)
         if not demo_enabled():
             print("Demo data skipped (SEED_DEMO_DATA is not enabled for this database).")
             return

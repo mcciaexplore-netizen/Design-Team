@@ -22,7 +22,7 @@ def db_path():
 
 def run_seed(path, **env):
     full = {**os.environ, "DATABASE_URL": "sqlite:///" + path.replace("\\", "/"), **env}
-    for k in ("SEED_DEMO_DATA", "ADMIN_EMAIL", "ADMIN_PASSWORD"):
+    for k in ("SEED_DEMO_DATA", "ADMIN_EMAIL", "ADMIN_PASSWORD", "ADMIN_RESET_PASSWORD"):
         if k not in env:
             full.pop(k, None)
     r = subprocess.run([sys.executable, "seed.py"], cwd=BACKEND, env=full, capture_output=True, text=True, timeout=180)
@@ -64,3 +64,21 @@ def test_existing_account_is_promoted_to_design_lead(db_path):
     con.commit(); con.close()
     run_seed(db_path, SEED_DEMO_DATA="false", ADMIN_EMAIL="boss@example.com")
     assert query(db_path, "select role from users where email='boss@example.com'") == [("DESIGN_LEAD",)]
+
+
+def test_admin_password_reset_applies_once(db_path):
+    run_seed(db_path, SEED_DEMO_DATA="false", ADMIN_EMAIL="boss@example.com", ADMIN_PASSWORD="first-pass-123")
+    before = query(db_path, "SELECT hashed_password FROM users WHERE email='boss@example.com'")[0][0]
+    con = sqlite3.connect(db_path); con.execute("UPDATE users SET is_active=0"); con.commit(); con.close()
+
+    out = run_seed(db_path, SEED_DEMO_DATA="false", ADMIN_EMAIL="boss@example.com", ADMIN_RESET_PASSWORD="reset-pass-456")
+    assert "Reset the password" in out
+    reset_hash, active, must_change = query(
+        db_path, "SELECT hashed_password, is_active, must_change_password FROM users WHERE email='boss@example.com'")[0]
+    assert reset_hash != before and active == 1 and must_change == 1
+
+    # The admin then picks a new password; restarting with the same variable must not undo that.
+    con = sqlite3.connect(db_path); con.execute("UPDATE users SET hashed_password='chosen'"); con.commit(); con.close()
+    out = run_seed(db_path, SEED_DEMO_DATA="false", ADMIN_EMAIL="boss@example.com", ADMIN_RESET_PASSWORD="reset-pass-456")
+    assert "Reset the password" not in out
+    assert query(db_path, "SELECT hashed_password FROM users")[0][0] == "chosen"
