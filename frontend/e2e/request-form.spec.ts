@@ -299,7 +299,6 @@ test('a finished request can be requested again from the portal and from the tic
   };
 
   // From the portal.
-  await page.getByRole('button', { name: 'Completed' }).click();
   await page.getByRole('button', { name: /^Request again: Again Fest/ }).click();
   await expectPrefilled();
   await dialog.getByRole('button', { name: 'Cancel' }).click();
@@ -327,7 +326,6 @@ test('"Request again" on a ticket made before the channels were split lands on t
   await old('Legacy LinkedIn post', 'Social Media Post (Insta, LinkedIn, Twitter)', { platforms: ['LinkedIn', 'Instagram'] });
 
   await login(page, ACCOUNTS.client);
-  await page.getByRole('button', { name: 'Completed' }).click();
   const dialog = page.getByRole('dialog');
   const again = async (title: string, requirement: string) => {
     await page.getByRole('button', { name: new RegExp(`^Request again: ${title}`) }).click();

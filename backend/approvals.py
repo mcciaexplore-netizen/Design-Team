@@ -14,7 +14,7 @@ import delivery
 import events
 import revision_engine
 import models
-from auth import get_current_user, get_ticket_for_user, require_staff
+from auth import get_current_user, get_ticket_for_user, is_client, require_staff
 from common import app_url, as_utc, ensure_changes_allowed, mark_delivered, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
 from database import get_db
 
@@ -328,3 +328,33 @@ def ticket_audit(ticket_id: int, db: Session = Depends(get_db), user: models.Use
         "details": r.details if is_staff else {},  # Internal field-level details stay staff-only
         "timestamp": as_utc(r.timestamp).isoformat() if r.timestamp else None,
     } for r in rows]
+
+
+# ── Client dashboard ─────────────────────────────────────────────────────────
+
+@router.get("/api/portal/overview")
+def portal_overview(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+    """Per request the client can see: its newest design, an open review (with when it closes) and when it was
+    delivered. One call for the whole dashboard instead of one per request."""
+    q = db.query(models.Ticket.id, models.Ticket.delivered_at)
+    if is_client(user):   # the same rule as the ticket list
+        q = q.filter(models.Ticket.client_org == user.client_org) if user.client_org else q.filter(models.Ticket.requester_id == user.id)
+    rows = q.order_by(models.Ticket.created_at.desc()).limit(300).all()
+    ids = [r.id for r in rows] or [0]
+
+    latest: dict[int, models.ProofVersion] = {}
+    for p in db.query(models.ProofVersion).filter(models.ProofVersion.ticket_id.in_(ids)).order_by(models.ProofVersion.version):
+        latest[p.ticket_id] = p   # ordered by version, so the last one wins
+    reviews = {r.ticket_id: r for r in db.query(models.ApprovalRequest).filter(
+        models.ApprovalRequest.ticket_id.in_(ids), models.ApprovalRequest.status == "pending")}
+
+    out = {}
+    for r in rows:
+        p, review = latest.get(r.id), reviews.get(r.id)
+        out[str(r.id)] = {
+            "latest_proof": {"id": p.id, "version": p.version, "file_name": p.file_name, "content_type": p.content_type} if p else None,
+            "review": {"id": review.id, "expires_at": as_utc(review.expires_at).isoformat()}
+                      if review and as_utc(review.expires_at) > _now() else None,
+            "delivered_at": as_utc(r.delivered_at).isoformat() if r.delivered_at else None,
+        }
+    return out
