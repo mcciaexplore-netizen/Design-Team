@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordForm from '../components/ChangePasswordForm';
 import { useReveal } from '../hooks/useReveal';
 import UsersAdmin from '../components/UsersAdmin';
-import DesignTypesAdmin from '../components/DesignTypesAdmin';
 
 const SECTION_LABEL: React.CSSProperties = { fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', marginBottom: 2 };
 const FIELD_LABEL: React.CSSProperties = { fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: 6 };
@@ -205,7 +204,7 @@ function AccountTab() {
   );
 }
 
-type TabKey = 'me' | 'account' | 'users' | 'types' | 'integrations';
+type TabKey = 'me' | 'account' | 'users' | 'integrations';
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -215,7 +214,7 @@ const SettingsPage: React.FC = () => {
   const tabs: [TabKey, string][] = [
     ['me', 'My notifications'],
     ['account', 'Password'],
-    ...(isLead ? [['users', 'Users'], ['types', 'Design types'], ['integrations', 'Integrations & alerts']] as [TabKey, string][] : []),
+    ...(isLead ? [['users', 'Users'], ['integrations', 'Integrations & alerts']] as [TabKey, string][] : []),
   ];
 
   return (
@@ -230,7 +229,6 @@ const SettingsPage: React.FC = () => {
       </div>
       {tab === 'account' ? <AccountTab />
         : tab === 'users' && isLead ? <UsersAdmin />
-        : tab === 'types' && isLead ? <DesignTypesAdmin />
         : tab === 'integrations' && isLead ? <IntegrationsTab />
         : <MyNotificationsTab />}
     </div>
