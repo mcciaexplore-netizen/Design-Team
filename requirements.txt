@@ -1,0 +1,16 @@
+# Runtime dependencies for the Vercel function (api/index.py). Keep in step with backend/requirements.txt,
+# minus the test-only packages.
+fastapi
+uvicorn
+sqlalchemy
+psycopg[binary]
+alembic
+boto3
+python-dotenv
+pytz
+passlib
+bcrypt==4.0.1
+pyjwt
+python-multipart
+httpx
+reportlab

@@ -71,8 +71,10 @@ def health_check():
     return {"status": "ok"}
 
 @app.post("/internal/tick")
-def internal_tick(x_cron_secret: str = Header(None), db: Session = Depends(get_db)):
-    if x_cron_secret != CRON_SECRET:
+@app.get("/internal/tick")  # Vercel Cron sends a GET with "Authorization: Bearer $CRON_SECRET"
+def internal_tick(x_cron_secret: str = Header(None), authorization: str = Header(None), db: Session = Depends(get_db)):
+    bearer = authorization[7:] if authorization and authorization.startswith("Bearer ") else None
+    if not any(s and secrets.compare_digest(s, CRON_SECRET) for s in (x_cron_secret, bearer)):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     from cron_jobs import run_all_cron_jobs

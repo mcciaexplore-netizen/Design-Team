@@ -26,6 +26,8 @@ export function useTicketSocket({ userId, onMessage, reconnectDelay = 3000 }: Op
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    // Serverless hosts (Vercel) cannot hold WebSockets; the ticket list's own polling keeps pages current there.
+    if (import.meta.env.VITE_LIVE_UPDATES === 'false') return;
     mountedRef.current = true;
 
     const connect = () => {

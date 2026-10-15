@@ -72,9 +72,11 @@ def last_proof_submitter(db: Session, ticket: models.Ticket) -> Optional[models.
 
 # ── File storage ─────────────────────────────────────────────────────────────
 
-MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "10")) * 1024 * 1024
+# Vercel rejects request bodies over 4.5 MB before they reach the app, so default below that there.
+_ON_VERCEL = bool(os.getenv("VERCEL"))
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "4" if _ON_VERCEL else "10")) * 1024 * 1024
 # Source files (CDR, PSD, AI...) are routinely larger than proofs and attachments.
-MAX_CDR_BYTES = int(os.getenv("MAX_CDR_UPLOAD_MB", "50")) * 1024 * 1024
+MAX_CDR_BYTES = int(os.getenv("MAX_CDR_UPLOAD_MB", "4" if _ON_VERCEL else "50")) * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {
     "png", "jpg", "jpeg", "gif", "webp", "pdf", "txt", "csv",
@@ -98,7 +100,9 @@ _CONTENT_TYPES = {
 
 
 def _upload_dir() -> str:
-    path = os.getenv("UPLOAD_DIR", os.path.join(os.path.dirname(__file__), "uploads"))
+    # Only /tmp is writable on Vercel, and it is wiped often: production there must set S3_ENDPOINT_URL.
+    default = "/tmp/uploads" if _ON_VERCEL else os.path.join(os.path.dirname(__file__), "uploads")
+    path = os.getenv("UPLOAD_DIR", default)
     os.makedirs(path, exist_ok=True)
     return path
 

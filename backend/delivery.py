@@ -138,4 +138,8 @@ def run_in_background(fn: Callable, *args) -> None:
             fn(*args)
         except Exception:
             logger.exception("Background delivery failed")
+    if os.getenv("VERCEL"):
+        # A serverless function is frozen once it responds, so a thread would never finish: send before replying.
+        runner()
+        return
     threading.Thread(target=runner, daemon=True).start()
