@@ -224,7 +224,9 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
     company = " ".join(body.company.split())
     if db.query(models.User).filter(func.lower(models.User.email) == email).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
-    if db.query(models.User).filter(func.lower(models.User.client_org) == company.lower()).first():
+    taken = db.query(models.User.id).filter(func.lower(models.User.client_org) == company.lower()).first() or \
+        db.query(models.Ticket.id).filter(func.lower(models.Ticket.client_org) == company.lower()).first()
+    if taken:   # its tickets would become visible to whoever registers the name
         raise HTTPException(status_code=409, detail="That company already has an account. Ask your design team to add you.")
     user = models.User(
         email=email,

@@ -15,7 +15,7 @@ import integrations
 import models
 import schemas
 from auth import get_current_user, get_ticket_for_user, is_client, require_lead, require_staff
-from common import compute_due_at, log_audit, mark_delivered, next_ticket_number, track_waiting
+from common import DEFAULT_SCHEDULE, after_status_change, compute_due_at, log_audit, next_ticket_number, track_waiting
 from database import get_db
 from sla_engine import calculate_due_date
 
@@ -75,6 +75,8 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), r
         # Clients can request work but not plan it.
         data.pop("assignee_id", None)
         data.pop("estimate_hours", None)
+        data.pop("workflow_stage_id", None)
+    _check_refs(db, data)
 
     db_ticket = models.Ticket(
         **data,
@@ -100,6 +102,21 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), r
 
     return db_ticket
 
+NOT_BLANK = {"title", "brief", "type_specific_fields", "priority", "status", "tags"}
+
+
+def _check_refs(db: Session, data: dict) -> None:
+    """An assignee must be active staff and a workflow stage must exist (Postgres would otherwise fail with a 500,
+    and assigning a client would show them another company's ticket in a notification)."""
+    if data.get("assignee_id") is not None and not db.query(models.User.id).filter(
+            models.User.id == data["assignee_id"], models.User.is_active == True,  # noqa: E712
+            models.User.role != models.RoleEnum.REQUESTER).first():
+        raise HTTPException(status_code=422, detail="Assignee must be an active staff member")
+    if data.get("workflow_stage_id") is not None and not db.query(models.WorkflowStage.id).filter(
+            models.WorkflowStage.id == data["workflow_stage_id"]).first():
+        raise HTTPException(status_code=422, detail="Unknown workflow stage")
+
+
 @router.patch("/api/tickets/{ticket_id}", response_model=schemas.TicketResponse)
 def update_ticket(ticket_id: int, ticket_update: schemas.TicketUpdate, db: Session = Depends(get_db), user: models.User = Depends(require_staff)):
     db_ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
@@ -107,6 +124,10 @@ def update_ticket(ticket_id: int, ticket_update: schemas.TicketUpdate, db: Sessi
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     update_data = ticket_update.model_dump(exclude_unset=True)
+    _check_refs(db, update_data)
+    blanked = sorted(k for k in NOT_BLANK if k in update_data and update_data[k] is None)
+    if blanked:   # a stored null here would break every ticket list for everyone
+        raise HTTPException(status_code=422, detail="These can't be empty: " + ", ".join(blanked))
 
     if user.role not in auth.LEAD_ROLES:
         forbidden = {"assignee_id", "priority"} & update_data.keys()
@@ -124,10 +145,7 @@ def update_ticket(ticket_id: int, ticket_update: schemas.TicketUpdate, db: Sessi
 
     if "status" in changes:
         track_waiting(db_ticket, old_status, db_ticket.status)
-        if db_ticket.status == models.TicketStatus.DELIVERED:
-            mark_delivered(db, db_ticket)
-        else:
-            db_ticket.edit_window_ends_at = None
+        after_status_change(db, db_ticket)
     if changes:
         log_audit(db, db_ticket.id, user, "Updated", changes)
 
@@ -177,7 +195,7 @@ def recalculate_sla(db: Session = Depends(get_db), _user: models.User = Depends(
     schedule_dict = {
         s.day_of_week: {'is_working': s.is_working_day, 'start': s.start_hour, 'end': s.end_hour}
         for s in schedules
-    }
+    } or DEFAULT_SCHEDULE   # with no rows every day was "not working" and the due-date search never ended
 
     # 2. Grab holidays
     holidays = db.query(models.Holiday).all()

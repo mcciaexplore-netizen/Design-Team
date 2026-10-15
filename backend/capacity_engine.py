@@ -1,6 +1,8 @@
 import datetime
 from typing import Optional
 
+import pytz
+
 import models
 
 # Open work that still needs a designer's hands. In Review and Waiting on Requester don't consume their time.
@@ -37,7 +39,7 @@ def suggest_assignee(db, ticket_design_type_id: int) -> Optional[models.User]:
     if not designers:
         return None
 
-    today = datetime.date.today()
+    today = datetime.datetime.now(pytz.timezone("Asia/Kolkata")).date()   # the studio's today, not UTC
     weekdays = _working_weekdays(db)
     holidays = {h.date.date() for h in db.query(models.Holiday).all()}
     days = [d for d in (today + datetime.timedelta(n) for n in range(HORIZON_DAYS))

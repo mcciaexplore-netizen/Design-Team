@@ -1,0 +1,84 @@
+"""Fixes from the code review: cron robustness, closing labels, stale review links, bad PATCH values, form identity."""
+import datetime
+
+import pytz
+
+import models
+from test_auth import TestingSessionLocal, auth, client, make_ticket  # noqa: F401
+from test_review_flow import isolated, sent_design  # noqa: F401
+from test_workflow_features import db_ticket, form, set_status, tick
+
+
+def update(model, row_id, **values):
+    db = TestingSessionLocal()
+    db.query(model).filter_by(id=row_id).update(values)
+    db.commit()
+    db.close()
+
+
+def test_an_unassigned_overdue_ticket_does_not_stop_the_tick(client):
+    t = make_ticket(client, "a@tata.com")
+    update(models.Ticket, t["id"], assignee_id=None, status=models.TicketStatus.NEW,
+           due_at=datetime.datetime.now(pytz.utc) - datetime.timedelta(hours=5))
+    later = make_ticket(client, "a@tata.com", title="Delivered earlier")
+    set_status(client, later["id"], "Delivered")
+    update(models.Ticket, later["id"], edit_window_ends_at=datetime.datetime.now(pytz.utc) - datetime.timedelta(hours=1))
+
+    assert tick(client).status_code == 200
+    assert db_ticket(t["id"]).is_overdue
+    assert db_ticket(later["id"]).is_locked          # the other steps still ran
+
+
+def test_an_approved_design_closes_as_closed_not_without_approval(client):
+    tid, _ = sent_design(client)
+    cl = auth(client, "a@tata.com")
+    pending = client.get(f"/api/tickets/{tid}/approval-requests", headers=cl).json()[0]
+    assert client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "approve"}, headers=cl).status_code == 200
+    update(models.Ticket, tid, edit_window_ends_at=datetime.datetime.now(pytz.utc) - datetime.timedelta(hours=1))
+    tick(client)
+    assert db_ticket(tid).status == models.TicketStatus.CLOSED
+
+
+def test_an_old_review_link_cannot_move_a_ticket_that_moved_on(client):
+    tid, _ = sent_design(client)
+    cl = auth(client, "a@tata.com")
+    pending = client.get(f"/api/tickets/{tid}/approval-requests", headers=cl).json()[0]
+    set_status(client, tid, "In Progress")             # the designer pulled it back
+    r = client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "approve"}, headers=cl)
+    assert r.status_code == 409
+    assert db_ticket(tid).status == models.TicketStatus.IN_PROGRESS
+
+
+def test_blank_values_and_bad_ids_are_refused(client):
+    t = make_ticket(client, "a@tata.com")
+    lead = auth(client, "lead@x.com")
+    assert client.patch(f"/api/tickets/{t['id']}", json={"tags": None}, headers=lead).status_code == 422
+    assert client.patch(f"/api/tickets/{t['id']}", json={"status": None}, headers=lead).status_code == 422
+    assert client.patch(f"/api/tickets/{t['id']}", json={"assignee_id": 9999}, headers=lead).status_code == 422
+    client_id = TestingSessionLocal().query(models.User).filter_by(email="a@tata.com").one().id
+    assert client.patch(f"/api/tickets/{t['id']}", json={"assignee_id": client_id}, headers=lead).status_code == 422
+    assert client.get("/api/tickets", headers=lead).status_code == 200
+
+
+def test_bulk_delivery_opens_the_edit_window(client):
+    t = make_ticket(client, "a@tata.com")
+    r = client.post("/api/tickets/bulk", json={"ticket_ids": [t["id"]], "status": "Delivered"}, headers=auth(client, "lead@x.com"))
+    assert r.status_code == 200, r.text
+    assert db_ticket(t["id"]).edit_window_ends_at is not None
+
+
+def test_public_form_cannot_post_as_staff_or_into_a_company_portal(client):
+    assert client.post("/api/public/requests", data=form(email="des@x.com")).status_code == 409
+    r = client.post("/api/public/requests", data=form(email="a@tata.com"))
+    assert r.status_code == 201, r.text
+    db = TestingSessionLocal()
+    t = db.query(models.Ticket).filter_by(ticket_number=r.json()["ticket_number"]).one()
+    db.close()
+    assert t.client_org is None        # not shown in TATA's portal just because someone typed that email
+
+
+def test_registering_a_company_name_still_on_old_tickets_is_refused(client):
+    t = make_ticket(client, "a@tata.com")
+    update(models.Ticket, t["id"], client_org="Old Co")
+    r = client.post("/api/auth/register", json={"full_name": "New Person", "email": "new@old.co", "company": "old co", "password": "long-enough-1"})
+    assert r.status_code == 409

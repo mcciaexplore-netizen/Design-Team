@@ -146,6 +146,8 @@ def create_approval_request(ticket_id: int, body: ApprovalCreate, db: Session = 
         models.ProofVersion.id == body.proof_version_id, models.ProofVersion.ticket_id == ticket.id).first()
     if not proof:
         raise HTTPException(status_code=422, detail="Choose a proof that belongs to this ticket")
+    if ticket.is_locked:
+        raise HTTPException(status_code=409, detail="This version is closed. Send the design from the newest version of the request.")
     # A new request supersedes any still-open one for this ticket, so only one link is ever live.
     req, link = _open_review(db, ticket, proof, user, body.ttl_hours)
     db.commit()
@@ -241,15 +243,16 @@ def _apply_decision(db: Session, req: models.ApprovalRequest, body: "Decision", 
     if req.status != "pending":
         raise HTTPException(status_code=409, detail={"approved": "This design was already approved.",
                                                      "changes_requested": "Changes were already requested.",
-                                                     "revoked": "This review link has been withdrawn."}.get(req.status, "Already decided"))
+                                                     "revoked": "This review link has been withdrawn.",
+                                                     "expired": "This review has closed."}.get(req.status, "Already decided"))
     if as_utc(req.expires_at) < _now():
         raise HTTPException(status_code=410, detail="This review has expired. Ask the design team for a new one.")
     if body.decision == "request_changes" and not (body.comment and body.comment.strip()):
         raise HTTPException(status_code=422, detail="Please describe the changes you would like")
 
     current = db.query(models.Ticket).filter(models.Ticket.id == req.ticket_id).first()
-    if body.decision == "request_changes" and current and current.is_locked:
-        raise HTTPException(status_code=409, detail="This request is closed. Please raise a new request.")
+    if not current or current.is_locked or current.status not in (models.TicketStatus.IN_REVIEW, models.TicketStatus.DELIVERED):
+        raise HTTPException(status_code=409, detail="This design is no longer waiting for your review.")
     if body.decision == "request_changes" and current:
         ensure_changes_allowed(current)
 
@@ -284,12 +287,6 @@ def _apply_decision(db: Session, req: models.ApprovalRequest, body: "Decision", 
         revision_engine.announce(db, child)
         out["new_ticket"] = {"id": child.id, "ticket_number": child.ticket_number}
     return out
-
-
-class Decision(BaseModel):
-    decision: Literal["approve", "request_changes"]
-    name: str = Field(min_length=1, max_length=80)
-    comment: Optional[str] = Field(default=None, max_length=2000)
 
 
 @router.post("/api/public/review/{token}/decision")

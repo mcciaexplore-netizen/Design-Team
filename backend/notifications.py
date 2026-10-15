@@ -51,7 +51,8 @@ def handle_overdue_escalations(db, ticket, working_hours_overdue):
 
     cycle = working_hours_overdue // 4
 
-    notify_user(db, ticket.assignee, f"Ticket {ticket.ticket_number} is OVERDUE", f"OVERDUE_DESIGNER_{cycle}", ticket.id)
+    if ticket.assignee:   # an unassigned ticket still escalates to the lead and admin below
+        notify_user(db, ticket.assignee, f"Ticket {ticket.ticket_number} is OVERDUE", f"OVERDUE_DESIGNER_{cycle}", ticket.id)
 
     if working_hours_overdue >= 4:
         from models import User

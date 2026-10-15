@@ -1,8 +1,6 @@
 """Saved board views (per-user or shared) and bulk ticket actions."""
-import datetime
 from typing import List, Literal, Optional
 
-import pytz
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
@@ -10,7 +8,7 @@ from sqlalchemy.orm import Session
 import events
 import models
 from auth import LEAD_ROLES, get_current_user, require_staff
-from common import log_audit, track_waiting
+from common import after_status_change, log_audit, track_waiting
 from database import get_db
 
 router = APIRouter(tags=["views"])
@@ -148,8 +146,7 @@ def bulk_update(body: BulkAction, db: Session = Depends(get_db), user: models.Us
             changes["status"] = {"from": t.status.value, "to": body.status.value}
             track_waiting(t, t.status, body.status)
             t.status = body.status
-            if body.status == models.TicketStatus.DELIVERED and t.delivered_at is None:
-                t.delivered_at = datetime.datetime.now(pytz.utc)
+            after_status_change(db, t)   # edit window and open review links, exactly as on the ticket page
             moved.append(t)
         if body.priority and t.priority != body.priority:
             changes["priority"] = {"from": t.priority.value, "to": body.priority.value}

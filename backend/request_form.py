@@ -115,7 +115,7 @@ RATE_LIMIT, RATE_WINDOW = 5, 3600
 
 def priority_for(delivery_date: datetime.date) -> models.TicketPriority:
     """Priority follows how soon the creative is needed: the form never asks for it."""
-    days = (delivery_date - datetime.date.today()).days
+    days = (delivery_date - datetime.datetime.now(IST).date()).days
     if days <= 1:
         return models.TicketPriority.URGENT
     if days <= 3:
@@ -208,6 +208,8 @@ def _design_type(db: Session, option: str) -> models.DesignType:
 def _requester(db: Session, name: str, email: str) -> models.User:
     """The person's account if they have one; otherwise a login-less client account an admin can later enable."""
     user = db.query(models.User).filter(models.User.email == email).first()
+    if user and user.role != models.RoleEnum.REQUESTER:
+        raise HTTPException(status_code=409, detail="This email belongs to a team account. Please sign in to make a request.")
     if user:
         return user
     user = models.User(email=email, full_name=name, role=models.RoleEnum.REQUESTER,
@@ -249,7 +251,7 @@ class RequestFields:
             raise HTTPException(status_code=422, detail="Please choose a design requirement")
         if OTHER in self.requirements and not self.other_details:
             raise HTTPException(status_code=422, detail="Please describe the design you need")
-        if self.delivery_date < datetime.date.today():
+        if self.delivery_date < datetime.datetime.now(IST).date():   # the studio's today, not the server's (UTC)
             raise HTTPException(status_code=422, detail="Expected delivery date cannot be in the past")
         self.details = clean_details(self.requirements, self.raw_details)
         self.links = clean_links(self.raw_links)
@@ -295,7 +297,8 @@ def _new_ticket(db: Session, requester: models.User, f: RequestFields, requireme
         type_specific_fields=fields,
         priority=priority_for(f.delivery_date),
         requester_id=requester.id,
-        client_org=requester.client_org,
+        # Only a signed-in request joins the company's portal: anyone can type a client's email on the public form.
+        client_org=requester.client_org if via == "portal form" else None,
         due_at=datetime.datetime.combine(f.delivery_date, datetime.time(12, 30), tzinfo=pytz.utc),  # 18:00 IST
         tags=["request-form"],
     )

@@ -8,7 +8,7 @@ from xml.sax.saxutils import escape
 
 import pytz
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 import models
 from auth import require_lead
@@ -49,7 +49,8 @@ def _week_start(d: datetime.datetime) -> datetime.date:
 def build_report(db: Session, date_from=None, date_to=None, client_org: Optional[str] = None) -> dict:
     start, end, lo, hi = _range(date_from, date_to)
     now = datetime.datetime.now(pytz.utc)
-    q = db.query(models.Ticket).filter(models.Ticket.created_at >= lo, models.Ticket.created_at < hi)
+    q = db.query(models.Ticket).options(joinedload(models.Ticket.design_type), joinedload(models.Ticket.assignee)) \
+        .filter(models.Ticket.created_at >= lo, models.Ticket.created_at < hi)
     if client_org:
         q = q.filter(models.Ticket.client_org == client_org)
     tickets = q.all()

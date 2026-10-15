@@ -77,6 +77,19 @@ def ensure_changes_allowed(ticket: models.Ticket) -> None:
             "Please contact the design team directly."))
 
 
+def after_status_change(db: Session, ticket: models.Ticket) -> None:
+    """Bookkeeping every status change needs, wherever it happens (ticket page, bulk edit): the edit window opens on
+    Delivered and closes otherwise, and a review link still open is withdrawn once the ticket is no longer waiting on
+    the client, so a late click on it cannot move the ticket."""
+    if ticket.status == models.TicketStatus.DELIVERED:
+        mark_delivered(db, ticket)
+    else:
+        ticket.edit_window_ends_at = None
+    if ticket.status not in (models.TicketStatus.IN_REVIEW, models.TicketStatus.DELIVERED):
+        db.query(models.ApprovalRequest).filter(models.ApprovalRequest.ticket_id == ticket.id,
+                                                models.ApprovalRequest.status == "pending").update({"status": "revoked"})
+
+
 def track_waiting(ticket: models.Ticket, old: models.TicketStatus, new: models.TicketStatus) -> None:
     """While a ticket waits on the requester its clock is paused; record when that started and how long it lasted."""
     now = datetime.datetime.now(pytz.utc)
