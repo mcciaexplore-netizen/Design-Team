@@ -296,7 +296,7 @@ const KanbanBoard = () => {
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
         <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 160, maxWidth: 300 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} />
           <input
             className="input-field"
             aria-label="Search tickets"
@@ -306,7 +306,7 @@ const KanbanBoard = () => {
             style={{ paddingLeft: '2.1rem', paddingRight: filters.search ? '2rem' : undefined, width: '100%' }}
           />
           {filters.search && (
-            <button type="button" aria-label="Clear search" onClick={() => applyFilters({ search: '' })} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 2 }}><X size={13} /></button>
+            <button type="button" aria-label="Clear search" onClick={() => applyFilters({ search: '' })} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', padding: 2 }}><X size={13} /></button>
           )}
         </div>
 
@@ -331,7 +331,7 @@ const KanbanBoard = () => {
         </select>
 
         {filtersActive && (
-          <button type="button" onClick={() => chooseView('q:all')} className="chip" style={{ color: '#EF4444', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.05)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button type="button" onClick={() => chooseView('q:all')} className="chip" style={{ color: '#B91C1C', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.05)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <X size={11} /> Clear filters
           </button>
         )}

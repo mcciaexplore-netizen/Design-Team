@@ -38,11 +38,13 @@ const TicketDetailPage: React.FC = () => {
 
   useEffect(() => { setFigmaInput(ticket?.figma_url ?? ''); setFigmaCheck(null); setError(null); }, [ticket?.id, ticket?.figma_url]);
 
+  // Every version of this request (DF-0005, DF-0005-V2, DF-0005-V3…). Each one's parent is the version before it,
+  // so they are grouped by the shared ticket number rather than by parent.
   const related = useMemo(() => {
     if (!ticket) return [];
-    const rootId = ticket.parent_id ?? ticket.id;
+    const base = baseNumber(ticket.number);
     return tickets
-      .filter(t => t.id === rootId || t.parent_id === rootId)
+      .filter(t => baseNumber(t.number) === base)
       .sort((a, b) => (a.version_number ?? 1) - (b.version_number ?? 1));
   }, [tickets, ticket]);
 
@@ -63,13 +65,13 @@ const TicketDetailPage: React.FC = () => {
 
   const ps = PRIORITY_STYLE[ticket.priority] ?? {};
   const statusOptions = STATUSES.includes(ticket.status) ? STATUSES : [...STATUSES, ticket.status];
-  const dueMs = ticket.due_at ? new Date(ticket.due_at).getTime() : NaN;
-  const revisionsLocked = !Number.isNaN(dueMs) && dueMs - Date.now() < 24 * 3600 * 1000 && ticket.status !== 'Delivered';
+  const cutoff = changeCutoff(ticket);
+  const revisionsLocked = cutoff !== null && Date.now() >= cutoff;
   const canRequestChanges = (ticket.status === 'In Review' || ticket.status === 'Delivered') && !ticket.is_locked;
   const done = ticket.subtasks.filter(s => s.is_completed).length;
 
   const TABS: { key: TabKey; label: string; hidden?: boolean }[] = [
-    { key: 'overview', label: 'Overview & activity' },
+    { key: 'overview', label: 'Overview' },
     { key: 'proofs',   label: 'Proofs & approval' },
     { key: 'source',   label: 'Source files' },
     { key: 'figma',    label: 'Figma' },
@@ -128,6 +130,8 @@ const TicketDetailPage: React.FC = () => {
 
       {error && <p role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem', marginBottom: '1rem' }}>{error}</p>}
 
+      <VersionBanner ticket={ticket} versions={related} />
+
       <div className="ticket-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: '1.5rem', alignItems: 'start' }}>
         <div style={{ minWidth: 0 }}>
           <div role="tablist" aria-label="Ticket sections" style={{ display: 'flex', gap: 0, background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 'var(--radius-md)', padding: 4, marginBottom: '1.25rem', overflowX: 'auto' }}>
@@ -148,10 +152,10 @@ const TicketDetailPage: React.FC = () => {
                 <p style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.7, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{ticket.description || 'No brief provided.'}</p>
                 {ticket.type_specific_fields && Object.keys(ticket.type_specific_fields).length > 0 && (
                   <dl style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'minmax(110px,auto) 1fr', gap: '6px 14px', fontSize: '0.8rem' }}>
-                    {Object.entries(ticket.type_specific_fields).map(([k, v]) => (
+                    {detailRows(ticket.type_specific_fields).map(([k, v]) => (
                       <React.Fragment key={k}>
-                        <dt style={{ color: '#64748b', fontWeight: 700, textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</dt>
-                        <dd style={{ margin: 0, color: '#0F172A', overflowWrap: 'anywhere' }}>{String(v)}</dd>
+                        <dt style={{ color: '#64748b', fontWeight: 700, textTransform: 'capitalize' }}>{k}</dt>
+                        <dd style={{ margin: 0, color: '#0F172A', overflowWrap: 'anywhere' }}>{v}</dd>
                       </React.Fragment>
                     ))}
                   </dl>
@@ -192,11 +196,16 @@ const TicketDetailPage: React.FC = () => {
         <aside style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0 }}>
           {canRequestChanges && (
             <button type="button" className="btn-primary" disabled={revisionsLocked}
-              title={revisionsLocked ? 'Revisions are locked within 24 hours of the deadline. Contact the design lead.' : undefined}
+              title={revisionsLocked ? 'Changes stop 12 hours before the event. Contact the design team.' : undefined}
               style={{ width: '100%', justifyContent: 'center', background: revisionsLocked ? '#FCA5A5' : '#EF4444', borderColor: revisionsLocked ? '#FCA5A5' : '#DC2626' }}
               onClick={() => setShowRevisionModal(true)}>
               Request changes {revisionsLocked ? '(locked)' : ''}
             </button>
+          )}
+          {canRequestChanges && cutoff !== null && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-soft)', marginTop: -6 }}>
+              {revisionsLocked ? 'Changes closed' : 'Changes allowed until'} {new Date(cutoff).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+            </p>
           )}
 
           {!isClient && (
@@ -255,7 +264,7 @@ const TicketDetailPage: React.FC = () => {
                 <button key={s.id} type="button" role="checkbox" aria-checked={s.is_completed} disabled={isClient}
                   onClick={() => void run(() => toggleSubtask(ticket.id, s.id), 'Could not update the subtask.')}
                   style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '4px 0', background: 'none', border: 'none', cursor: isClient ? 'default' : 'pointer', textAlign: 'left', fontSize: '0.78rem', color: s.is_completed ? '#94a3b8' : '#0F172A', textDecoration: s.is_completed ? 'line-through' : 'none' }}>
-                  {s.is_completed ? <CheckSquare size={14} style={{ color: '#059669', flexShrink: 0 }} /> : <Square size={14} style={{ color: '#94a3b8', flexShrink: 0 }} />} {s.title}
+                  {s.is_completed ? <CheckSquare size={14} style={{ color: '#059669', flexShrink: 0 }} /> : <Square size={14} style={{ color: '#64748B', flexShrink: 0 }} />} {s.title}
                 </button>
               ))}
             </div>
@@ -266,7 +275,7 @@ const TicketDetailPage: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
                 <GitBranch size={13} style={{ color: '#003F8A' }} />
                 <h3 className="section-label">Revision history</h3>
-                <span style={{ marginLeft: 'auto', fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8' }}>{related.length} versions</span>
+                <span style={{ marginLeft: 'auto', fontSize: '0.65rem', fontWeight: 700, color: '#64748B' }}>{related.length} versions</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {related.map(t => {
@@ -275,12 +284,12 @@ const TicketDetailPage: React.FC = () => {
                     <Link key={t.id} to={`/tickets/${t.id}`} aria-current={current ? 'page' : undefined} style={{ display: 'block', textDecoration: 'none', padding: '0.5rem 0.625rem', borderRadius: 8, background: current ? 'rgba(0,63,138,0.06)' : 'transparent', border: `1px solid ${current ? 'rgba(0,63,138,0.15)' : 'rgba(226,232,240,0.7)'}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: '0.75rem', fontWeight: 700, color: current ? '#003F8A' : '#0F172A' }}>V{t.version_number ?? 1}</span>
-                        <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{t.status}</span>
+                        <span style={{ fontSize: '0.65rem', color: '#64748B' }}>{t.status}</span>
                         {current && <span style={{ marginLeft: 'auto', fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', color: '#003F8A' }}>current</span>}
                       </div>
                       {t.reason_for_change && (
                         <p style={{ fontSize: '0.68rem', color: '#64748B', lineHeight: 1.5, fontStyle: 'italic', marginTop: 3, display: 'flex', gap: 4 }}>
-                          <Tag size={9} style={{ color: '#8b5cf6', flexShrink: 0, marginTop: 3 }} /> {t.reason_for_change}
+                          <Tag size={9} style={{ color: '#003F8A', flexShrink: 0, marginTop: 3 }} /> {t.reason_for_change}
                         </p>
                       )}
                     </Link>
@@ -317,3 +326,67 @@ const TicketDetailPage: React.FC = () => {
 };
 
 export default TicketDetailPage;
+
+/** "DF-0005" for DF-0005, DF-0005-V2, DF-0005-V3… */
+const baseNumber = (n: string) => n.replace(/-V\d+$/, '');
+
+/** Fields worth listing under the brief, as readable text: no empty values, no "[object Object]", dates in words.
+ *  The requester's name, email, notes and links are already in the brief itself. */
+const HIDDEN_FIELDS = new Set(['requester_name', 'requester_email', 'content', 'reference_links', 'details']);
+function detailRows(fields: Record<string, unknown>): [string, string][] {
+  const show = (v: unknown): string => {
+    if (v === null || v === undefined || v === '') return '';
+    if (Array.isArray(v)) return v.map(show).filter(Boolean).join(', ');
+    if (typeof v === 'object') return Object.entries(v as Record<string, unknown>).map(([k, x]) => `${k.replace(/_/g, ' ')}: ${show(x)}`).join(' · ');
+    const text = String(v);
+    return /^\d{4}-\d{2}-\d{2}$/.test(text) ? new Date(`${text}T00:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : text;
+  };
+  return Object.entries(fields)
+    .filter(([k]) => !HIDDEN_FIELDS.has(k))
+    .map(([k, v]): [string, string] => [k.replace(/_/g, ' '), show(v)])
+    .filter(([, v]) => v !== '');
+}
+
+type VersionTicket = { id: string; number: string; status: string; version_number?: number; reason_for_change?: string };
+
+/** Says in plain words which version this is, what the client asked to change, and where to work. */
+function VersionBanner({ ticket, versions }: { ticket: VersionTicket; versions: VersionTicket[] }) {
+  const newest = versions[versions.length - 1];
+  const version = ticket.version_number ?? 1;
+  const box = { borderRadius: 10, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.85rem', lineHeight: 1.5 } as const;
+  if (ticket.status === 'Revision Requested' && newest && newest.id !== ticket.id) {
+    return (
+      <div role="note" style={{ ...box, background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#334155' }}>
+        <strong>This version has been replaced.</strong> The client asked for changes, so the work continues on{' '}
+        <Link to={`/tickets/${newest.id}`} style={{ fontWeight: 800, color: '#003F8A' }}>{newest.number}</Link>. Nothing more is needed here.
+      </div>
+    );
+  }
+  if (version > 1) {
+    const previous = versions.find(v => (v.version_number ?? 1) === version - 1);
+    return (
+      <div role="note" style={{ ...box, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', color: '#78350F' }}>
+        <p style={{ fontWeight: 800, color: '#92400E' }}>Version {version}: the client asked for changes</p>
+        {ticket.reason_for_change && <p style={{ marginTop: 4, whiteSpace: 'pre-wrap' }}><strong>What to change:</strong> {ticket.reason_for_change}</p>}
+        {previous && (
+          <p style={{ marginTop: 4, fontSize: '0.8rem' }}>
+            The earlier design is on <Link to={`/tickets/${previous.id}`} style={{ fontWeight: 700, color: '#92400E' }}>{previous.number}</Link> (Proofs & approval tab).
+          </p>
+        )}
+      </div>
+    );
+  }
+  return null;
+}
+
+/** When change requests stop (ms), or null if they never do. Same rule as the server (common.change_cutoff): 12 hours
+ *  before the event day starts (IST); without an event date, 12 hours before the deadline until the deadline passes. */
+function changeCutoff(t: { type_specific_fields?: Record<string, unknown>; due_at?: string }): number | null {
+  const event = t.type_specific_fields?.event_date;
+  if (typeof event === 'string' && /^\d{4}-\d{2}-\d{2}/.test(event)) {
+    return Date.parse(`${event.slice(0, 10)}T00:00:00+05:30`) - 12 * 3600_000;
+  }
+  const due = t.due_at ? Date.parse(t.due_at) : NaN;
+  if (Number.isNaN(due) || Date.now() >= due) return null;
+  return due - 12 * 3600_000;
+}

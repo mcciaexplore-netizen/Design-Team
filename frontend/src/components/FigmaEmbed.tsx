@@ -14,7 +14,7 @@ const FigmaEmbed: React.FC<FigmaEmbedProps> = ({ url }) => {
         border:       '1px dashed rgba(0,63,138,0.15)',
         borderRadius: 'var(--radius-md)',
         textAlign:    'center',
-        color:        '#94a3b8',
+        color: '#64748B',
         fontSize:     '0.82rem',
         fontFamily:   'var(--font-body)',
         display:      'flex', alignItems: 'center', justifyContent: 'center', gap: 8,

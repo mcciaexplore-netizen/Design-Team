@@ -80,7 +80,7 @@ const Dashboard = () => {
       </div>
 
       {error && <p role="alert" style={{ color: '#b91c1c', marginBottom: 12 }}>{error} <button type="button" className="chip" onClick={load}>Retry</button></p>}
-      {loading && !summary && <p role="status" style={{ color: '#94a3b8' }}>Loading…</p>}
+      {loading && !summary && <p role="status" style={{ color: '#64748B' }}>Loading…</p>}
 
       {summary && k && (
         <>
@@ -92,7 +92,7 @@ const Dashboard = () => {
 
           {k.tickets_created === 0 ? (
             <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', marginTop: 16 }}>
-              <Inbox size={32} style={{ color: '#94a3b8', margin: '0 auto 8px' }} />
+              <Inbox size={32} style={{ color: '#64748B', margin: '0 auto 8px' }} />
               <p style={{ fontWeight: 700, color: '#0F172A' }}>No tickets in the last 30 days</p>
               <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>Charts appear once tickets are created and delivered.</p>
             </div>
@@ -136,7 +136,7 @@ const Dashboard = () => {
           <div className="dashboard-chart-grid dashboard-chart-grid-secondary">
             <div className="glass-card dashboard-chart-card">
               <h3>This week: planned hours vs capacity</h3>
-              {load7.length === 0 ? <p style={{ color: '#94a3b8', fontSize: '0.82rem' }}>No designers yet.</p> : (
+              {load7.length === 0 ? <p style={{ color: '#64748B', fontSize: '0.82rem' }}>No designers yet.</p> : (
                 <div style={{ height: 240 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={load7}>

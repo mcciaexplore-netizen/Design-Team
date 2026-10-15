@@ -5,8 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 
 const DEMO_ACCOUNTS = [
   { label: 'Design Lead',  email: 'lead@mccia.in',    password: 'mccia123', color: '#003F8A', desc: 'Full admin + analytics access'  },
-  { label: 'Designer',     email: 'alice@mccia.in',   password: 'mccia123', color: '#8B5CF6', desc: 'Ticket management + timers'      },
-  { label: 'Client View',  email: 'client@tata.com',  password: 'client123',color: '#f97316', desc: 'View-only + approval workflow'   },
+  { label: 'Designer',     email: 'alice@mccia.in',   password: 'mccia123', color: '#003F8A', desc: 'Ticket management + timers'      },
+  { label: 'Client View',  email: 'client@tata.com',  password: 'client123',color: '#C2410C', desc: 'View-only + approval workflow'   },
 ];
 
 /** Demo shortcuts only exist in local dev builds; the deployed seed passwords are generated. */

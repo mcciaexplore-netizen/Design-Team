@@ -17,7 +17,7 @@ import events
 import models
 import ratelimit
 from auth import get_current_user
-from common import MAX_UPLOAD_BYTES, compute_due_at, log_audit, next_ticket_number, read_upload, store_bytes
+from common import MAX_CDR_BYTES, MAX_UPLOAD_BYTES, compute_due_at, log_audit, next_ticket_number, read_upload, store_bytes
 from database import get_db
 from tracking import my_requests_url, tracking_url
 
@@ -365,6 +365,9 @@ def _send_confirmation(requester: models.User, tickets: list, f: "RequestFields"
 @router.get("/api/public/request-form")
 def form_options():
     return {"design_requirements": list(REQUIREMENTS), "other_label": OTHER, "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
+            "max_cdr_upload_mb": MAX_CDR_BYTES // (1024 * 1024),
+            # Vercel refuses any request body over 4.5 MB, so files sent together must fit in that.
+            "max_request_mb": 4 if os.getenv("VERCEL") else None,
             "max_files": MAX_FILES, "max_reference_links": MAX_REFERENCE_LINKS, "questions": QUESTIONS,
             "turnstile_site_key": os.getenv("TURNSTILE_SITE_KEY") if delivery.turnstile_enabled() else None}
 

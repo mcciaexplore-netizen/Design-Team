@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AtSign, CheckCircle2, FileText, MapPin, MessageSquare, Paperclip, RotateCcw, Send, X } from 'lucide-react';
 import { apiJson, authFetch, downloadFile } from '../api';
 import { useTickets } from '../contexts/TicketsContext';
+import { useUploadLimits } from '../uploadLimits';
 
 interface Person { id: number; full_name: string; role: string }
 interface Attachment { id: number; file_name: string; content_type: string | null; size_bytes: number }
@@ -26,12 +27,11 @@ function EventRow({ icon, tone, children, at }: { icon: React.ReactNode; tone: s
     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '0.35rem 0.5rem', fontSize: '0.78rem', color: '#475569' }}>
       <span aria-hidden="true" style={{ color: tone, marginTop: 2, flexShrink: 0 }}>{icon}</span>
       <div style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{children}</div>
-      {at && <time dateTime={at} style={{ fontSize: '0.65rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>{when(at)}</time>}
+      {at && <time dateTime={at} style={{ fontSize: '0.65rem', color: '#64748B', whiteSpace: 'nowrap' }}>{when(at)}</time>}
     </div>
   );
 }
 
-const MAX_MB = 10;
 const ALLOWED = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'psd', 'ai', 'fig'];
 
 const fmtSize = (n: number) => (n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
@@ -51,6 +51,7 @@ function MentionText({ text, names }: { text: string; names: string[] }) {
 }
 
 export default function CommentsPanel({ ticketId, compact = false }: { ticketId: string; compact?: boolean }) {
+  const limits = useUploadLimits();
   const { refresh } = useTickets();
   const [items, setItems] = useState<ThreadItem[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -133,7 +134,7 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
     for (const f of Array.from(list)) {
       const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
       if (!ALLOWED.includes(ext)) problems.push(`${f.name}: .${ext} files are not allowed`);
-      else if (f.size > MAX_MB * 1024 * 1024) problems.push(`${f.name}: larger than ${MAX_MB} MB`);
+      else if (f.size > limits.max_upload_mb * 1024 * 1024) problems.push(`${f.name}: larger than ${limits.max_upload_mb} MB`);
       else ok.push(f);
     }
     setFiles(prev => [...prev, ...ok].slice(0, 5));
@@ -157,7 +158,7 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
         body.append('comment_id', String(created.id));
         const res = await authFetch(`/api/tickets/${ticketId}/attachments`, { method: 'POST', body });
         if (!res.ok) {
-          let detail = `HTTP ${res.status}`;
+          let detail = res.status === 413 ? 'too large to send' : `HTTP ${res.status}`;
           try { detail = (await res.json()).detail ?? detail; } catch { /* keep status */ }
           failed.push(`${f.name}: ${detail}`);
         }
@@ -184,10 +185,10 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
         <MessageSquare size={11} /> Conversation ({items.length})
       </h3>
 
-      {loading && <p role="status" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Loading comments…</p>}
+      {loading && <p role="status" style={{ fontSize: '0.78rem', color: '#64748B' }}>Loading comments…</p>}
       {loadError && <p role="alert" style={{ fontSize: '0.78rem', color: '#b91c1c' }}>{loadError} <button type="button" className="chip" onClick={() => void load()}>Retry</button></p>}
       {!loading && !loadError && items.length === 0 && (
-        <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: 10 }}>Nothing here yet. Start the conversation — use @ to mention a teammate.</p>
+        <p style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: 10 }}>Nothing here yet. Start the conversation — use @ to mention a teammate.</p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, maxHeight: compact ? 260 : 420, overflowY: 'auto' }}>
@@ -222,9 +223,9 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
           <div key={`c-${c.id}`} style={{ background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 8, padding: '0.625rem 0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#003F8A' }}>
-                {c.author.full_name}{c.author.role === 'Requester' && <span style={{ color: '#94a3b8', fontWeight: 600 }}> · client</span>}
+                {c.author.full_name}{c.author.role === 'Requester' && <span style={{ color: '#64748B', fontWeight: 600 }}> · client</span>}
               </span>
-              {c.created_at && <time dateTime={c.created_at} style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{new Date(c.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</time>}
+              {c.created_at && <time dateTime={c.created_at} style={{ fontSize: '0.65rem', color: '#64748B' }}>{new Date(c.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</time>}
             </div>
             <p style={{ fontSize: '0.82rem', color: '#334155', lineHeight: 1.55, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
               <MentionText text={c.content} names={c.mentions.map(m => m.full_name)} />
@@ -233,7 +234,7 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                 {c.attachments.map(a => (
                   <button key={a.id} type="button" className="chip" onClick={() => void download(a)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }} title={`Download ${a.file_name}`}>
-                    <FileText size={11} /> {a.file_name} <span style={{ color: '#94a3b8' }}>{fmtSize(a.size_bytes)}</span>
+                    <FileText size={11} /> {a.file_name} <span style={{ color: '#64748B' }}>{fmtSize(a.size_bytes)}</span>
                   </button>
                 ))}
               </div>
@@ -267,7 +268,7 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
               <li key={p.id} id={`mention-opt-${p.id}`} role="option" aria-selected={i === pickerIdx}
                 onMouseDown={e => { e.preventDefault(); choose(p); }} onMouseEnter={() => setPickerIdx(i)}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.4rem 0.6rem', borderRadius: 7, cursor: 'pointer', background: i === pickerIdx ? 'var(--brand-soft)' : 'transparent', fontSize: '0.8rem' }}>
-                <AtSign size={12} style={{ color: '#64748b' }} /> {p.full_name} <span style={{ color: '#94a3b8', fontSize: '0.7rem' }}>{p.role === 'Requester' ? 'Client' : p.role}</span>
+                <AtSign size={12} style={{ color: '#64748b' }} /> {p.full_name} <span style={{ color: '#64748B', fontSize: '0.7rem' }}>{p.role === 'Requester' ? 'Client' : p.role}</span>
               </li>
             ))}
           </ul>
@@ -278,8 +279,8 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
           {files.map((f, i) => (
             <span key={`${f.name}-${i}`} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <FileText size={11} /> {f.name} <span style={{ color: '#94a3b8' }}>{fmtSize(f.size)}</span>
-              <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: '#94a3b8' }}><X size={11} /></button>
+              <FileText size={11} /> {f.name} <span style={{ color: '#64748B' }}>{fmtSize(f.size)}</span>
+              <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: '#64748B' }}><X size={11} /></button>
             </span>
           ))}
         </div>
@@ -295,7 +296,7 @@ export default function CommentsPanel({ ticketId, compact = false }: { ticketId:
           <button type="button" className="btn-ghost" style={{ padding: '0.35rem 0.75rem', fontSize: '0.76rem' }} onClick={() => fileRef.current?.click()} disabled={files.length >= 5}>
             <Paperclip size={12} /> Attach
           </button>
-          <span style={{ fontSize: '0.68rem', color: '#94a3b8', marginLeft: 8 }}>Up to 5 files, {MAX_MB} MB each</span>
+          <span style={{ fontSize: '0.68rem', color: '#64748B', marginLeft: 8 }}>Up to 5 files, {limits.max_upload_mb} MB each</span>
         </div>
         <button type="button" className="btn-primary" style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem' }} onClick={() => void submit()} disabled={busy}>
           <Send size={12} /> {busy ? 'Posting…' : 'Post'}

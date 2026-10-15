@@ -57,7 +57,8 @@ IST = pytz.timezone("Asia/Kolkata")
 
 def change_cutoff(ticket: models.Ticket) -> Optional[datetime.datetime]:
     """Changes stop 12 hours before the event (counted from the start of the event day, IST). Tickets without an
-    event date (made inside the app) use their delivery deadline instead."""
+    event date (made inside the app) use their delivery deadline instead, but only until it passes: a design
+    delivered late can still be corrected. The ticket page applies the same rule (changeCutoff in the frontend)."""
     event = (ticket.type_specific_fields or {}).get("event_date")
     if event:
         try:
@@ -65,7 +66,9 @@ def change_cutoff(ticket: models.Ticket) -> Optional[datetime.datetime]:
             return IST.localize(datetime.datetime.combine(day, datetime.time())) - CHANGE_CUTOFF
         except ValueError:
             pass
-    return as_utc(ticket.due_at) - CHANGE_CUTOFF if ticket.due_at else None
+    if not ticket.due_at or datetime.datetime.now(pytz.utc) >= as_utc(ticket.due_at):
+        return None
+    return as_utc(ticket.due_at) - CHANGE_CUTOFF
 
 
 def ensure_changes_allowed(ticket: models.Ticket) -> None:

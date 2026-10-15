@@ -8,6 +8,7 @@ export interface RequestFormOptions {
   design_requirements: string[];
   other_label: string;
   max_upload_mb: number;
+  max_request_mb?: number | null;   // all files together (Vercel caps a request at 4.5 MB)
   max_files: number;
   max_reference_links: number;
   questions: Record<string, Question[]>;
@@ -104,6 +105,8 @@ export function checkNewFiles(have: File[], incoming: File[], options: RequestFo
     else if (f.size > options.max_upload_mb * 1024 * 1024) notes.push(`${f.name}: larger than ${options.max_upload_mb} MB`);
     else if (f.size === 0) notes.push(`${f.name}: the file is empty`);
     else if (have.length + ok.length >= options.max_files) notes.push(`${f.name}: only ${options.max_files} files can be attached`);
+    else if (options.max_request_mb && [...have, ...ok, f].reduce((n, x) => n + x.size, 0) > options.max_request_mb * 1024 * 1024)
+      notes.push(`${f.name}: the files together can be at most ${options.max_request_mb} MB`);
     else ok.push(f);
   }
   return { ok, notes };

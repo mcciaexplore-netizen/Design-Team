@@ -126,6 +126,8 @@ export default function ReviewPage() {
     const s = loadErr?.status ?? 0;
     if (s === 404) return <Shell><Notice icon={<FileWarning size={44} />} color="#EF4444" title="This review link isn't valid">Please check the link in your email, or ask the design team to send it again.</Notice></Shell>;
     if (s === 429) return <Shell><Notice icon={<Clock size={44} />} color="#f59e0b" title="Too many requests" action={<button type="button" onClick={() => { setLoading(true); void load(); }} style={{ ...btn, background: BLUE, color: '#fff' }}>Retry</button>}>Please wait a minute and try again.</Notice></Shell>;
+    if (s === 410) return <Shell><Notice icon={<Clock size={44} />} color="#f59e0b" title="This review has closed">Ask the design team to send it again if you still need to respond.</Notice></Shell>;
+    if (s !== 0) return <Shell><Notice icon={<FileWarning size={44} />} color="#EF4444" title="Something went wrong on our side" action={<button type="button" onClick={() => { setLoading(true); void load(); }} style={{ ...btn, background: BLUE, color: '#fff' }}>Retry</button>}>Please try again in a moment.</Notice></Shell>;
     return (
       <Shell>
         <Notice icon={<WifiOff size={44} />} color="#EF4444" title="Can't reach the server"
@@ -163,22 +165,22 @@ export default function ReviewPage() {
       <blockquote style={{ margin: '12px 0 0', padding: '10px 14px', background: '#f8fafc', borderLeft: `4px solid ${BLUE}`, textAlign: 'left', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: '#0f172a' }}>{data.decision_comment}</blockquote>
     );
     if (effective === 'approved') return (
-      <div style={{ textAlign: 'center' }}><div style={{ color: '#10B981' }} aria-hidden="true"><CheckCircle2 size={40} /></div>
+      <div style={{ textAlign: 'center' }}><div style={{ color: '#047857' }} aria-hidden="true"><CheckCircle2 size={40} /></div>
         <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>Approved</h2>
         <p style={{ color: '#475569', margin: 0 }}>This design was approved on {fmt(data.decided_at)}.</p>{quote}</div>
     );
     if (effective === 'changes_requested') return (
-      <div style={{ textAlign: 'center' }}><div style={{ color: '#f59e0b' }} aria-hidden="true"><MessageSquare size={40} /></div>
+      <div style={{ textAlign: 'center' }}><div style={{ color: '#B45309' }} aria-hidden="true"><MessageSquare size={40} /></div>
         <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>Changes requested</h2>
         <p style={{ color: '#475569', margin: 0 }}>Changes were requested on {fmt(data.decided_at)}.</p>{quote}</div>
     );
     if (effective === 'expired') return (
-      <div style={{ textAlign: 'center' }}><div style={{ color: '#f59e0b' }} aria-hidden="true"><Clock size={40} /></div>
+      <div style={{ textAlign: 'center' }}><div style={{ color: '#B45309' }} aria-hidden="true"><Clock size={40} /></div>
         <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>This link has expired</h2>
         <p style={{ color: '#475569', margin: 0 }}>Please ask the design team for a new one.</p></div>
     );
     return (
-      <div style={{ textAlign: 'center' }}><div style={{ color: '#EF4444' }} aria-hidden="true"><Ban size={40} /></div>
+      <div style={{ textAlign: 'center' }}><div style={{ color: '#B91C1C' }} aria-hidden="true"><Ban size={40} /></div>
         <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>This link was withdrawn</h2>
         <p style={{ color: '#475569', margin: 0 }}>Please use the latest link from the design team.</p></div>
     );

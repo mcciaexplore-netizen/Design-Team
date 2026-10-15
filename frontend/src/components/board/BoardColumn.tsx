@@ -5,11 +5,11 @@ import { AlertTriangle } from 'lucide-react';
 export const STATUS_COLORS: Record<string, string> = {
   'New':                  '#94a3b8',
   'Assigned':             '#475569',
-  'In Progress':          '#8b5cf6',
+  'In Progress':          '#0056B3',
   'Waiting on Requester': '#f59e0b',
-  'In Review':            '#06b6d4',
+  'In Review':            '#003F8A',
   'Delivered':            '#10b981',
-  'Closed':               '#475569',
+  'Closed':               '#047857',
 };
 
 /* ── Droppable Column ─────────────────────── */
@@ -40,7 +40,7 @@ export function DroppableColumn({ id, label, count, wipLimit, isOver, children }
         </div>
         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
           {exceeded && (
-            <span title={`WIP limit: ${wipLimit}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 6, padding: '1px 6px', color: '#EF4444', fontSize: '0.62rem', fontWeight: 800 }}>
+            <span title={`WIP limit: ${wipLimit}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 6, padding: '1px 6px', color: '#B91C1C', fontSize: '0.62rem', fontWeight: 800 }}>
               <AlertTriangle size={9} /> {count}/{wipLimit}
             </span>
           )}

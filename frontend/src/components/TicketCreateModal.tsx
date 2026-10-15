@@ -7,14 +7,14 @@ import { useTickets, type DesignType } from '../contexts/TicketsContext';
 import FigmaEmbed from './FigmaEmbed';
 import ClientRequestForm from './ClientRequestForm';
 import type { RequestPrefill } from '../requestForm';
+import { useUploadLimits } from '../uploadLimits';
 
 const PRIORITIES: { value: string; color: string }[] = [
   { value: 'Low', color: '#059669' }, { value: 'Normal', color: '#0056B3' },
-  { value: 'High', color: '#f97316' }, { value: 'Urgent', color: '#EF4444' },
+  { value: 'High', color: '#C2410C' }, { value: 'Urgent', color: '#B91C1C' },
 ];
 const PRESET_TAGS = ['Needs Copy', 'Marketing', 'Social', 'Internal', 'Urgent Fix'];
 const MAX_FILES = 5;
-const MAX_MB = 10;
 const ALLOWED = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'psd', 'ai', 'fig'];
 
 const sectionTitle: React.CSSProperties = { fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', marginBottom: '0.5rem', display: 'block' };
@@ -23,6 +23,7 @@ const fmtSize = (n: number) => (n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} 
 interface Props { isOpen: boolean; onClose: () => void; prefill?: RequestPrefill | null }
 
 const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
+  const limits = useUploadLimits();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { designTypes, createTicket, addSubtask, refresh } = useTickets();
@@ -68,10 +69,11 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
   closeRef.current = onClose;
   useEffect(() => {
     if (!isOpen) return;
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && (!dirty || done)) closeRef.current(); };
+    // The client form keeps its own state (attached files are lost on close), so there only Cancel closes it.
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && (done || (isStaff && !dirty))) closeRef.current(); };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [isOpen, dirty, done]);
+  }, [isOpen, dirty, done, isStaff]);
 
   /* Advisory completeness score (the server never blocks on it). */
   const score = useMemo(() => {
@@ -89,7 +91,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
     for (const f of Array.from(list)) {
       const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
       if (!ALLOWED.includes(ext)) notes.push(`${f.name}: .${ext} files are not allowed`);
-      else if (f.size > MAX_MB * 1024 * 1024) notes.push(`${f.name}: larger than ${MAX_MB} MB`);
+      else if (f.size > limits.max_upload_mb * 1024 * 1024) notes.push(`${f.name}: larger than ${limits.max_upload_mb} MB`);
       else ok.push(f);
     }
     setFiles(prev => [...prev, ...ok].slice(0, MAX_FILES));
@@ -144,7 +146,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
         body.append('file', f);
         const res = await authFetch(`/api/tickets/${created.id}/attachments`, { method: 'POST', body });
         if (!res.ok) {
-          let detail = `HTTP ${res.status}`;
+          let detail = res.status === 413 ? 'too large to send' : `HTTP ${res.status}`;
           try { detail = (await res.json()).detail ?? detail; } catch { /* keep status */ }
           warnings.push(`${f.name} was not attached (${detail})`);
         }
@@ -185,7 +187,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
 
         {done ? (
           <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center' }} role="status">
-            <CheckCircle2 size={44} style={{ color: '#10B981', margin: '0 auto 12px' }} />
+            <CheckCircle2 size={44} style={{ color: '#047857', margin: '0 auto 12px' }} />
             <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A' }}>{done.number} created</h3>
             <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: 6 }}>The design team has been notified. You'll be told when it moves forward.</p>
             {done.warnings.length > 0 && (
@@ -208,7 +210,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
               <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
                 <legend style={sectionTitle}>What do you need?</legend>
                 {designTypes.length === 0 ? (
-                  <p role="status" style={{ fontSize: '0.82rem', color: '#94a3b8' }}>Loading design types…</p>
+                  <p role="status" style={{ fontSize: '0.82rem', color: '#64748B' }}>Loading design types…</p>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem' }}>
                     {designTypes.map(d => {
@@ -233,7 +235,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
               <div>
                 <label htmlFor="nt-brief" style={sectionTitle}>Brief *</label>
                 <textarea id="nt-brief" className="input-field" rows={5} maxLength={5000} value={brief} onChange={e => setBrief(e.target.value)} placeholder="What should it communicate? Who is it for? Any copy, sizes, colours or references?" style={{ resize: 'vertical' }} required />
-                <p style={{ fontSize: '0.68rem', color: '#94a3b8', textAlign: 'right', marginTop: 2 }}>{brief.length}/5000</p>
+                <p style={{ fontSize: '0.68rem', color: '#64748B', textAlign: 'right', marginTop: 2 }}>{brief.length}/5000</p>
               </div>
 
               {type && type.required_fields.length > 0 && (
@@ -306,15 +308,15 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
                   <p style={{ fontSize: '0.8rem', color: '#64748b' }}>
                     Drag files here or <button type="button" className="chip" onClick={() => fileRef.current?.click()}><Paperclip size={11} /> browse</button>
                   </p>
-                  <p style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: 4 }}>Up to {MAX_FILES} files, {MAX_MB} MB each · images, PDF, Office files, zip, PSD/AI</p>
+                  <p style={{ fontSize: '0.68rem', color: '#64748B', marginTop: 4 }}>Up to {MAX_FILES} files, {limits.max_upload_mb} MB each · images, PDF, Office files, zip, PSD/AI</p>
                 </div>
                 {fileNotes.length > 0 && <p role="alert" style={{ fontSize: '0.74rem', color: '#b91c1c', marginTop: 6 }}>{fileNotes.join(' · ')}</p>}
                 {files.length > 0 && (
                   <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {files.map((f, i) => (
                       <li key={`${f.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.78rem', color: '#475569' }}>
-                        <FileText size={13} /> <span style={{ flex: 1, overflowWrap: 'anywhere' }}>{f.name}</span> <span style={{ color: '#94a3b8' }}>{fmtSize(f.size)}</span>
-                        <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles(files.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}><X size={13} /></button>
+                        <FileText size={13} /> <span style={{ flex: 1, overflowWrap: 'anywhere' }}>{f.name}</span> <span style={{ color: '#64748B' }}>{fmtSize(f.size)}</span>
+                        <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles(files.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' }}><X size={13} /></button>
                       </li>
                     ))}
                   </ul>
@@ -327,7 +329,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
                   {subtasks.map((s, i) => (
                     <div key={`${s}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', padding: '3px 0' }}>
                       <span style={{ flex: 1 }}>{s}</span>
-                      <button type="button" aria-label={`Remove subtask ${s}`} onClick={() => setSubtasks(subtasks.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}><Trash2 size={13} /></button>
+                      <button type="button" aria-label={`Remove subtask ${s}`} onClick={() => setSubtasks(subtasks.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' }}><Trash2 size={13} /></button>
                     </div>
                   ))}
                   <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
@@ -349,7 +351,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
                   <div style={{ height: 5, background: 'rgba(226,232,240,0.9)', borderRadius: 99, overflow: 'hidden' }} role="progressbar" aria-valuenow={score} aria-valuemin={0} aria-valuemax={100} aria-label="Brief completeness">
                     <div style={{ height: '100%', width: `${score}%`, background: scoreColor, transition: 'width 0.25s' }} />
                   </div>
-                  {score < 90 && <p style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: 3 }}>More detail, a file or a link speeds things up.</p>}
+                  {score < 90 && <p style={{ fontSize: '0.66rem', color: '#64748B', marginTop: 3 }}>More detail, a file or a link speeds things up.</p>}
                 </div>
                 <div style={{ display: 'flex', gap: '0.6rem' }}>
                   <button type="button" onClick={onClose} className="btn-ghost" style={{ padding: '0.6rem 1.1rem', fontSize: '0.82rem' }}>Cancel</button>

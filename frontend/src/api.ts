@@ -33,6 +33,7 @@ async function errorMessage(res: Response): Promise<string> {
   } catch { /* not JSON */ }
   if (res.status === 403) return 'You do not have permission to do that.';
   if (res.status === 404) return 'Not found.';
+  if (res.status === 413) return 'The files are too large to send. Attach smaller files, or fewer at once.';
   if (res.status >= 500) return 'The server had a problem. Please try again.';
   return `Request failed (${res.status}).`;
 }

@@ -9,8 +9,8 @@ interface Item { id: number; content: string; type: string; ticket_id: number | 
 interface Feed { unread: number; items: Item[] }
 
 const TYPE_CONFIG: Record<string, { icon: typeof Info; color: string; bg: string; border: string }> = {
-  sla_breach:        { icon: AlertTriangle, color: '#EF4444', bg: 'rgba(239,68,68,0.07)',  border: 'rgba(239,68,68,0.15)' },
-  mention:           { icon: AtSign,        color: '#8B5CF6', bg: 'rgba(124,58,237,0.07)', border: 'rgba(124,58,237,0.15)' },
+  sla_breach:        { icon: AlertTriangle, color: '#B91C1C', bg: 'rgba(239,68,68,0.07)',  border: 'rgba(239,68,68,0.15)' },
+  mention:           { icon: AtSign,        color: '#003F8A', bg: 'rgba(124,58,237,0.07)', border: 'rgba(124,58,237,0.15)' },
   comment_added:     { icon: MessageSquare, color: '#003F8A', bg: 'rgba(0,63,138,0.06)',   border: 'rgba(0,63,138,0.12)' },
   ticket_assigned:   { icon: UserPlus,      color: '#003F8A', bg: 'rgba(0,63,138,0.06)',   border: 'rgba(0,63,138,0.12)' },
   approval_decision: { icon: CheckCircle2,  color: '#059669', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.15)' },
@@ -123,7 +123,7 @@ const NotificationBell = () => {
 
           <div style={{ maxHeight: 360, overflowY: 'auto' }}>
             {error && <p role="alert" style={{ padding: '1rem', fontSize: '0.8rem', color: '#b91c1c' }}>Couldn't load notifications. <button type="button" className="chip" onClick={() => void load()}>Retry</button></p>}
-            {!error && feed.items.length === 0 && <p style={{ padding: '1.5rem 1rem', fontSize: '0.82rem', color: '#94a3b8', textAlign: 'center' }}>You're all caught up.</p>}
+            {!error && feed.items.length === 0 && <p style={{ padding: '1.5rem 1rem', fontSize: '0.82rem', color: '#64748B', textAlign: 'center' }}>You're all caught up.</p>}
             {feed.items.map(n => {
               const cfg = TYPE_CONFIG[n.type] ?? DEFAULT_CFG;
               const Icon = cfg.icon;
@@ -136,7 +136,7 @@ const NotificationBell = () => {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: '0.8rem', color: '#0F172A', lineHeight: 1.5, fontWeight: n.is_read ? 400 : 600, overflowWrap: 'anywhere' }}>{n.content}</p>
-                    <p style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: 3 }}>{ago(n.created_at)}</p>
+                    <p style={{ fontSize: '0.68rem', color: '#64748B', marginTop: 3 }}>{ago(n.created_at)}</p>
                   </div>
                   {!n.is_read && <span aria-label="Unread" style={{ width: 7, height: 7, borderRadius: 99, background: '#003F8A', flexShrink: 0, marginTop: 6 }} />}
                 </button>

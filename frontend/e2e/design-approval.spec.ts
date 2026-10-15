@@ -35,7 +35,7 @@ test('the designer uploads once; the client is notified, reviews in the portal, 
   await clientPage.getByLabel('What should we change?').fill('Please make the headline bigger');
   await clientPage.getByRole('button', { name: 'Send feedback' }).click();
   await expect(clientPage.getByText('your feedback was sent')).toBeVisible();
-  const v2Link = clientPage.getByRole('link', { name: /-V2$/ });
+  const v2Link = clientPage.getByRole('link', { name: /-V2$/ }).first();
   await expect(v2Link).toBeVisible();
   await v2Link.click();
   await expect(clientPage).toHaveURL(/\/tickets\/\d+$/);

@@ -10,6 +10,7 @@ interface Props {
   notes: string[];          // one message per rejected file
   maxFiles: number;
   maxMb: number;
+  totalMb?: number | null;
   onAdd: (files: File[]) => void;
   onRemove: (index: number) => void;
 }
@@ -29,12 +30,12 @@ function Thumb({ file }: { file: File }) {
 }
 
 /** Drag-and-drop area plus a picker for up to `maxFiles` attachments. */
-export default function FileDropzone({ id, files, notes, maxFiles, maxMb, onAdd, onRemove }: Props) {
+export default function FileDropzone({ id, files, notes, maxFiles, maxMb, totalMb, onAdd, onRemove }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   return (
     <div>
-      <label htmlFor={id} style={requestLabel}>Attach files (up to {maxFiles}, max {maxMb} MB each)</label>
+      <label htmlFor={id} style={requestLabel}>Attach files (up to {maxFiles}, max {maxMb} MB each{totalMb ? `, ${totalMb} MB in total` : ''})</label>
       <div
         onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
         onDrop={e => { e.preventDefault(); setDragging(false); onAdd(Array.from(e.dataTransfer.files)); }}
@@ -56,7 +57,7 @@ export default function FileDropzone({ id, files, notes, maxFiles, maxMb, onAdd,
             <li key={`${f.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem', color: '#475569' }}>
               <Thumb file={f} />
               <span style={{ flex: 1, overflowWrap: 'anywhere' }}>{f.name}</span>
-              <span style={{ color: '#94a3b8' }}>{fmtSize(f.size)}</span>
+              <span style={{ color: '#64748B' }}>{fmtSize(f.size)}</span>
               <button type="button" aria-label={`Remove ${f.name}`} onClick={() => onRemove(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'flex' }}><X size={14} /></button>
             </li>
           ))}

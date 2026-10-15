@@ -3,6 +3,7 @@ import { Download, FileLock2, Upload } from 'lucide-react';
 import { apiJson, authFetch, downloadFile } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Ticket } from '../types';
+import { sizeProblem, useUploadLimits } from '../uploadLimits';
 
 interface CdrRequest {
   id: number; status: 'Requested' | 'Approved' | 'Declined' | 'Uploaded';
@@ -15,6 +16,7 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { da
 
 /** Source-file (CDR) requests: client asks, a lead approves, a designer uploads, the client downloads. */
 export default function CdrPanel({ ticket }: { ticket: Ticket }) {
+  const limits = useUploadLimits();
   const { user } = useAuth();
   const isClient = user?.role === 'Client';
   const isLead = user?.role === 'Design Lead';
@@ -40,6 +42,8 @@ export default function CdrPanel({ ticket }: { ticket: Ticket }) {
 
   const post = (path: string) => apiJson(path, { method: 'POST' });
   const upload = (file: File) => act(async () => {
+    const tooBig = sizeProblem(file, limits.max_cdr_upload_mb);
+    if (tooBig) throw new Error(tooBig);
     const body = new FormData();
     body.append('file', file);
     const res = await authFetch(`/api/cdr-requests/${uploadFor.current}/upload`, { method: 'POST', body });
@@ -63,7 +67,7 @@ export default function CdrPanel({ ticket }: { ticket: Ticket }) {
 
       {!releasable && <p style={{ fontSize: '0.8rem', color: '#64748B' }}>The editable source file can be requested once the design is approved.</p>}
       {error && <p role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c' }}>{error}</p>}
-      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Loading…</p>}
+      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#64748B' }}>Loading…</p>}
       {!loading && releasable && requests.length === 0 && <p style={{ fontSize: '0.8rem', color: '#64748B' }}>No source file requested yet.</p>}
 
       <input ref={fileRef} type="file" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void upload(f); }} />

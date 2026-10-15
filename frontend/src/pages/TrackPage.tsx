@@ -27,7 +27,7 @@ export default function TrackPage() {
       <main style={{ maxWidth: 640, margin: '0 auto' }}>
         <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 44, marginBottom: 16 }} />
         {error && <p role="alert" style={{ color: '#b91c1c' }}>{error}</p>}
-        {!data && !error && <p role="status" style={{ color: '#94a3b8' }}>Loading…</p>}
+        {!data && !error && <p role="status" style={{ color: '#64748B' }}>Loading…</p>}
         {data && (
           <div className="glass-card" style={{ padding: '1.5rem' }}>
             <p style={{ fontSize: '0.72rem', fontFamily: 'monospace', fontWeight: 700, color: '#64748b' }}>{data.ticket_number}{data.design_type ? ` · ${data.design_type}` : ''}</p>
@@ -53,7 +53,7 @@ export default function TrackPage() {
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {data.history.map((h, i) => (
                 <li key={`${h.at}-${i}`} style={{ fontSize: '0.84rem', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                  <span>{h.text}</span><span style={{ color: '#94a3b8', whiteSpace: 'nowrap' }}>{fmt(h.at)}</span>
+                  <span>{h.text}</span><span style={{ color: '#64748B', whiteSpace: 'nowrap' }}>{fmt(h.at)}</span>
                 </li>
               ))}
             </ul>

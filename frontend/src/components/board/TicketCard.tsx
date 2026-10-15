@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useDraggable } from '@dnd-kit/core';
 import { AlertTriangle, Copy, CheckSquare, MessageCircle } from 'lucide-react';
-import { type Ticket, PRIORITY_STYLE } from '../../types';
+import { type Ticket, DONE_STATUSES, PRIORITY_STYLE } from '../../types';
 import { colorFor } from '../../contexts/TicketsContext';
 
 /* ── helpers ─────────────────────────────────── */
@@ -24,7 +25,8 @@ export function SLABadge({ dueAt }: { dueAt?: string }) {
     if (!dueAt) return;
     const tick = () => {
       const diff = new Date(dueAt).getTime() - Date.now();
-      if (diff <= 0) { setOver(true); setLabel('Overdue'); return; }
+      setOver(diff <= 0);
+      if (diff <= 0) { setLabel('Overdue'); return; }
       const h = Math.floor(diff / 3_600_000);
       const m = Math.floor((diff % 3_600_000) / 60_000);
       setLabel(`${h}h ${m}m`);
@@ -64,6 +66,11 @@ export function TicketCard({
 
   useEffect(() => { if (editingTitle !== null) ref.current?.select(); }, [editingTitle]);
 
+  // A newer version (V2, V3…) replaced this ticket: nothing to do here, so say so and fade it out.
+  const replaced = ticket.status === 'Revision Requested';
+  const version = ticket.version_number ?? 1;
+  const finished = DONE_STATUSES.includes(ticket.status);
+
   const elapsed = ticket.timer_started_at
     ? ticket.time_spent_seconds + Math.floor((now - new Date(ticket.timer_started_at).getTime()) / 1000)
     : ticket.time_spent_seconds;
@@ -82,6 +89,7 @@ export function TicketCard({
         transition:     isDragging ? 'none' : 'box-shadow 0.2s, border-color 0.2s, transform 0.15s',
         userSelect:     'none',
         position:       'relative',
+        opacity:        replaced && !isDragging ? 0.6 : undefined,
       }}
     >
       {/* Ticket number + badges */}
@@ -98,7 +106,10 @@ export function TicketCard({
             onPointerDown={e => e.stopPropagation()}
           />
         )}
-        <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.08em', color: '#64748b', textTransform: 'uppercase', fontFamily: 'var(--font-body)', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: 3 }}>{ticket.number}</span>
+        <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.08em', color: '#64748b', textTransform: 'uppercase', fontFamily: 'var(--font-body)', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: 3 }}>
+          <Link to={`/tickets/${ticket.id}`} onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}
+            aria-label={`Open ${ticket.number}: ${ticket.title}`} style={{ color: 'inherit', textDecoration: 'none' }}>{ticket.number}</Link>
+        </span>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', minWidth: 0 }}>
           {ticket.info_score !== undefined && (
             <span className={ticket.info_score < 90 ? 'badge-red' : 'badge-green'} title="AI Info Score">
@@ -106,17 +117,19 @@ export function TicketCard({
             </span>
           )}
           <button
+            type="button"
+            aria-label={`Duplicate ${ticket.number}`}
             onClick={e => { e.stopPropagation(); onDuplicate(); }}
             title="Duplicate Ticket"
-            style={{ color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 2, marginRight: 2 }}
+            style={{ color: '#64748B', background: 'none', border: 'none', cursor: 'pointer', padding: 2, marginRight: 2 }}
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#003F8A'}
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#94a3b8'}
           >
             <Copy size={13} />
           </button>
           {ticket.status === 'Waiting on Requester' && <span className="badge-red" title="Waiting on the requester">Blocked</span>}
-          <SLABadge dueAt={ticket.due_at} />
-          <span className="badge-blue" style={ps}>{ticket.priority}</span>
+          {!finished && <SLABadge dueAt={ticket.due_at} />}
+          {!replaced && <span className="badge-blue" style={ps}>{ticket.priority}</span>}
         </div>
       </div>
 
@@ -143,11 +156,28 @@ export function TicketCard({
         </h4>
       )}
 
+      {/* Versions, in plain words for the designer */}
+      {replaced ? (
+        <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', background: '#F1F5F9', borderRadius: 8, padding: '0.35rem 0.55rem', marginBottom: '0.5rem' }}>
+          Replaced by a newer version: no work needed on this one
+        </p>
+      ) : version > 1 && (
+        <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 8, padding: '0.4rem 0.55rem', marginBottom: '0.5rem' }}>
+          <p style={{ fontSize: '0.72rem', fontWeight: 800, color: '#92400E' }}>Version {version} · Changes requested</p>
+          {ticket.reason_for_change && (
+            <p title={ticket.reason_for_change}
+              style={{ fontSize: '0.72rem', color: '#78350F', marginTop: 2, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+              {ticket.reason_for_change}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Tags */}
       {ticket.tags?.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: '0.5rem' }}>
           {ticket.tags.map(tag => (
-            <span key={tag} style={{ fontSize: '0.62rem', fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(0,63,138,0.07)', border: '1px solid rgba(0,63,138,0.18)', color: '#8B5CF6', fontFamily: 'var(--font-body)' }}>
+            <span key={tag} style={{ fontSize: '0.62rem', fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: 'rgba(0,63,138,0.07)', border: '1px solid rgba(0,63,138,0.18)', color: '#003F8A', fontFamily: 'var(--font-body)' }}>
               {tag}
             </span>
           ))}

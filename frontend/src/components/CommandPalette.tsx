@@ -32,7 +32,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {
     const matching = tickets
       .filter(t => !q || t.title.toLowerCase().includes(q) || t.number.toLowerCase().includes(q) || (t.client_org ?? '').toLowerCase().includes(q) || t.assignee.toLowerCase().includes(q))
       .slice(0, q ? 8 : 5)
-      .map<Entry>(t => ({ key: `t${t.id}`, icon: TicketIcon, label: `${t.number} — ${t.title}`, sub: `${t.status}${t.assignee ? ` · ${t.assignee}` : ''}`, to: `/tickets/${t.id}`, group: 'Tickets', color: '#f97316' }));
+      .map<Entry>(t => ({ key: `t${t.id}`, icon: TicketIcon, label: `${t.number} — ${t.title}`, sub: `${t.status}${t.assignee ? ` · ${t.assignee}` : ''}`, to: `/tickets/${t.id}`, group: 'Tickets', color: '#C2410C' }));
     return [...pages, ...matching];
   }, [search, tickets, user]);
 
@@ -64,7 +64,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {
         </div>
 
         <div id="cmd-list" ref={listRef} role="listbox" style={{ maxHeight: 360, overflowY: 'auto', padding: '0.5rem' }}>
-          {entries.length === 0 && <p style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.85rem', color: '#94a3b8' }}>Nothing matches “{search}”.</p>}
+          {entries.length === 0 && <p style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.85rem', color: '#64748B' }}>Nothing matches “{search}”.</p>}
           {entries.map((e, i) => {
             const header = e.group !== lastGroup ? e.group : null;
             lastGroup = e.group;

@@ -250,7 +250,7 @@ const CampaignsPage = () => {
         ))}
       </div>
 
-      {loading && <p role="status" style={{ color: '#94a3b8' }}>Loading…</p>}
+      {loading && <p role="status" style={{ color: '#64748B' }}>Loading…</p>}
 
       {!loading && tab === 'timeline' && (
         campaigns.length === 0 && posts.length === 0

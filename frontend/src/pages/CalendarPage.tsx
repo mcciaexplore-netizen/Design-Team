@@ -73,6 +73,7 @@ export default function CalendarPage() {
           buttonText={{ today: 'Today', month: 'Month', week: 'Week' }}
           events={events}
           eventClick={onClick}
+          eventInteractive
           eventDidMount={info => {
             const p = info.event.extendedProps as { health: Health; status: string; assignee: string };
             info.el.title = `${info.event.title}\n${COLOR[p.health].label} · ${p.status}${p.assignee ? ` · ${p.assignee}` : ''}`;

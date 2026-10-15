@@ -54,7 +54,7 @@ export default function WorkloadPage() {
       </div>
 
       {error && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{error} <button type="button" className="chip" onClick={() => void load()}>Retry</button></p>}
-      {loading && !data && <p role="status" style={{ color: '#94a3b8' }}>Calculating workload…</p>}
+      {loading && !data && <p role="status" style={{ color: '#64748B' }}>Calculating workload…</p>}
 
       {data && (
         <>
@@ -71,7 +71,7 @@ export default function WorkloadPage() {
             </div>
           </div>
 
-          {data.designers.length === 0 && <p style={{ color: '#94a3b8' }}>No designers found.</p>}
+          {data.designers.length === 0 && <p style={{ color: '#64748B' }}>No designers found.</p>}
 
           {data.designers.map(d => {
             const pct = Math.min(100, d.utilization_pct);
@@ -110,7 +110,7 @@ export default function WorkloadPage() {
               </section>
             );
           })}
-          <p style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+          <p style={{ fontSize: '0.72rem', color: '#64748B' }}>
             Planned hours are each ticket&apos;s remaining effort (its estimate, or the design-type default, minus time already logged), placed on its due date. Weekends, holidays and leave reduce capacity.
           </p>
         </>

@@ -53,7 +53,7 @@ const MyTasksPage = () => {
       </p>
 
       {error && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{error} <button type="button" className="chip" onClick={() => void refresh()}>Retry</button></p>}
-      {loading && tickets.length === 0 && <p role="status" style={{ color: '#94a3b8' }}>Loading your tasks…</p>}
+      {loading && tickets.length === 0 && <p role="status" style={{ color: '#64748B' }}>Loading your tasks…</p>}
 
       {!loading && mine.length === 0 && (
         <div className="glass-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>

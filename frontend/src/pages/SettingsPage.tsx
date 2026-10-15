@@ -85,7 +85,7 @@ function IntegrationsTab() {
   };
 
   if (loadError) return <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{loadError} <button type="button" className="chip" onClick={() => void load()}>Retry</button></p>;
-  if (!cfg) return <p role="status" style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Loading…</p>;
+  if (!cfg) return <p role="status" style={{ color: '#64748B', fontSize: '0.85rem' }}>Loading…</p>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -151,7 +151,7 @@ function MyNotificationsTab() {
   useEffect(() => { void load(); }, [load]);
 
   if (loadError) return <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{loadError} <button type="button" className="chip" onClick={() => void load()}>Retry</button></p>;
-  if (!prefs) return <p role="status" style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Loading…</p>;
+  if (!prefs) return <p role="status" style={{ color: '#64748B', fontSize: '0.85rem' }}>Loading…</p>;
 
   const set = (patch: Partial<Prefs>) => { setPrefs({ ...prefs, ...patch }); setResult(null); };
 

@@ -214,7 +214,7 @@ export default function DesignRequestFields({ options, form, idPrefix }: Props) 
         </div>
       </fieldset>
 
-      <FileDropzone id={fieldId(p, 'files')} files={form.files} notes={form.fileNotes} maxFiles={options.max_files} maxMb={options.max_upload_mb}
+      <FileDropzone id={fieldId(p, 'files')} files={form.files} notes={form.fileNotes} maxFiles={options.max_files} maxMb={options.max_upload_mb} totalMb={options.max_request_mb}
         onAdd={form.addFiles} onRemove={form.removeFile} />
     </>
   );

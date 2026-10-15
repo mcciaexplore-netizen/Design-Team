@@ -29,7 +29,7 @@ export default function AnnotatePanel({ ticketId }: { ticketId: string }) {
   }, [ticketId]);
 
   if (error) return <p role="alert" style={{ color: '#b91c1c', fontSize: '0.82rem' }}>{error}</p>;
-  if (!items) return <p role="status" style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Loading proofs…</p>;
+  if (!items) return <p role="status" style={{ color: '#64748B', fontSize: '0.82rem' }}>Loading proofs…</p>;
   return (
     <div style={{ height: items.length ? 520 : undefined }}>
       <DesignProofer ticketId={ticketId} imageUrls={items.map(i => i.url)} imageKeys={items.map(i => i.key)} labels={items.map(i => i.label)} />

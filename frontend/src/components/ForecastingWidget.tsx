@@ -39,9 +39,9 @@ const ForecastingWidget = () => {
         </div>
       </div>
 
-      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Calculating…</p>}
+      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#64748B' }}>Calculating…</p>}
       {error && <p role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c' }}>{error} <button type="button" className="chip" onClick={load}>Retry</button></p>}
-      {!loading && !error && forecasts.length === 0 && <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>No designers to forecast yet.</p>}
+      {!loading && !error && forecasts.length === 0 && <p style={{ fontSize: '0.8rem', color: '#64748B' }}>No designers to forecast yet.</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
         {forecasts.map(f => {
           const overloaded = f.is_overloaded_next_7_days;
@@ -94,7 +94,7 @@ const ForecastingWidget = () => {
               </div>
 
               {overloaded && (
-                <p style={{ fontSize: '0.72rem', color: '#EF4444', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, fontFamily: 'var(--font-body)' }}>
+                <p style={{ fontSize: '0.72rem', color: '#B91C1C', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, fontFamily: 'var(--font-body)' }}>
                   <AlertTriangle size={12} />
                   Bottleneck predicted on {f.overload_date ? new Date(f.overload_date + 'T00:00:00').toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) : 'an upcoming day'} — consider reassigning work.
                 </p>

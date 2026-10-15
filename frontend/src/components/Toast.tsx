@@ -17,8 +17,8 @@ interface ToastItemProps {
 
 const TOAST_CFG: Record<ToastType, { icon: any; color: string; bg: string; border: string }> = {
   success: { icon: CheckCircle2, color: '#059669', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.25)' },
-  warning: { icon: AlertTriangle,color: '#f97316', bg: 'rgba(249,115,22,0.1)',  border: 'rgba(249,115,22,0.25)' },
-  error:   { icon: AlertTriangle,color: '#EF4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)'  },
+  warning: { icon: AlertTriangle,color: '#C2410C', bg: 'rgba(249,115,22,0.1)',  border: 'rgba(249,115,22,0.25)' },
+  error:   { icon: AlertTriangle,color: '#B91C1C', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)'  },
   info:    { icon: Info,         color: '#003F8A', bg: 'rgba(0,63,138,0.08)',   border: 'rgba(0,63,138,0.2)'   },
 };
 
@@ -53,7 +53,7 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
       </p>
       <button
         onClick={() => onRemove(toast.id)}
-        style={{ color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 4, flexShrink: 0 }}
+        style={{ color: '#64748B', background: 'none', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 4, flexShrink: 0 }}
       >
         <X size={13} />
       </button>

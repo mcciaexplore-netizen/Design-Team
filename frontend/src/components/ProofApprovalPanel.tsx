@@ -7,6 +7,7 @@ import { useTickets } from '../contexts/TicketsContext';
 import { DONE_STATUSES, type Ticket } from '../types';
 import { ProofCompare, RevisionTimeline } from './ProofCompare';
 import PinnableImage, { type PinItem } from './PinnableImage';
+import { sizeProblem, useUploadLimits } from '../uploadLimits';
 
 interface Proof { id: number; version: number; file_name: string; content_type: string | null; size_bytes: number; note: string | null; created_at: string | null }
 interface ApiPin { id: number; image_url: string; x_pct: string; y_pct: string; content: string; is_resolved: boolean; author_name: string | null }
@@ -27,6 +28,7 @@ const STATUS_LABEL: Record<ApprovalReq['status'], { text: string; cls: string }>
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '');
 
 export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
+  const limits = useUploadLimits();
   const { user } = useAuth();
   const { refresh, tickets } = useTickets();
   const isClient = user?.role === 'Client';
@@ -83,6 +85,8 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
 
   const upload = async (file: File | undefined) => {
     if (!file) return;
+    const tooBig = sizeProblem(file, limits.max_upload_mb);
+    if (tooBig) { setError(tooBig); if (fileRef.current) fileRef.current.value = ''; return; }
     setBusy(true); setError(null); setInfo(null);
     try {
       const body = new FormData();
@@ -91,7 +95,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
       body.append('send_for_approval', String(sendNow));
       const res = await authFetch(`/api/tickets/${ticket.id}/proofs`, { method: 'POST', body });
       if (!res.ok) {
-        let detail = `Upload failed (HTTP ${res.status})`;
+        let detail = res.status === 413 ? 'The file is too large to send.' : `Upload failed (HTTP ${res.status})`;
         try { detail = (await res.json()).detail ?? detail; } catch { /* keep default */ }
         throw new Error(detail);
       }
@@ -256,7 +260,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
         </div>
       )}
 
-      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Loading proofs…</p>}
+      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#64748B' }}>Loading proofs…</p>}
       {!loading && proofs.length === 0 && (
         <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', border: '2px dashed rgba(226,232,240,0.9)' }}>
           <p style={{ fontWeight: 700, color: '#0F172A' }}>No proofs yet</p>
@@ -284,7 +288,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
                   <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: '0.82rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={m.is_resolved} onChange={() => void toggleOn(ticket.parent_id as string, { id: m.id, x: 0, y: 0, content: m.content, author: m.author_name ?? '', resolved: m.is_resolved })} style={{ marginTop: 3, accentColor: '#059669' }} />
                     <span style={{ textDecoration: m.is_resolved ? 'line-through' : 'none', color: m.is_resolved ? '#94a3b8' : '#334155', overflowWrap: 'anywhere' }}>
-                      <span style={{ color: '#94a3b8' }}>Version {earlierProofVersion.get(Number(m.image_url.slice(6)))}:</span> {m.content}
+                      <span style={{ color: '#64748B' }}>Version {earlierProofVersion.get(Number(m.image_url.slice(6)))}:</span> {m.content}
                     </span>
                   </label>
                 </li>
@@ -311,7 +315,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
             <span className="badge-blue">Version {p.version}</span>
             {p.id === latest?.id && <span className="badge-green">Latest</span>}
             <span style={{ fontSize: '0.78rem', color: '#475569', flex: 1, minWidth: 120, overflowWrap: 'anywhere' }}>{p.file_name}{p.note ? ` — ${p.note}` : ''}</span>
-            <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{fmt(p.created_at)}</span>
+            <span style={{ fontSize: '0.68rem', color: '#64748B' }}>{fmt(p.created_at)}</span>
             <button type="button" className="chip" onClick={() => downloadFile(`/api/proofs/${p.id}/file`, p.file_name).catch(e => setError(e instanceof Error ? e.message : 'Download failed'))}><Download size={11} /> Download</button>
             {!isClient && (
               <button type="button" className="chip" onClick={() => { setSendFor(sendFor === p.id ? null : p.id); setCreated(null); }}><Send size={11} /> {p.id === latest?.id ? 'Share link' : 'Send this version'}</button>
@@ -354,7 +358,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
                     <span className={st.cls}>{st.text}</span>
                     <strong>Version {r.proof_version ?? '?'}</strong>
                     {r.decided_by_name && <span>by {r.decided_by_name} · {fmt(r.decided_at)}</span>}
-                    {r.status === 'pending' && <span style={{ color: '#94a3b8' }}>expires {fmt(r.expires_at)}</span>}
+                    {r.status === 'pending' && <span style={{ color: '#64748B' }}>expires {fmt(r.expires_at)}</span>}
                     {!isClient && r.status === 'pending' && <button type="button" className="chip" style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, alignItems: 'center' }} onClick={() => void revoke(r.id)}><XCircle size={11} /> Withdraw link</button>}
                   </div>
                   {r.decision_comment && <p style={{ marginTop: 4, fontStyle: 'italic', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>“{r.decision_comment}”</p>}

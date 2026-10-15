@@ -166,17 +166,17 @@ export default function TimeTracker({ ticket, showEntries = true }: { ticket: Ti
           )}
 
           {entries.length === 0 ? (
-            <p style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: 6 }}>No time recorded yet.</p>
+            <p style={{ fontSize: '0.74rem', color: '#64748B', marginTop: 6 }}>No time recorded yet.</p>
           ) : (
             <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 150, overflowY: 'auto' }}>
               {entries.map(en => (
                 <li key={en.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', color: '#475569' }}>
                   <strong style={{ minWidth: 48 }}>{en.ended_at ? fmtHm(en.seconds) : 'running'}</strong>
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {en.user_name}{en.note ? ` — ${en.note}` : ''} <span style={{ color: '#94a3b8' }}>· {en.source} · {new Date(en.started_at).toLocaleDateString([], { day: 'numeric', month: 'short' })}</span>
+                    {en.user_name}{en.note ? ` — ${en.note}` : ''} <span style={{ color: '#64748B' }}>· {en.source} · {new Date(en.started_at).toLocaleDateString([], { day: 'numeric', month: 'short' })}</span>
                   </span>
                   {en.ended_at && (en.user_id === myId || isLead) && (
-                    <button type="button" aria-label="Delete time entry" onClick={() => void removeEntry(en.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', padding: 2 }}><Trash2 size={12} /></button>
+                    <button type="button" aria-label="Delete time entry" onClick={() => void removeEntry(en.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748B', padding: 2 }}><Trash2 size={12} /></button>
                   )}
                 </li>
               ))}

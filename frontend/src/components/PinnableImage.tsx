@@ -54,8 +54,8 @@ export default function PinnableImage({ proofId, name, pins, canAdd, canToggle, 
     finally { setSaving(false); }
   };
 
-  if (failed) return <div style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.78rem', color: '#94a3b8' }}>Preview unavailable</div>;
-  if (!url) return <div role="status" style={{ padding: '2rem', textAlign: 'center', fontSize: '0.78rem', color: '#94a3b8' }}>Loading preview…</div>;
+  if (failed) return <div style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.78rem', color: '#64748B' }}>Preview unavailable</div>;
+  if (!url) return <div role="status" style={{ padding: '2rem', textAlign: 'center', fontSize: '0.78rem', color: '#64748B' }}>Loading preview…</div>;
 
   const marker = (n: number, x: number, y: number, tone: string, dashed = false) => (
     <span aria-hidden="true" key={`${n}-${x}-${y}`}

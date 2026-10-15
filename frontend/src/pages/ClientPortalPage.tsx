@@ -123,7 +123,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
   const firstName = user?.name?.split(' ')[0] ?? '';
 
   const tabs: [typeof filter, string, number][] = [
-    ...(counts.review > 0 ? [['review', 'Needs you', counts.review] as [typeof filter, string, number]] : []),
+    ...(counts.review > 0 || filter === 'review' ? [['review', 'Needs you', counts.review] as [typeof filter, string, number]] : []),
     ['open', 'In progress', counts.open],
     ['done', 'Completed', counts.done],
     ['all', 'All', counts.all],
@@ -205,7 +205,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
         )}
 
         {error && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem', marginBottom: 12 }}>{error} <button type="button" className="chip" onClick={() => void refresh()}>Retry</button></p>}
-        {loading && tickets.length === 0 && <p role="status" style={{ color: '#94a3b8' }}>Loading your requests…</p>}
+        {loading && tickets.length === 0 && <p role="status" style={{ color: '#64748B' }}>Loading your requests…</p>}
 
         <div ref={listRef} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', marginTop: 4 }}>
           {shown.map(ticket => {

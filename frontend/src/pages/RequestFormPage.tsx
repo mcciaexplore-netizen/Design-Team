@@ -52,6 +52,7 @@ function RequestFormBody({ options }: { options: RequestFormOptions }) {
       const res = await publicForm<{ tickets?: Created[] }>('/api/public/requests', body);
       form.submitted();
       setDone({ tickets: res.tickets ?? [] });   // no tickets: the honeypot answer
+      setCaptcha(''); setCaptchaReset(n => n + 1);   // a token works once; the next request needs a fresh one
     } catch (err) {
       setError(form.showServerError(err instanceof ApiError ? err.message : 'Could not submit the request.'));
       setCaptchaReset(n => n + 1);

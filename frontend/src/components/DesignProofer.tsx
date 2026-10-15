@@ -40,7 +40,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
             x: parseFloat(p.x_pct),
             y: parseFloat(p.y_pct),
             comment: p.content,
-            author: `User ${p.author_id}`,
+            author: p.author_name ?? 'Someone',
             createdAt: p.created_at,
             imageUrl: p.image_url
           })));
@@ -83,7 +83,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
         x:         parseFloat(data.x_pct),
         y:         parseFloat(data.y_pct),
         comment:   data.content,
-        author:    `User ${data.author_id}`,
+        author:    data.author_name ?? 'You',
         createdAt: data.created_at,
         imageUrl:  data.image_url
       };
@@ -121,6 +121,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <h3 style={{ fontSize: '0.88rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A' }}>Visual Proofing</h3>
           <select
+            aria-label="Design version"
             value={activeVersionIdx}
             onChange={(e) => {
               setActiveVersionIdx(Number(e.target.value));
@@ -235,7 +236,7 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {pins.length === 0 && !activePinDraft && (
-              <div style={{ textAlign: 'center', padding: '2rem 1rem', color: '#94a3b8' }}>
+              <div style={{ textAlign: 'center', padding: '2rem 1rem', color: '#64748B' }}>
                 <MessageCircle size={28} style={{ margin: '0 auto 0.5rem', color: 'rgba(0,63,138,0.15)' }} />
                 <p style={{ fontSize: '0.8rem', fontFamily: 'var(--font-body)' }}>No feedback yet.<br />Click the image to start.</p>
               </div>
@@ -283,17 +284,18 @@ const DesignProofer: React.FC<DesignProoferProps> = ({ ticketId, imageUrls, imag
               borderTop:    '1px solid rgba(249,115,22,0.12)',
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f97316', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-body)' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#C2410C', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-body)' }}>
                   <MapPin size={12} /> New Pin
                 </span>
                 <button
                   onClick={() => setActivePinDraft(null)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 2 }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', padding: 2 }}
                 >
                   <X size={14} />
                 </button>
               </div>
               <textarea
+                aria-label="Your feedback on this spot"
                 autoFocus
                 value={draftComment}
                 onChange={e => setDraftComment(e.target.value)}

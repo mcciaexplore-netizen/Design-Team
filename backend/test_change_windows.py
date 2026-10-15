@@ -81,3 +81,10 @@ def test_review_page_refuses_changes_after_the_cut_off_but_still_allows_approval
     assert r.status_code == 409 and "12 hours" in r.json()["detail"]
     ok = client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "approve"}, headers=cl)
     assert ok.status_code == 200
+
+
+def test_a_late_delivery_can_still_be_corrected(client):
+    t = make_ticket(client, "a@tata.com", title="Delivered late")
+    set_status(client, t["id"], "Delivered")
+    update_ticket(t["id"], type_specific_fields={}, due_at=datetime.datetime.now(pytz.utc) - datetime.timedelta(hours=3))
+    assert ask_for_changes(client, t["id"]).status_code == 201

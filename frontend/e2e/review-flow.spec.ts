@@ -35,7 +35,7 @@ test('mark a spot, ask for changes, see the checklist on the redo, then approve 
   await page.getByRole('button', { name: 'Send feedback' }).click();                  // no written note needed
   await expect(page.getByText('your feedback was sent')).toBeVisible();
   // Asking for changes opened V2 as a new ticket (the link to it is shown right here).
-  const v2Link = page.getByRole('link', { name: /-V2$/ });
+  const v2Link = page.getByRole('link', { name: /-V2$/ }).first();
   await expect(v2Link).toBeVisible();
   const v2Id = Number((await v2Link.getAttribute('href'))!.split('/').pop());
 
