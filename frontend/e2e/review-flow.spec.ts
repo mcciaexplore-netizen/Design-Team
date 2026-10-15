@@ -39,12 +39,6 @@ test('mark a spot, ask for changes, see the checklist on the redo, then approve 
   await expect(v2Link).toBeVisible();
   const v2Id = Number((await v2Link.getAttribute('href'))!.split('/').pop());
 
-  // The conversation shows it all in one place.
-  await page.getByRole('tab', { name: 'Overview & activity' }).click();
-  const convo = page.getByRole('region', { name: 'Comments' });
-  await expect(convo.getByText('marked a spot')).toBeVisible();
-  await expect(convo.getByText(/asked for changes on version 1/)).toBeVisible();
-  await expect(convo.getByText('Please see the 1 marked spot on the design.')).toBeVisible();
 
   // The designer redoes it on V2 and it goes out automatically.
   const redo = await request.post(`${API}/api/tickets/${v2Id}/proofs`, {

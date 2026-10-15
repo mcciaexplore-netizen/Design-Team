@@ -7,8 +7,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
 import { useNewRequest } from '../contexts/NewRequestContext';
 import { prefillFromTicket } from '../requestForm';
-import AuditTrail from '../components/AuditTrail';
-import CommentsPanel from '../components/CommentsPanel';
 import AnnotatePanel from '../components/AnnotatePanel';
 import FigmaEmbed from '../components/FigmaEmbed';
 import ProofApprovalPanel from '../components/ProofApprovalPanel';
@@ -159,8 +157,6 @@ const TicketDetailPage: React.FC = () => {
                   </dl>
                 )}
               </div>
-              <div className="glass-card" style={{ padding: '1.25rem' }}><CommentsPanel ticketId={ticket.id} /></div>
-              <AuditTrail ticketId={ticket.id} />
             </div>
           )}
 

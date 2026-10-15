@@ -9,10 +9,10 @@ import { Search, X, Bookmark, Save, Trash2 } from 'lucide-react';
 import {
   type Ticket, STATUSES, PRIORITIES, DEFAULT_WIP_LIMITS,
 } from '../types';
-import TicketSlideOver from './TicketSlideOver';
 import { ToastContainer, useToast } from './Toast';
 import { useTickets } from '../contexts/TicketsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { apiJson } from '../api';
 
 /* ── helpers ─────────────────────────────────── */
@@ -36,7 +36,7 @@ const KanbanBoard = () => {
   const [viewName, setViewName] = useState('');
   const [viewShared, setViewShared] = useState(false);
   const [selectedIds,   setSelectedIds]   = useState<Set<string>>(new Set());
-  const [slideOverId,   setSlideOverId]   = useState<string | null>(null);
+  const navigate = useNavigate();
   const [editingId,     setEditingId]     = useState<string | null>(null);
   const [editingTitle,  setEditingTitle]  = useState('');
   const [wipLimits]                       = useState(DEFAULT_WIP_LIMITS);
@@ -95,7 +95,6 @@ const KanbanBoard = () => {
 
   const filtersActive = !sameFilters(filters, EMPTY_FILTERS);
   const currentSaved = savedViews.find(v => `s:${v.id}` === activeView);
-  const slideOverTicket = tickets.find(t => t.id === slideOverId) ?? null;
 
   /* ── View handling ── */
   const applyFilters = (patch: Partial<BoardFilters>) => {
@@ -163,7 +162,7 @@ const KanbanBoard = () => {
     if (editingId === ticket.id) return;
     if (e.shiftKey || e.metaKey || e.ctrlKey) toggleSelect(ticket.id);
     else if (selectedIds.size > 0) toggleSelect(ticket.id);
-    else setSlideOverId(ticket.id);
+    else navigate(`/tickets/${ticket.id}`);   // the full ticket page, not a side panel
   };
 
   /* ── DnD ── */
@@ -415,7 +414,6 @@ const KanbanBoard = () => {
       )}
 
       {/* Slide-over */}
-      <TicketSlideOver ticket={slideOverTicket} onClose={() => setSlideOverId(null)} />
 
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />

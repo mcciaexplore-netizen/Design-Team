@@ -28,3 +28,17 @@ test('two accounts with the same name get separate columns, and a ticket sits un
   await expect(column(second)).toContainText('E2E twin ticket');         // under the account it is assigned to...
   await expect(column(original)).not.toContainText('E2E twin ticket');   // ...and not under the same-named one
 });
+
+test('clicking a card on the board opens the full ticket page', async ({ page, request }) => {
+  const client = await token(request, ACCOUNTS.client);
+  const types = await (await request.get(`${API}/api/design-types`, { headers: { Authorization: `Bearer ${client}` } })).json();
+  const made = await (await request.post(`${API}/api/tickets`, {
+    headers: { Authorization: `Bearer ${client}` }, data: { title: 'E2E full page ticket', brief: 'x', design_type_id: types[0].id, type_specific_fields: {} },
+  })).json();
+
+  await login(page, ACCOUNTS.lead);
+  await page.getByText('E2E full page ticket').first().click();
+  await expect(page).toHaveURL(new RegExp(`/tickets/${made.id}$`));
+  await expect(page.getByRole('heading', { name: 'E2E full page ticket' })).toBeVisible();
+  await expect(page.getByText('Write a comment')).toHaveCount(0);   // no conversation box on the ticket page
+});
