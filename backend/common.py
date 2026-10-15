@@ -46,8 +46,35 @@ def mark_delivered(db: Session, ticket: models.Ticket) -> None:
     if ticket.edit_window_ends_at is None:
         settings = db.query(models.SystemSettings).first()
         own = ticket.design_type.edit_window_hours if ticket.design_type else None
-        hours = own or (settings.edit_window_hours if settings else 12)
+        hours = own or (settings.edit_window_hours if settings else DEFAULT_EDIT_WINDOW_HOURS)
         ticket.edit_window_ends_at = now + datetime.timedelta(hours=hours)
+
+
+DEFAULT_EDIT_WINDOW_HOURS = 48
+CHANGE_CUTOFF = datetime.timedelta(hours=12)
+IST = pytz.timezone("Asia/Kolkata")
+
+
+def change_cutoff(ticket: models.Ticket) -> Optional[datetime.datetime]:
+    """Changes stop 12 hours before the event (counted from the start of the event day, IST). Tickets without an
+    event date (made inside the app) use their delivery deadline instead."""
+    event = (ticket.type_specific_fields or {}).get("event_date")
+    if event:
+        try:
+            day = datetime.date.fromisoformat(str(event)[:10])
+            return IST.localize(datetime.datetime.combine(day, datetime.time())) - CHANGE_CUTOFF
+        except ValueError:
+            pass
+    return as_utc(ticket.due_at) - CHANGE_CUTOFF if ticket.due_at else None
+
+
+def ensure_changes_allowed(ticket: models.Ticket) -> None:
+    cutoff = change_cutoff(ticket)
+    if cutoff and datetime.datetime.now(pytz.utc) >= cutoff:
+        when = cutoff.astimezone(IST).strftime("%d %b %Y, %I:%M %p")
+        raise HTTPException(status_code=409, detail=(
+            f"Changes can't be requested within 12 hours of the event (the cut-off was {when} IST). "
+            "Please contact the design team directly."))
 
 
 def track_waiting(ticket: models.Ticket, old: models.TicketStatus, new: models.TicketStatus) -> None:

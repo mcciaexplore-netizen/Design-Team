@@ -116,8 +116,9 @@ def test_approval_shows_in_the_thread(client):
 
 def age_request(tid, days):
     db = TestingSessionLocal()
+    created = datetime.datetime.now(pytz.utc) - datetime.timedelta(days=days)
     db.query(models.ApprovalRequest).filter_by(ticket_id=tid, status="pending").update(
-        {"created_at": datetime.datetime.now(pytz.utc) - datetime.timedelta(days=days)})
+        {"created_at": created, "expires_at": created + datetime.timedelta(days=2)})
     db.commit()
     db.close()
 
@@ -126,25 +127,27 @@ def reminders(email="a@tata.com"):
     return [n for n in notes(email) if "still waiting for your review" in n]
 
 
-def test_a_review_left_for_two_days_triggers_one_reminder_then_more_every_two_days(client):
+def test_a_review_is_reminded_once_after_a_day_then_closes_after_two(client):
     tid, _ = sent_design(client)
     tick(client)
     assert reminders() == []                         # fresh: no nagging
-    age_request(tid, 1.5)
+    age_request(tid, 0.5)
     tick(client)
-    assert reminders() == []                         # under two days
-    age_request(tid, 2.5)
+    assert reminders() == []                         # under a day
+    age_request(tid, 1.2)
     tick(client)
     tick(client)
     assert len(reminders()) == 1                     # one reminder, however often the tick runs
-    age_request(tid, 4.5)
+    age_request(tid, 2.1)
     tick(client)
-    assert len(reminders()) == 2                     # and another two days later
+    t = db_ticket(tid)
+    assert t.status == models.TicketStatus.CLOSED_WITHOUT_APPROVAL and t.is_locked   # no answer in 2 days: closed
+    assert len(reminders()) == 1
 
 
 def test_no_reminder_once_the_client_has_decided_or_the_ticket_moved_on(client):
     tid, _ = sent_design(client)
-    age_request(tid, 3)
+    age_request(tid, 1.5)
     cl = auth(client, "a@tata.com")
     pending = client.get(f"/api/tickets/{tid}/approval-requests", headers=cl).json()[0]
     client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "approve"}, headers=cl)
@@ -152,7 +155,7 @@ def test_no_reminder_once_the_client_has_decided_or_the_ticket_moved_on(client):
     assert reminders() == []
 
     t2, _ = sent_design(client)
-    age_request(t2, 3)
+    age_request(t2, 1.5)
     set_status(client, t2, "In Progress")           # the designer pulled it back
     tick(client)
     assert reminders() == []
@@ -160,11 +163,11 @@ def test_no_reminder_once_the_client_has_decided_or_the_ticket_moved_on(client):
 
 def test_a_resent_design_is_reminded_about_afresh(client):
     tid, _ = sent_design(client)
-    age_request(tid, 3)
+    age_request(tid, 1.5)
     tick(client)
     assert len(reminders()) == 1
     upload_design(client, tid)                      # version 2 replaces the open review
-    age_request(tid, 3)
+    age_request(tid, 1.5)
     tick(client)
     assert len(reminders()) == 2
 
@@ -172,7 +175,7 @@ def test_a_resent_design_is_reminded_about_afresh(client):
 def test_muting_review_notifications_silences_the_reminder_too(client):
     client.put("/api/me/preferences", json={"muted_events": ["approval_requested"]}, headers=auth(client, "a@tata.com"))
     tid, _ = sent_design(client)
-    age_request(tid, 3)
+    age_request(tid, 1.5)
     tick(client)
     assert reminders() == [] and not any("sent a design" in n for n in notes("a@tata.com"))
 

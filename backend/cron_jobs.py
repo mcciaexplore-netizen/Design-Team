@@ -21,14 +21,10 @@ def run_all_cron_jobs(db: Session):
             edit_end = edit_end.replace(tzinfo=pytz.UTC)
             
         if now >= edit_end:
-            # After 12 hours, the ticket automatically moves to APPROVED
-            # Then we can check for the 36 hour auto-close limit
+            # The edit window (2 days by default, per design type if set) is over: close and lock the ticket.
             ticket.status = models.TicketStatus.CLOSED_WITHOUT_APPROVAL
-            # We'll use CLOSED_WITHOUT_APPROVAL to signify the 12 hour window expired without requester action.
             ticket.is_locked = True
-            
-            # The 36 hour global auto-close logic can just permanently lock it.
-            
+
             audit = models.AuditLog(
                 ticket_id=ticket.id,
                 changed_by_id=ticket.requester_id,
@@ -85,17 +81,28 @@ def run_all_cron_jobs(db: Session):
                                        f"Hi {ticket.requester.full_name},\n\n{text}\n\nMCCIA Applied AI Studio")
     db.commit()
 
-    # 4. Designs waiting for the client's review: remind every two days, at most three times per request
+    # 4. Designs waiting for the client's review. The review closes after two days: remind once after the first
+    #    day, and when it has run out with no answer, close and lock the ticket (silence counts as acceptance).
     pending = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.status == "pending").all()
     for req in pending:
         created = req.created_at if req.created_at.tzinfo else req.created_at.replace(tzinfo=pytz.UTC)
         expires = req.expires_at if req.expires_at.tzinfo else req.expires_at.replace(tzinfo=pytz.UTC)
         ticket = db.query(models.Ticket).filter(models.Ticket.id == req.ticket_id).first()
-        step = int((now - created).total_seconds() // (2 * 86400))
-        if step < 1 or expires < now or not ticket or ticket.status != models.TicketStatus.IN_REVIEW or not ticket.requester:
+        if not ticket or ticket.status != models.TicketStatus.IN_REVIEW or ticket.is_locked:
             continue
-        text = f"{ticket.ticket_number} is still waiting for your review. Please approve it or tell us what to change."
-        if notify_user(db, ticket.requester, text, f"REVIEW_REMINDER_{req.id}_{min(step, 3)}", ticket.id) is not False and delivery.email_configured():
+        if expires <= now:
+            ticket.status = models.TicketStatus.CLOSED_WITHOUT_APPROVAL
+            ticket.is_locked = True
+            db.add(models.AuditLog(ticket_id=ticket.id, changed_by_id=None, actor_label="System", action="Auto-closed",
+                                   details={"status": ticket.status.value, "reason": "No reply to the review within 2 days"}))
+            if ticket.assignee:
+                notify_user(db, ticket.assignee, f"{ticket.ticket_number} closed: the client did not reply to the review within 2 days",
+                            "REVIEW_AUTO_CLOSED", ticket.id)
+            continue
+        if now - created < datetime.timedelta(days=1) or not ticket.requester:
+            continue
+        text = f"{ticket.ticket_number} is still waiting for your review. Please approve it or tell us what to change before {expires.astimezone(pytz.timezone('Asia/Kolkata')):%d %b, %I:%M %p} IST, when it closes."
+        if notify_user(db, ticket.requester, text, f"REVIEW_REMINDER_{req.id}_1", ticket.id) is not False and delivery.email_configured():
             delivery.run_in_background(delivery.send_email, ticket.requester.email, f"Your review is needed: {ticket.ticket_number}",
                                        f"Hi {ticket.requester.full_name},\n\n{text}\n\nMCCIA Applied AI Studio")
     db.commit()

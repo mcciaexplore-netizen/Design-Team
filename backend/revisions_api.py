@@ -7,7 +7,7 @@ import models
 import revision_engine
 import schemas
 from auth import get_current_user, get_ticket_for_user
-from common import log_audit
+from common import ensure_changes_allowed, log_audit
 from database import get_db
 
 router = APIRouter(tags=["revisions"])
@@ -27,6 +27,7 @@ def request_revision(ticket_id: int, request: RevisionRequest, db: Session = Dep
         raise HTTPException(status_code=400, detail="Can only request revisions on IN_REVIEW or DELIVERED tickets")
     if ticket.is_locked:
         raise HTTPException(status_code=409, detail="This request is closed. Please raise a new request.")
+    ensure_changes_allowed(ticket)
 
     child = revision_engine.request_changes(db, ticket, request.reason_for_change)
     log_audit(db, ticket.id, user, "Changes requested", {"reason": request.reason_for_change, "new_version": child.ticket_number})

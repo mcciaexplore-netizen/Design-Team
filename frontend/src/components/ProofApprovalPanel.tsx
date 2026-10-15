@@ -47,7 +47,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [sendFor, setSendFor] = useState<number | null>(null);
-  const [days, setDays] = useState('7');
+  const [days, setDays] = useState('2');
   const [created, setCreated] = useState<Created | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -322,7 +322,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
               <div>
                 <label htmlFor={`ttl-${p.id}`} className="section-label" style={{ display: 'block', marginBottom: 4 }}>Link valid for</label>
                 <select id={`ttl-${p.id}`} className="input-field" value={days} onChange={e => setDays(e.target.value)}>
-                  {['3', '7', '14', '30'].map(d => <option key={d} value={d}>{d} days</option>)}
+                  {['1', '2'].map(d => <option key={d} value={d}>{d} day{d === '1' ? '' : 's'}</option>)}
                 </select>
               </div>
               <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Creating…' : 'Create link'}</button>

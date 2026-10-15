@@ -16,13 +16,14 @@ import events
 import revision_engine
 import models
 from auth import get_current_user, get_ticket_for_user, require_staff
-from common import as_utc, mark_delivered, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
+from common import as_utc, ensure_changes_allowed, mark_delivered, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["approvals"])
 
-DEFAULT_TTL_HOURS = 7 * 24
-MAX_TTL_HOURS = 30 * 24
+# The client has two days to approve or ask for changes; after that the cron tick closes the ticket.
+DEFAULT_TTL_HOURS = 2 * 24
+MAX_TTL_HOURS = 2 * 24
 PUBLIC_APP_URL = lambda: os.getenv("PUBLIC_APP_URL", "http://localhost:5173").rstrip("/")
 
 
@@ -251,6 +252,8 @@ def _apply_decision(db: Session, req: models.ApprovalRequest, body: "Decision", 
     current = db.query(models.Ticket).filter(models.Ticket.id == req.ticket_id).first()
     if body.decision == "request_changes" and current and current.is_locked:
         raise HTTPException(status_code=409, detail="This request is closed. Please raise a new request.")
+    if body.decision == "request_changes" and current:
+        ensure_changes_allowed(current)
 
     # Compare-and-set so a double-click or two reviewers cannot both record a decision.
     new_status = "approved" if body.decision == "approve" else "changes_requested"

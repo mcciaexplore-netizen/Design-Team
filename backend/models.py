@@ -57,7 +57,7 @@ class SystemSettings(Base):
     __tablename__ = "system_settings"
 
     id = Column(Integer, primary_key=True, index=True)
-    edit_window_hours = Column(Integer, default=12, nullable=False)
+    edit_window_hours = Column(Integer, default=48, nullable=False)
     edit_window_uses_working_hours = Column(Boolean, default=True, nullable=False)
     max_free_revisions = Column(Integer, default=2, nullable=False)
 

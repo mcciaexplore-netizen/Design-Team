@@ -136,12 +136,12 @@ def test_design_type_edit_window_overrides_the_global_default(client):
         else (t.edit_window_ends_at - t.delivered_at).total_seconds() / 3600
     assert 1.9 < hours < 2.1
 
-    client.patch("/api/design-types/1", json={"edit_window_hours": None}, headers=lead)   # back to the global 12 h
+    client.patch("/api/design-types/1", json={"edit_window_hours": None}, headers=lead)   # back to the global 2 days
     b = make_ticket(client, "a@tata.com")
     set_status(client, b["id"], "Delivered")
     t = db_ticket(b["id"])
     hours = (t.edit_window_ends_at - t.delivered_at).total_seconds() / 3600
-    assert 11.9 < hours < 12.1
+    assert 47.9 < hours < 48.1
 
 
 # ── Waiting on requester ─────────────────────────────────────────────────────
