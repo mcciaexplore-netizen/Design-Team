@@ -194,7 +194,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
               </ul>
             )}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
-              <button type="button" className="btn-primary" onClick={() => { onClose(); navigate(`/tickets/${done.id}`); }}>Open ticket</button>
+              <button type="button" className="btn-primary" onClick={() => { onClose(); navigate(`/tickets/${done.id}`); }}>{done.number.includes(',') ? `Open ${done.number.split(', ')[0]}` : 'Open ticket'}</button>
               <button type="button" className="btn-ghost" onClick={() => { reset(); setBlank(true); }}>Create another</button>
               <button type="button" className="btn-ghost" onClick={onClose}>Close</button>
             </div>

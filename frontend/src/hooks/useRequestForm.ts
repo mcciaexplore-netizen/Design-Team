@@ -18,22 +18,24 @@ export function useRequestFormOptions() {
 
 export interface Estimate { standard_ready_by: string; rush: boolean; priority: string | null }
 
-/** The standard "ready by" date for this kind of request, and whether the requested date is a rush. Debounced. */
-export function useEstimate(requirement: string, deliveryDate: string): Estimate | null {
+/** When the chosen designs are normally all ready (the slowest decides), and whether the requested date is a rush. Debounced. */
+export function useEstimate(requirements: string[], deliveryDate: string): Estimate | null {
   const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const chosen = requirements.join('\n');   // a stable dependency for the list
   useEffect(() => {
-    if (!requirement) return;
+    if (!chosen) return;
     let stale = false;
     const timer = setTimeout(() => {
       const validDate = /^\d{4}-\d{2}-\d{2}$/.test(deliveryDate) && deliveryDate >= todayISO();
-      const query = `design_requirement=${encodeURIComponent(requirement)}${validDate ? `&delivery_date=${deliveryDate}` : ''}`;
+      const query = new URLSearchParams(chosen.split('\n').map(r => ['design_requirement', r]));
+      if (validDate) query.set('delivery_date', deliveryDate);
       publicJson<Estimate>(`/api/public/request-form/estimate?${query}`)
         .then(r => { if (!stale) setEstimate(r); })
         .catch(() => { if (!stale) setEstimate(null); });   // the estimate is a courtesy: never block the form on it
     }, 400);
     return () => { stale = true; clearTimeout(timer); };
-  }, [requirement, deliveryDate]);
-  return requirement ? estimate : null;
+  }, [chosen, deliveryDate]);
+  return chosen ? estimate : null;
 }
 
 interface Config {
@@ -71,9 +73,15 @@ export function useRequestForm({ options, idPrefix, draftName, needsIdentity, pr
   }, []);
 
   const set = useCallback(<K extends keyof RequestValues>(key: K, value: RequestValues[K]) => {
-    change(v => (key === 'design_requirement' ? { ...v, [key]: value, details: {} } : { ...v, [key]: value }));
+    change(v => ({ ...v, [key]: value }));
   }, [change]);
-  const setDetail = useCallback((id: string, value: string | string[]) => change(v => ({ ...v, details: { ...v.details, [id]: value } })), [change]);
+  /** Tick or untick a design. Its answers are kept, so unticking by mistake loses nothing; only ticked designs are sent. */
+  const toggleRequirement = useCallback((design: string, on: boolean) => change(v => ({
+    ...v,
+    design_requirements: on ? [...v.design_requirements.filter(d => d !== design), design] : v.design_requirements.filter(d => d !== design),
+  })), [change]);
+  const setDetail = useCallback((design: string, id: string, value: string | string[]) =>
+    change(v => ({ ...v, details: { ...v.details, [design]: { ...v.details[design], [id]: value } } })), [change]);
 
   // Autosave the draft shortly after the last change, and once more when the form closes.
   const latest = useRef(values);
@@ -145,7 +153,7 @@ export function useRequestForm({ options, idPrefix, draftName, needsIdentity, pr
   };
 
   return {
-    values, set, setDetail, files, addFiles, removeFile, fileNotes, errors, summary, focusField, validateAll, showServerError,
+    values, set, toggleRequirement, setDetail, files, addFiles, removeFile, fileNotes, errors, summary, focusField, validateAll, showServerError,
     restored, discardDraft, remembered, forgetPerson, submitted, reset,
   };
 }

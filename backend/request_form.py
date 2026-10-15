@@ -7,7 +7,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import pytz
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy.orm import Session
 
 import auth
@@ -125,17 +125,31 @@ def priority_for(delivery_date: datetime.date) -> models.TicketPriority:
     return models.TicketPriority.LOW
 
 
-def clean_details(requirement: str, raw: str) -> dict:
-    """Validate the per-type answers (a JSON object keyed by question id). Returns only known, non-empty answers."""
+def clean_details(requirements: list, raw: str) -> dict:
+    """Validate the per-type answers. Returns {requirement: {question id: answer}} with only known, non-empty answers.
+
+    The form sends a JSON object keyed by requirement, each holding answers by question id. A flat object of answers
+    (the older single-choice form) is accepted when exactly one requirement is chosen."""
     try:
         sent = json.loads(raw) if raw.strip() else {}
     except ValueError:
         sent = None
     if not isinstance(sent, dict):
         raise HTTPException(status_code=422, detail="The extra details could not be read")
+    grouped = bool(sent) and all(k in REQUIREMENTS and isinstance(v, dict) for k, v in sent.items())
+    if not grouped:
+        if len(requirements) > 1 and sent:
+            raise HTTPException(status_code=422, detail="The extra details could not be read")
+        sent = {requirements[0]: sent} if requirements else {}
+    # With several designs, say which one an error is about (the form uses this to find the field).
+    prefix = (lambda r: f"{r} – ") if len(requirements) > 1 else (lambda r: "")
+    return {r: _clean_answers(r, sent.get(r) or {}, prefix(r)) for r in requirements}
+
+
+def _clean_answers(requirement: str, sent: dict, prefix: str) -> dict:
     answers = {}
     for q in QUESTIONS.get(requirement, []):
-        label, value = q["label"], sent.get(q["id"])
+        label, value = prefix + q["label"], sent.get(q["id"])
         if q["type"] == "multiselect":
             value = value if isinstance(value, list) else []
             if any(v not in q["options"] for v in value):
@@ -210,7 +224,7 @@ class RequestFields:
         self,
         event_name: str = Form(..., min_length=1, max_length=200),
         event_date: datetime.date = Form(...),
-        design_requirement: str = Form(...),
+        design_requirement: list[str] = Form(...),                 # one or more; each becomes its own ticket
         delivery_date: datetime.date = Form(...),
         num_creatives: int = Form(default=1, ge=1, le=100),
         other_details: str = Form(default="", max_length=1000),
@@ -220,7 +234,8 @@ class RequestFields:
         file: Optional[UploadFile] = File(default=None),           # the older single-file field
         files: list[UploadFile] = File(default=[]),
     ):
-        self.event_name, self.event_date, self.design_requirement = event_name.strip(), event_date, design_requirement
+        self.event_name, self.event_date = event_name.strip(), event_date
+        self.requirements = list(dict.fromkeys(r.strip() for r in design_requirement if r.strip()))  # in order, no repeats
         self.delivery_date, self.num_creatives = delivery_date, num_creatives
         self.other_details, self.content = other_details.strip(), content.strip()
         self.raw_details, self.raw_links = details, reference_links
@@ -230,35 +245,37 @@ class RequestFields:
 
     async def validated_uploads(self) -> list:
         """Check the fields and files before anything is created. Returns a list of (data, name, content_type)."""
-        if self.design_requirement not in REQUIREMENTS:
+        if not self.requirements or any(r not in REQUIREMENTS for r in self.requirements):
             raise HTTPException(status_code=422, detail="Please choose a design requirement")
-        if self.design_requirement == OTHER and not self.other_details:
+        if OTHER in self.requirements and not self.other_details:
             raise HTTPException(status_code=422, detail="Please describe the design you need")
         if self.delivery_date < datetime.date.today():
             raise HTTPException(status_code=422, detail="Expected delivery date cannot be in the past")
-        self.details = clean_details(self.design_requirement, self.raw_details)
+        self.details = clean_details(self.requirements, self.raw_details)
         self.links = clean_links(self.raw_links)
         if len(self.files) > MAX_FILES:
             raise HTTPException(status_code=422, detail=f"You can attach up to {MAX_FILES} files")
         return [await read_upload(f) for f in self.files]
 
 
-def create_ticket_from_form(db: Session, requester: models.User, f: RequestFields, uploads: list, via: str) -> models.Ticket:
-    """Create, auto-assign and announce a ticket from the request form fields."""
-    design_type = _design_type(db, f.design_requirement)
-    label = f.other_details if f.design_requirement == OTHER else f.design_requirement
+def _label(f: RequestFields, requirement: str) -> str:
+    return f.other_details if requirement == OTHER else requirement
 
-    due_at = datetime.datetime.combine(f.delivery_date, datetime.time(12, 30), tzinfo=pytz.utc)  # 18:00 IST
-    priority = priority_for(f.delivery_date)
+
+def _new_ticket(db: Session, requester: models.User, f: RequestFields, requirement: str, via: str) -> models.Ticket:
+    """One ticket for one of the chosen designs, auto-assigned and flushed (not committed)."""
+    design_type = _design_type(db, requirement)
+    label = _label(f, requirement)
+    details = f.details.get(requirement, {})
     fields = {
         "requester_name": requester.full_name, "requester_email": requester.email, "event_name": f.event_name,
-        "event_date": f.event_date.isoformat(), "design_requirement": f.design_requirement,
+        "event_date": f.event_date.isoformat(), "design_requirement": requirement,
         "expected_delivery_date": f.delivery_date.isoformat(), "number_of_creatives": f.num_creatives,
-        "other_details": f.other_details or None, "content": f.content or None,
-        "details": f.details, "reference_links": f.links,
+        "other_details": (f.other_details or None) if requirement == OTHER else None, "content": f.content or None,
+        "details": details, "reference_links": f.links,
     }
-    labels = {q["id"]: q["label"] for q in QUESTIONS[f.design_requirement]}
-    detail_lines = [f"{labels[k]}: {', '.join(v) if isinstance(v, list) else v}" for k, v in f.details.items()]
+    labels = {q["id"]: q["label"] for q in QUESTIONS[requirement]}
+    detail_lines = [f"{labels[k]}: {', '.join(v) if isinstance(v, list) else v}" for k, v in details.items()]
     brief = "\n".join(filter(None, [
         f"Event: {f.event_name} ({f.event_date:%d %b %Y})",
         f"Requirement: {label}",
@@ -276,10 +293,10 @@ def create_ticket_from_form(db: Session, requester: models.User, f: RequestField
         brief=brief,
         design_type_id=design_type.id,
         type_specific_fields=fields,
-        priority=priority,
+        priority=priority_for(f.delivery_date),
         requester_id=requester.id,
         client_org=requester.client_org,
-        due_at=due_at,
+        due_at=datetime.datetime.combine(f.delivery_date, datetime.time(12, 30), tzinfo=pytz.utc),  # 18:00 IST
         tags=["request-form"],
     )
     designer = capacity_engine.suggest_assignee(db, design_type.id)
@@ -287,40 +304,56 @@ def create_ticket_from_form(db: Session, requester: models.User, f: RequestField
         ticket.assignee_id = designer.id
         ticket.status = models.TicketStatus.ASSIGNED
     db.add(ticket)
-    db.flush()
+    db.flush()   # so the next ticket gets the next number and the next assignment sees this one's load
     log_audit(db, ticket.id, None, "Created", {"via": via, "event": f.event_name},
               actor_label=f"{requester.full_name} ({via})")
-    for data, fname, ctype in uploads:
-        db.add(models.Attachment(ticket_id=ticket.id, file_name=fname, file_url=store_bytes(data, fname.rsplit(".", 1)[-1].lower()),
-                                 content_type=ctype, size_bytes=len(data), uploaded_by_id=requester.id))
-    db.commit()
-    db.refresh(ticket)
-
-    events.emit(db, "ticket_created", ticket, requester if via == "portal form" else None)
-    if designer:
-        events.emit(db, "ticket_assigned", ticket, None, {"auto": True})
-    _send_confirmation(requester, ticket, f)
     return ticket
 
 
-def _send_confirmation(requester: models.User, ticket: models.Ticket, f: "RequestFields") -> None:
-    """Email the requester their ticket number and a link to follow progress (only if SMTP is configured)."""
+def create_tickets_from_form(db: Session, requester: models.User, f: RequestFields, uploads: list, via: str) -> list:
+    """One ticket per chosen design, created together, then assigned and announced. Files are stored once and
+    attached to every ticket."""
+    stored = [(store_bytes(data, fname.rsplit(".", 1)[-1].lower()), fname, ctype, len(data)) for data, fname, ctype in uploads]
+    tickets = [_new_ticket(db, requester, f, r, via) for r in f.requirements]
+    for ticket in tickets:
+        for key, fname, ctype, size in stored:
+            db.add(models.Attachment(ticket_id=ticket.id, file_name=fname, file_url=key, content_type=ctype,
+                                     size_bytes=size, uploaded_by_id=requester.id))
+        others = [t for t in tickets if t is not ticket]
+        if others:   # tell the team which tickets came in together
+            ticket.brief += "\n\nSame request also asked for:\n" + "\n".join(
+                f"- {t.ticket_number}: {_label(f, t.type_specific_fields['design_requirement'])}" for t in others)
+    db.commit()
+
+    for ticket in tickets:
+        db.refresh(ticket)
+        events.emit(db, "ticket_created", ticket, requester if via == "portal form" else None)
+        if ticket.assignee_id:
+            events.emit(db, "ticket_assigned", ticket, None, {"auto": True})
+    _send_confirmation(requester, tickets, f)
+    return tickets
+
+
+def _send_confirmation(requester: models.User, tickets: list, f: "RequestFields") -> None:
+    """Email the requester their ticket numbers and links to follow progress (only if SMTP is configured)."""
     if not delivery.email_configured():
         return
+    lines = [f"{t.ticket_number} ({_label(f, t.type_specific_fields['design_requirement'])}): {tracking_url(t.ticket_number)}"
+             for t in tickets]
     body = "\n".join([
         f"Hi {requester.full_name},",
         "",
         f'We have received your design request for "{f.event_name}".',
-        "",
-        f"Ticket number: {ticket.ticket_number}",
         f"Expected delivery: {f.delivery_date:%d %b %Y}",
         "",
-        "Follow its progress any time, no login needed:",
-        tracking_url(ticket.ticket_number),
+        "Follow progress any time, no login needed:" if len(tickets) == 1 else
+        f"It has been split into {len(tickets)} tickets, one per design. Follow each one any time, no login needed:",
+        *lines,
         "",
         "MCCIA Applied AI Studio",
     ])
-    delivery.run_in_background(delivery.send_email, requester.email, f"Design request received: {ticket.ticket_number}", body)
+    subject = f"Design request received: {', '.join(t.ticket_number for t in tickets)}"
+    delivery.run_in_background(delivery.send_email, requester.email, subject[:150], body)
 
 
 @router.get("/api/public/request-form")
@@ -331,14 +364,16 @@ def form_options():
 
 
 @router.get("/api/public/request-form/estimate")
-def estimate(design_requirement: str, delivery_date: Optional[datetime.date] = None, db: Session = Depends(get_db)):
-    """When this kind of request is normally ready, and whether (and how urgently) the requested date beats that."""
-    if design_requirement not in REQUIREMENTS:
+def estimate(design_requirement: list[str] = Query(...), delivery_date: Optional[datetime.date] = None,
+             db: Session = Depends(get_db)):
+    """When these designs are normally all ready, and whether (and how urgently) the requested date beats that."""
+    if any(r not in REQUIREMENTS for r in design_requirement):
         raise HTTPException(status_code=422, detail="Please choose a design requirement")
-    name, sla, _ = REQUIREMENTS[design_requirement]
-    # A throwaway design type, so an estimate never creates database rows.
-    ready = compute_due_at(db, models.DesignType(name=name, default_sla_hours=sla), models.TicketPriority.NORMAL)
-    ready_on = ready.astimezone(IST).date()
+    # Throwaway design types, so an estimate never creates database rows. The slowest design decides.
+    ready_on = max(
+        compute_due_at(db, models.DesignType(name=REQUIREMENTS[r][0], default_sla_hours=REQUIREMENTS[r][1]),
+                       models.TicketPriority.NORMAL).astimezone(IST).date()
+        for r in design_requirement)
     out = {"standard_ready_by": ready_on.isoformat(), "rush": False, "priority": None}
     if delivery_date:
         out["rush"] = delivery_date < ready_on
@@ -366,8 +401,10 @@ async def submit_request(
     if not EMAIL_RE.match(email):
         raise HTTPException(status_code=422, detail="Please enter a valid email address")
     uploads = await fields.validated_uploads()
-    ticket = create_ticket_from_form(db, _requester(db, name, email), fields, uploads, "request form")
-    return {"ticket_number": ticket.ticket_number, "tracking_url": tracking_url(ticket.ticket_number),
+    tickets = create_tickets_from_form(db, _requester(db, name, email), fields, uploads, "request form")
+    return {"ticket_number": tickets[0].ticket_number, "tracking_url": tracking_url(tickets[0].ticket_number),
+            "tickets": [{"ticket_number": t.ticket_number, "design": _label(fields, t.type_specific_fields["design_requirement"]),
+                         "tracking_url": tracking_url(t.ticket_number)} for t in tickets],
             "message": "Request received. The design team has been notified."}
 
 
@@ -376,5 +413,6 @@ async def submit_portal_request(fields: RequestFields = Depends(), db: Session =
                                 user: models.User = Depends(get_current_user)):
     """The same form for signed-in users (the portal's New Request dialog)."""
     uploads = await fields.validated_uploads()
-    ticket = create_ticket_from_form(db, user, fields, uploads, "portal form")
-    return {"id": ticket.id, "ticket_number": ticket.ticket_number}
+    tickets = create_tickets_from_form(db, user, fields, uploads, "portal form")
+    return {"id": tickets[0].id, "ticket_number": tickets[0].ticket_number,
+            "tickets": [{"id": t.id, "ticket_number": t.ticket_number} for t in tickets]}

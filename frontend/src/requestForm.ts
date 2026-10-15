@@ -17,16 +17,18 @@ export interface RequestFormOptions {
 export interface RequestValues {
   name: string; email: string;
   event_name: string; event_date: string;
-  design_requirement: string; other_details: string;
+  design_requirements: string[]; other_details: string;   // every ticked design becomes its own ticket
   delivery_date: string; num_creatives: string; content: string;
-  details: Record<string, string | string[]>;   // answers to the per-type questions, by question id
+  details: Record<string, Answers>;   // answers to each design's questions: details[design][question id]
   links: string[];
 }
+
+export type Answers = Record<string, string | string[]>;
 
 /** Used to open the New Request dialog with some answers already filled in. */
 export type RequestPrefill = Partial<RequestValues>;
 
-/** Error messages by field key: name, email, event_name, …, `q:<question id>`, `link:<row>` or links. */
+/** Error messages by field key: name, email, event_name, …, `q:<design>:<question id>`, `link:<row>` or links. */
 export type FieldErrors = Record<string, string>;
 
 export const MAX_LINK_LENGTH = 500;
@@ -35,7 +37,7 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'psd', 'ai', 'fig', 'cdr', 'eps', 'indd'];
 
 export const emptyValues = (): RequestValues => ({
-  name: '', email: '', event_name: '', event_date: '', design_requirement: '', other_details: '',
+  name: '', email: '', event_name: '', event_date: '', design_requirements: [], other_details: '',
   delivery_date: '', num_creatives: '1', content: '', details: {}, links: [],
 });
 
@@ -52,7 +54,10 @@ export function shortDate(iso: string): string {
 }
 
 /** DOM id of a field's input, so error links and aria-describedby can find it. */
-export const fieldId = (prefix: string, key: string) => `${prefix}-${key.replace(':', '-')}`;
+export const fieldId = (prefix: string, key: string) => `${prefix}-${key.replace(/[^\w-]/g, '-')}`;
+
+/** Error key of one design's question. */
+export const questionKey = (design: string, id: string) => `q:${design}:${id}`;
 
 export function validate(v: RequestValues, options: RequestFormOptions, needsIdentity: boolean): FieldErrors {
   const e: FieldErrors = {};
@@ -63,14 +68,17 @@ export function validate(v: RequestValues, options: RequestFormOptions, needsIde
   }
   if (!v.event_name.trim()) e.event_name = 'Enter the event name';
   if (!v.event_date) e.event_date = 'Choose the event or workshop date';
-  if (!v.design_requirement) e.design_requirement = 'Choose a design requirement';
-  else {
-    if (v.design_requirement === options.other_label && !v.other_details.trim()) e.other_details = 'Describe the design you need';
-    for (const q of options.questions[v.design_requirement] ?? []) {
-      const answer = v.details[q.id];
+  if (v.design_requirements.length === 0) e.design_requirement = 'Choose at least one design requirement';
+  if (v.design_requirements.includes(options.other_label) && !v.other_details.trim()) e.other_details = 'Describe the design you need';
+  const several = v.design_requirements.length > 1;
+  for (const design of v.design_requirements) {
+    const where = several ? `${design}: ` : '';
+    for (const q of options.questions[design] ?? []) {
+      const answer = v.details[design]?.[q.id];
       const empty = Array.isArray(answer) ? answer.length === 0 : !(answer ?? '').trim();
-      if (empty) { if (q.required) e[`q:${q.id}`] = q.type === 'select' || q.type === 'multiselect' ? `Choose an option for “${q.label}”` : `Enter “${q.label}”`; }
-      else if (q.type === 'number' && !(Number(answer) > 0)) e[`q:${q.id}`] = `“${q.label}” must be a number above 0`;
+      const key = questionKey(design, q.id);
+      if (empty) { if (q.required) e[key] = where + (q.type === 'select' || q.type === 'multiselect' ? `Choose an option for “${q.label}”` : `Enter “${q.label}”`); }
+      else if (q.type === 'number' && !(Number(answer) > 0)) e[key] = `${where}“${q.label}” must be a number above 0`;
     }
   }
   if (!v.delivery_date) e.delivery_date = 'Choose the expected delivery date';
@@ -106,12 +114,12 @@ export function buildBody(v: RequestValues, files: File[], needsIdentity: boolea
   if (needsIdentity) { body.set('name', v.name.trim()); body.set('email', v.email.trim()); }
   body.set('event_name', v.event_name.trim());
   body.set('event_date', v.event_date);
-  body.set('design_requirement', v.design_requirement);
+  for (const design of v.design_requirements) body.append('design_requirement', design);
   body.set('other_details', v.other_details.trim());
   body.set('delivery_date', v.delivery_date);
   body.set('num_creatives', v.num_creatives);
   body.set('content', v.content.trim());
-  body.set('details', JSON.stringify(v.details));
+  body.set('details', JSON.stringify(Object.fromEntries(v.design_requirements.map(d => [d, v.details[d] ?? {}]))));
   body.set('reference_links', JSON.stringify(v.links.map(l => l.trim()).filter(Boolean)));
   for (const f of files) body.append('files', f);
   return body;
@@ -128,8 +136,14 @@ export function fieldForServerError(message: string, v: RequestValues, options: 
     const bad = v.links.findIndex(l => l.trim() && message.includes(l.trim().slice(0, 60)));
     return bad >= 0 ? `link:${bad}` : 'links';
   }
-  const q = (options.questions[v.design_requirement] ?? []).find(x => message.startsWith(x.label));
-  return q ? `q:${q.id}` : null;
+  // With several designs the server names the design first ("Instagram post – Format is required").
+  const several = v.design_requirements.length > 1;
+  for (const design of v.design_requirements) {
+    const rest = !several ? message : message.startsWith(`${design} – `) ? message.slice(design.length + 3) : null;
+    const q = rest === null ? undefined : (options.questions[design] ?? []).find(x => rest.startsWith(x.label));
+    if (q) return questionKey(design, q.id);
+  }
+  return null;
 }
 
 /* ── Remembered on this device (every access is guarded: storage can be blocked or full) ── */
@@ -160,12 +174,20 @@ export function loadDraft(form: string): RequestPrefill | null {
   if (!d || typeof d !== 'object') return null;
   const base = emptyValues();
   const out: RequestPrefill = {};
-  for (const key of ['event_name', 'event_date', 'design_requirement', 'other_details', 'delivery_date', 'num_creatives', 'content'] as const) {
+  for (const key of ['event_name', 'event_date', 'other_details', 'delivery_date', 'num_creatives', 'content'] as const) {
     const value = (d as Record<string, unknown>)[key];
     if (typeof value === 'string') out[key] = value;
   }
-  const { details, links } = d as { details?: unknown; links?: unknown };
-  if (details && typeof details === 'object' && !Array.isArray(details)) out.details = details as RequestValues['details'];
+  const { details, links, design_requirements, design_requirement } = d as Record<string, unknown>;
+  const answers = details && typeof details === 'object' && !Array.isArray(details) ? details as Record<string, unknown> : {};
+  if (Array.isArray(design_requirements)) {
+    out.design_requirements = design_requirements.filter((x): x is string => typeof x === 'string');
+    out.details = answers as RequestValues['details'];
+  } else if (typeof design_requirement === 'string' && design_requirement) {
+    // A draft saved by the older one-choice form: its answers belonged to that one design.
+    out.design_requirements = [design_requirement];
+    out.details = { [design_requirement]: answers as Answers };
+  }
   if (Array.isArray(links)) out.links = links.filter((l): l is string => typeof l === 'string');
   return isBlank({ ...base, ...out }) ? null : out;
 }
@@ -179,13 +201,14 @@ export const clearDraft = (form: string) => remove(draftKey(form));
 /** True when the person has not typed anything (the defaults do not count). */
 function isBlank(v: RequestValues): boolean {
   const base = emptyValues();
-  return v.event_name === '' && v.event_date === '' && v.design_requirement === '' && v.other_details === '' && v.delivery_date === ''
+  return v.event_name === '' && v.event_date === '' && v.design_requirements.length === 0 && v.other_details === '' && v.delivery_date === ''
     && v.content === '' && v.num_creatives === base.num_creatives
-    && Object.values(v.details).every(a => (Array.isArray(a) ? a.length === 0 : !a)) && v.links.every(l => !l);
+    && Object.values(v.details).every(answers => Object.values(answers ?? {}).every(a => (Array.isArray(a) ? a.length === 0 : !a)))
+    && v.links.every(l => !l);
 }
 
 /** Tickets made before the channels were split carry the old bundled names; map them to today's choices. */
-function currentRequirement(old: string, details: Record<string, string | string[]>): { requirement: string; details: Record<string, string | string[]> } {
+function currentRequirement(old: string, details: Answers): { requirement: string; details: Answers } {
   if (old === 'Flyer (Email/Whatsapp)') {
     return details.channel === 'WhatsApp' ? { requirement: 'WhatsApp creative', details: {} } : { requirement: 'Flyer (Email / Print)', details };
   }
@@ -202,14 +225,14 @@ export function prefillFromTicket(t: Ticket): RequestPrefill {
   const text = (x: unknown) => (typeof x === 'string' ? x : '');
   if (!f.event_name) return { event_name: t.title, content: t.description ?? '' };   // older ticket: no form fields saved
   const notes = text(f.content) || (t.description ?? '').split('\nContent / notes:\n')[1] || '';
-  const details: RequestValues['details'] = {};
+  const details: Answers = {};
   for (const [k, v] of Object.entries((f.details && typeof f.details === 'object' ? f.details : {}) as Record<string, unknown>)) {
     details[k] = Array.isArray(v) ? v.map(String) : String(v);
   }
   const now = currentRequirement(text(f.design_requirement), details);
   return {
-    event_name: text(f.event_name), design_requirement: now.requirement, other_details: text(f.other_details),
-    num_creatives: String(f.number_of_creatives ?? 1), content: notes, details: now.details,
+    event_name: text(f.event_name), design_requirements: now.requirement ? [now.requirement] : [], other_details: text(f.other_details),
+    num_creatives: String(f.number_of_creatives ?? 1), content: notes, details: now.requirement ? { [now.requirement]: now.details } : {},
     links: Array.isArray(f.reference_links) ? f.reference_links.map(String) : [],
   };
 }

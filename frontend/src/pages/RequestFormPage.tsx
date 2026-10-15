@@ -6,6 +6,9 @@ import DesignRequestFields, { DraftBanner, ErrorSummary, IdentityFields } from '
 import { useRequestForm, useRequestFormOptions } from '../hooks/useRequestForm';
 import { buildBody, type RequestFormOptions } from '../requestForm';
 
+/** One ticket the request became (one per ticked design). */
+interface Created { ticket_number: string; design: string; tracking_url: string }
+
 /** Public design request form. Submitting it creates and assigns a ticket; no sign-in needed. */
 export default function RequestFormPage() {
   const { options, error: loadError } = useRequestFormOptions();
@@ -28,7 +31,7 @@ function RequestFormBody({ options }: { options: RequestFormOptions }) {
   const form = useRequestForm({ options, idPrefix: 'rf', draftName: 'public', needsIdentity: true });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ number: string | null; tracking: string | null } | null>(null);
+  const [done, setDone] = useState<{ tickets: Created[] } | null>(null);
   const [captcha, setCaptcha] = useState('');
   const [captchaReset, setCaptchaReset] = useState(0);
 
@@ -45,9 +48,9 @@ function RequestFormBody({ options }: { options: RequestFormOptions }) {
     }
     setBusy(true);
     try {
-      const res = await publicForm<{ ticket_number: string | null; tracking_url: string | null }>('/api/public/requests', body);
+      const res = await publicForm<{ tickets?: Created[] }>('/api/public/requests', body);
       form.submitted();
-      setDone({ number: res.ticket_number, tracking: res.tracking_url ?? null });
+      setDone({ tickets: res.tickets ?? [] });   // no tickets: the honeypot answer
     } catch (err) {
       setError(form.showServerError(err instanceof ApiError ? err.message : 'Could not submit the request.'));
       setCaptchaReset(n => n + 1);
@@ -59,13 +62,32 @@ function RequestFormBody({ options }: { options: RequestFormOptions }) {
       <div className="glass-card" role="status" style={{ padding: '2rem', textAlign: 'center' }}>
         <CheckCircle2 size={36} color="#059669" style={{ margin: '0 auto 10px' }} />
         <h2 style={{ fontWeight: 800, marginBottom: 6 }}>Request received</h2>
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)' }}>
-          {done.number && <>Your ticket number is <strong>{done.number}</strong>. </>}The design team has been notified and will be in touch.
-        </p>
-        {done.tracking && (
-          <p style={{ fontSize: '0.85rem', marginTop: 10 }}>
-            <a href={done.tracking} style={{ fontWeight: 700 }}>Track this request</a> any time. Bookmark the link, no sign-in needed.
-          </p>
+        {done.tickets.length > 1 ? (
+          <>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)' }}>
+              Your request was split into {done.tickets.length} tickets, one per design. The design team has been notified and will be in touch.
+            </p>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '12px auto 0', maxWidth: 420, textAlign: 'left', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {done.tickets.map(t => (
+                <li key={t.ticket_number} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderBottom: '1px solid rgba(226,232,240,0.9)', paddingBottom: 6 }}>
+                  <span><strong>{t.ticket_number}</strong> · {t.design}</span>
+                  <a href={t.tracking_url} style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Track</a>
+                </li>
+              ))}
+            </ul>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-soft)', marginTop: 8 }}>Bookmark the links to follow each one, no sign-in needed.</p>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)' }}>
+              {done.tickets[0] && <>Your ticket number is <strong>{done.tickets[0].ticket_number}</strong>. </>}The design team has been notified and will be in touch.
+            </p>
+            {done.tickets[0] && (
+              <p style={{ fontSize: '0.85rem', marginTop: 10 }}>
+                <a href={done.tickets[0].tracking_url} style={{ fontWeight: 700 }}>Track this request</a> any time. Bookmark the link, no sign-in needed.
+              </p>
+            )}
+          </>
         )}
         <button type="button" className="btn-primary" style={{ marginTop: 16 }} onClick={() => { setDone(null); form.reset(); }}>Submit another request</button>
       </div>

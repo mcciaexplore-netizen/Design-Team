@@ -155,3 +155,66 @@ def test_a_choice_must_match_its_own_questions_and_old_bundled_names_are_rejecte
     assert post(client, design_requirement="Flyer (Email / Print)", details=json.dumps({"size": "A4", "channel": "WhatsApp"})).status_code == 422
     assert post(client, design_requirement="Flyer (Email/Whatsapp)").status_code == 422
     assert post(client, design_requirement="Social Media Post (Insta, LinkedIn, Twitter)").status_code == 422
+
+
+# ── Several designs in one request ───────────────────────────────────────────
+
+FLYER, INSTA, OTHER = "Flyer (Email / Print)", "Instagram post", "Other"
+
+
+def test_ticking_several_designs_creates_one_ticket_each(client, monkeypatch):
+    sent = []
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setattr(request_form.delivery, "send_email", lambda to, subject, body: sent.append((subject, body)) or (True, "Sent"))
+    details = {FLYER: {"size": "A4", "channel": "Print"}, INSTA: {"format": "Story (9:16)"}, OTHER: {}}
+    data = form(details=json.dumps(details), other_details="A mascot")
+    data["design_requirement"] = [FLYER, INSTA, OTHER, FLYER]   # a repeat is ignored
+    r = client.post("/api/public/requests", data=data, files=[("files", ("brief.png", PNG, "image/png"))])
+    assert r.status_code == 201, r.text
+    out = r.json()["tickets"]
+    assert [t["design"] for t in out] == [FLYER, INSTA, "A mascot"]
+    assert r.json()["ticket_number"] == out[0]["ticket_number"]
+
+    flyer, insta, other = (ticket(t["ticket_number"]) for t in out)
+    assert flyer.type_specific_fields["details"] == {"size": "A4", "channel": "Print"}
+    assert insta.type_specific_fields["details"] == {"format": "Story (9:16)"} and insta.title == "AI Workshop - Instagram post"
+    assert other.type_specific_fields["other_details"] == "A mascot" and flyer.type_specific_fields["other_details"] is None
+    assert flyer.design_type_id != insta.design_type_id
+    assert f"- {insta.ticket_number}: Instagram post" in flyer.brief and flyer.ticket_number not in flyer.brief.split("also asked for")[1]
+
+    db = TestingSessionLocal()
+    atts = db.query(models.Attachment).filter(models.Attachment.ticket_id.in_([flyer.id, insta.id, other.id])).all()
+    db.close()
+    assert len(atts) == 3 and len({a.file_url for a in atts}) == 1   # one stored file, attached to each ticket
+
+    assert len(sent) == 1 and all(t["ticket_number"] in sent[0][1] for t in out)   # one confirmation listing all
+
+
+def test_each_design_must_answer_its_own_required_questions(client):
+    data = form(details=json.dumps({FLYER: {"size": "A4", "channel": "Print"}, INSTA: {}}))
+    data["design_requirement"] = [FLYER, INSTA]
+    r = client.post("/api/public/requests", data=data)
+    assert r.status_code == 422 and r.json()["detail"] == "Instagram post – Format is required"
+    flat = form(details=json.dumps({"size": "A4", "channel": "Print"}))   # ungrouped answers only fit one design
+    flat["design_requirement"] = [FLYER, INSTA]
+    assert client.post("/api/public/requests", data=flat).status_code == 422
+    db = TestingSessionLocal()
+    assert db.query(models.Ticket).count() == 0   # nothing half-created
+    db.close()
+
+
+def test_portal_request_with_several_designs(client):
+    data = form(details=json.dumps({FLYER: {"size": "A5", "channel": "Email"}, INSTA: {"format": "Carousel"}}))
+    data["design_requirement"] = [FLYER, INSTA]
+    del data["name"], data["email"]
+    r = client.post("/api/requests", data=data, headers=auth(client, "a@tata.com"))
+    assert r.status_code == 201, r.text
+    assert len(r.json()["tickets"]) == 2 and r.json()["id"] == r.json()["tickets"][0]["id"]
+
+
+def test_estimate_for_several_designs_uses_the_slowest(client):
+    soon = (datetime.date.today() + datetime.timedelta(days=2)).isoformat()
+    one = client.get("/api/public/request-form/estimate", params={"design_requirement": FLYER}).json()
+    both = client.get("/api/public/request-form/estimate", params=[("design_requirement", FLYER), ("design_requirement", "Directory"),
+                                                                   ("delivery_date", soon)]).json()
+    assert both["standard_ready_by"] > one["standard_ready_by"] and both["rush"] is True

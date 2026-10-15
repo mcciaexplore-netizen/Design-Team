@@ -6,7 +6,14 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 const png = (name: string) => ({ name, mimeType: 'image/png', buffer: PNG });
 
 const FLYER = 'Flyer (Email / Print)';
-const radio = (root: Pick<Page, 'getByRole'>, name: string) => root.getByRole('radio', { name, exact: true });
+const box = (root: Pick<Page, 'getByRole'>, name: string) => root.getByRole('checkbox', { name, exact: true });
+
+/** Tick exactly this one design, unticking any others. */
+async function only(page: Page, name: string) {
+  const group = page.getByRole('group', { name: 'Design requirement *' });
+  for (const ticked of await group.getByRole('checkbox', { checked: true }).all()) await ticked.uncheck();
+  await box(page, name).check();
+}
 
 test('anyone can submit the public request form, get a ticket and follow it on the tracking page', async ({ page, request }) => {
   await page.goto('/request');
@@ -19,9 +26,10 @@ test('anyone can submit the public request form, get a ticket and follow it on t
   await page.getByLabel('Expected delivery date *').fill(dateInDays(1));
 
   // "Other" asks for details; Flyer asks its own questions instead.
-  await radio(page, 'Other').check();
+  await box(page, 'Other').check();
   await expect(page.getByLabel('Please specify the design requirement *')).toBeVisible();
-  await radio(page, FLYER).check();
+  await box(page, 'Other').uncheck();
+  await box(page, FLYER).check();
   await expect(page.getByLabel('Please specify the design requirement *')).toHaveCount(0);
   await page.getByLabel('Size *', { exact: true }).selectOption('A5');
   await page.getByLabel('Where will it be shared? *').selectOption('Print');
@@ -82,8 +90,8 @@ test('mistakes are shown beside each field, with a summary whose links jump to t
 
   await summary.getByRole('link', { name: 'Choose the event or workshop date' }).click();
   await expect(page.getByLabel('Event / Workshop date *')).toBeFocused();
-  await summary.getByRole('link', { name: 'Choose a design requirement' }).click();
-  await expect(radio(page, FLYER)).toBeFocused();
+  await summary.getByRole('link', { name: 'Choose at least one design requirement' }).click();
+  await expect(box(page, FLYER)).toBeFocused();
 
   // Fixing a field clears its message; a malformed email and a non-https link are caught before anything is sent.
   await page.getByLabel('Name *', { exact: true }).fill('Asha');
@@ -91,65 +99,65 @@ test('mistakes are shown beside each field, with a summary whose links jump to t
   await page.getByLabel('Email *').fill('not-an-email');
   await page.getByLabel('Event name *').fill('Validation Day');
   await page.getByLabel('Event / Workshop date *').fill(dateInDays(30));
-  await radio(page, FLYER).check();
+  await box(page, FLYER).check();
   await page.getByLabel('Expected delivery date *').fill(dateInDays(10));
   await page.getByRole('button', { name: 'Add a link' }).click();
   await page.getByLabel('Reference link 1').fill('http://insecure.example.com');
   await page.getByRole('button', { name: 'Submit request' }).click();
   await expect(summary).toContainText('Please fix 4 things');
   await expect(page.locator('#rf-email-error')).toContainText('valid email');
-  await expect(page.locator('#rf-q-size-error')).toContainText('Choose an option');
+  await expect(page.locator('#rf-q-Flyer--Email---Print--size-error')).toContainText('Choose an option');
   await expect(page.locator('#rf-link-0-error')).toContainText('https://');
   await expect(page.locator('#rf-link-0')).toHaveAttribute('aria-invalid', 'true');
 });
 
 test('each design type asks its own questions', async ({ page }) => {
   await page.goto('/request');
-  await radio(page, FLYER).check();
+  await only(page, FLYER);
   await expect(page.getByLabel('Size *', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Where will it be shared? *')).toBeVisible();
 
   // WhatsApp, Instagram and LinkedIn are separate choices, each with its own formats.
-  await radio(page, 'WhatsApp creative').check();
+  await only(page, 'WhatsApp creative');
   await expect(page.getByLabel('Where will it be shared? *')).toHaveCount(0);
   await expect(page.getByLabel('Format *').locator('option', { hasText: 'Status (9:16)' })).toHaveCount(1);
   await expect(page.getByLabel('Message or call-to-action to show on it')).toBeVisible();
 
-  await radio(page, 'Instagram post').check();
+  await only(page, 'Instagram post');
   await expect(page.getByLabel('Format *').locator('option', { hasText: 'Carousel' })).toHaveCount(1);
   await expect(page.getByLabel('Number of slides (for a carousel)')).toBeVisible();
   await expect(page.getByLabel('Message or call-to-action to show on it')).toHaveCount(0);
 
-  await radio(page, 'LinkedIn post').check();
+  await only(page, 'LinkedIn post');
   await expect(page.getByLabel('Format *').locator('option', { hasText: 'Page banner (4:1)' })).toHaveCount(1);
   await expect(page.getByLabel('Format *').locator('option', { hasText: 'Reel cover' })).toHaveCount(0);
 
-  await radio(page, 'Twitter / X post').check();
+  await only(page, 'Twitter / X post');
   await expect(page.getByLabel('Format *').locator('option', { hasText: 'Header banner (3:1)' })).toHaveCount(1);
-  await expect(page.getByRole('radio', { name: /Insta, LinkedIn/ })).toHaveCount(0);   // the old bundled choice is gone
+  await expect(page.getByRole('checkbox', { name: /Insta, LinkedIn/ })).toHaveCount(0);   // the old bundled choice is gone
 
-  await radio(page, 'Flex/Banner/Standee').check();
+  await only(page, 'Flex/Banner/Standee');
   await expect(page.getByLabel('Size (width x height) *')).toBeVisible();
   await expect(page.getByLabel('Print or digital? *')).toBeVisible();
   await expect(page.getByLabel('Quantity')).toBeVisible();
 
-  await radio(page, 'Digital Backdrop & Slides').check();
+  await only(page, 'Digital Backdrop & Slides');
   await expect(page.getByLabel('Number of slides *')).toBeVisible();
   await expect(page.getByLabel('Aspect ratio *')).toBeVisible();
 
-  await radio(page, 'Directory').check();
+  await only(page, 'Directory');
   await expect(page.getByLabel('Number of pages *')).toBeVisible();
   await expect(page.getByLabel('Is the content ready? *')).toBeVisible();
 
-  await radio(page, '4 pages Brochure').check();
+  await only(page, '4 pages Brochure');
   await expect(page.getByLabel('Copy *', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Language *')).toBeVisible();
 
-  await radio(page, 'Photo/Video/Reel').check();
+  await only(page, 'Photo/Video/Reel');
   await expect(page.getByLabel('Duration (if video or reel)')).toBeVisible();
   await expect(page.getByLabel('Shoot date and location')).toBeVisible();
 
-  await radio(page, 'Other').check();
+  await only(page, 'Other');
   await expect(page.getByRole('group', { name: /Details for/ })).toHaveCount(0);
 });
 
@@ -179,7 +187,7 @@ test('several files can be added, previewed and removed, and bad files are rejec
 
 test('a date earlier than the usual turnaround shows a warning', async ({ page }) => {
   await page.goto('/request');
-  await radio(page, 'Directory').check();
+  await box(page, 'Directory').check();
   await expect(page.getByText('earlier than usual')).toHaveCount(0);
   await expect(page.getByText('Standard turnaround')).toHaveCount(0);   // only the warning is ever shown
 
@@ -194,7 +202,7 @@ test('a date earlier than the usual turnaround shows a warning', async ({ page }
 test('a half-filled form is saved as a draft, restored on the next visit and can be discarded', async ({ page }) => {
   await page.goto('/request');
   await page.getByLabel('Event name *').fill('Draft Festival');
-  await radio(page, 'Flex/Banner/Standee').check();
+  await box(page, 'Flex/Banner/Standee').check();
   await page.getByLabel('Size (width x height) *').fill('8x4 ft');
   await page.getByRole('button', { name: 'Add a link' }).click();
   await page.getByLabel('Reference link 1').fill('https://www.figma.com/file/draft');
@@ -203,7 +211,7 @@ test('a half-filled form is saved as a draft, restored on the next visit and can
   await page.reload();
   await expect(page.getByRole('status').filter({ hasText: 'Draft restored' })).toBeVisible();
   await expect(page.getByLabel('Event name *')).toHaveValue('Draft Festival');
-  await expect(radio(page, 'Flex/Banner/Standee')).toBeChecked();
+  await expect(box(page, 'Flex/Banner/Standee')).toBeChecked();
   await expect(page.getByLabel('Size (width x height) *')).toHaveValue('8x4 ft');
   await expect(page.getByLabel('Reference link 1')).toHaveValue('https://www.figma.com/file/draft');
 
@@ -237,7 +245,7 @@ test('a client creates a request from the New Request dialog and the lead sees i
 
   // Required questions are checked in the dialog too.
   await dialog.getByLabel('Event / Workshop date *').fill(dateInDays(20));
-  await radio(dialog, '2 pages Brochure').check();
+  await box(dialog, '2 pages Brochure').check();
   await dialog.getByLabel('Expected delivery date *').fill(dateInDays(6));
   await dialog.getByRole('button', { name: 'Submit request' }).click();
   await expect(dialog.getByRole('alert')).toContainText('Please fix 2 things');
@@ -279,7 +287,7 @@ test('a finished request can be requested again from the portal and from the tic
   const dialog = page.getByRole('dialog');
   const expectPrefilled = async () => {
     await expect(dialog.getByLabel('Event name *')).toHaveValue('Again Fest');
-    await expect(radio(page, 'Flex/Banner/Standee')).toBeChecked();
+    await expect(box(page, 'Flex/Banner/Standee')).toBeChecked();
     await expect(dialog.getByLabel('Size (width x height) *')).toHaveValue('6x3 ft');
     await expect(dialog.getByLabel('Print or digital? *')).toHaveValue('Print');
     await expect(dialog.getByLabel('Quantity')).toHaveValue('2');
@@ -323,10 +331,35 @@ test('"Request again" on a ticket made before the channels were split lands on t
   const dialog = page.getByRole('dialog');
   const again = async (title: string, requirement: string) => {
     await page.getByRole('button', { name: new RegExp(`^Request again: ${title}`) }).click();
-    await expect(radio(page, requirement)).toBeChecked();
+    await expect(box(page, requirement)).toBeChecked();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
   };
   await again('Legacy WhatsApp flyer', 'WhatsApp creative');
   await again('Legacy email flyer', FLYER);
   await again('Legacy LinkedIn post', 'LinkedIn post');
+});
+
+test('ticking several designs makes one ticket per design, each with its own questions', async ({ page }) => {
+  await page.goto('/request');
+  await page.getByLabel('Name *', { exact: true }).fill('Ravi Kulkarni');
+  await page.getByLabel('Email *').fill('ravi.e2e@example.com');
+  await page.getByLabel('Event name *').fill('E2E Expo');
+  await page.getByLabel('Event / Workshop date *').fill(dateInDays(30));
+  await page.getByLabel('Expected delivery date *').fill(dateInDays(10));
+  await box(page, FLYER).check();
+  await box(page, 'Instagram post').check();
+
+  const flyer = page.getByRole('group', { name: `Details for ${FLYER}` });
+  const insta = page.getByRole('group', { name: 'Details for Instagram post' });
+  await flyer.getByLabel('Size *', { exact: true }).selectOption('A4');
+  await flyer.getByLabel('Where will it be shared? *').selectOption('Email');
+  await page.getByRole('button', { name: 'Submit request' }).click();
+  await expect(page.getByRole('alert')).toContainText('Instagram post: Choose an option for “Format”');   // each design's own required question
+
+  await insta.getByLabel('Format *').selectOption('Story (9:16)');
+  await page.getByRole('button', { name: 'Submit request' }).click();
+  const done = page.getByRole('status').filter({ hasText: 'Request received' });
+  await expect(done).toContainText('split into 2 tickets');
+  await expect(done.getByRole('listitem')).toHaveCount(2);
+  await expect(done.getByRole('listitem').nth(1)).toContainText('Instagram post');
 });

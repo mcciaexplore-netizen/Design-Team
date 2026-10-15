@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useEstimate, type RequestForm } from '../hooks/useRequestForm';
-import { fieldId, requestLabel, shortDate, todayISO, type Question, type RequestFormOptions } from '../requestForm';
+import { fieldId, questionKey, requestLabel, shortDate, todayISO, type Question, type RequestFormOptions } from '../requestForm';
 import FileDropzone from './FileDropzone';
 
 const errorStyle = { fontSize: '0.78rem', color: '#b91c1c', marginTop: 4 } as const;
@@ -69,10 +69,10 @@ export function DraftBanner({ form }: { form: RequestForm }) {
   );
 }
 
-function QuestionField({ q, form, prefix }: { q: Question; form: RequestForm; prefix: string }) {
-  const key = `q:${q.id}`;
+function QuestionField({ q, design, form, prefix }: { q: Question; design: string; form: RequestForm; prefix: string }) {
+  const key = questionKey(design, q.id);
   const label = `${q.label}${q.required ? ' *' : ''}`;
-  const answer = form.values.details[q.id];
+  const answer = form.values.details[design]?.[q.id];
   if (q.type === 'multiselect') {
     const picked = Array.isArray(answer) ? answer : [];
     const props = a11y(form, prefix, key);
@@ -83,7 +83,7 @@ function QuestionField({ q, form, prefix }: { q: Question; form: RequestForm; pr
           {q.options.map((o, i) => (
             <label key={o} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: '0.88rem' }}>
               <input type="checkbox" {...(i === 0 ? props : { 'aria-describedby': props['aria-describedby'] })} checked={picked.includes(o)}
-                onChange={e => form.setDetail(q.id, e.target.checked ? [...picked, o] : picked.filter(x => x !== o))} /> {o}
+                onChange={e => form.setDetail(design, q.id, e.target.checked ? [...picked, o] : picked.filter(x => x !== o))} /> {o}
             </label>
           ))}
         </div>
@@ -97,22 +97,22 @@ function QuestionField({ q, form, prefix }: { q: Question; form: RequestForm; pr
     <div>
       <label htmlFor={props.id} style={requestLabel}>{label}</label>
       {q.type === 'select' ? (
-        <select {...props} onChange={e => form.setDetail(q.id, e.target.value)}>
+        <select {...props} onChange={e => form.setDetail(design, q.id, e.target.value)}>
           <option value="">Select…</option>
           {q.options.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       ) : (
         <input {...props} type={q.type === 'number' ? 'number' : 'text'} min={q.type === 'number' ? 1 : undefined} maxLength={200}
-          onChange={e => form.setDetail(q.id, e.target.value)} />
+          onChange={e => form.setDetail(design, q.id, e.target.value)} />
       )}
       <FieldError form={form} prefix={prefix} name={key} />
     </div>
   );
 }
 
-/** A warning when the requested date is earlier than the usual turnaround for the chosen design. */
-function EstimateNote({ requirement, deliveryDate }: { requirement: string; deliveryDate: string }) {
-  const estimate = useEstimate(requirement, deliveryDate);
+/** A warning when the requested date is earlier than the usual turnaround for the chosen designs. */
+function EstimateNote({ requirements, deliveryDate }: { requirements: string[]; deliveryDate: string }) {
+  const estimate = useEstimate(requirements, deliveryDate);
   if (!estimate?.rush) return null;
   return (
     <p role="status" style={{ fontSize: '0.82rem', color: '#92400e', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '0.45rem 0.7rem' }}>
@@ -127,8 +127,17 @@ interface Props { options: RequestFormOptions; form: RequestForm; idPrefix: stri
 export default function DesignRequestFields({ options, form, idPrefix }: Props) {
   const { values } = form;
   const p = idPrefix;
-  const questions: ReactNode = (options.questions[values.design_requirement] ?? []).map(q => <QuestionField key={q.id} q={q} form={form} prefix={p} />);
-  const hasQuestions = (options.questions[values.design_requirement] ?? []).length > 0;
+  const chosen = values.design_requirements;
+  const several = chosen.length > 1;
+  // Each ticked design's own questions, in a labelled group once there is more than one.
+  const questions: ReactNode = chosen.filter(d => (options.questions[d] ?? []).length > 0).map(design => (
+    <fieldset key={design} aria-label={`Details for ${design}`}
+      style={several ? { border: '1px solid rgba(226,232,240,0.9)', borderRadius: 10, padding: '0.8rem 0.9rem 0.9rem', margin: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }
+        : { ...noBorder, display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+      {several && <legend style={{ ...requestLabel, padding: '0 6px', marginBottom: 0 }}>{design}</legend>}
+      {options.questions[design].map(q => <QuestionField key={q.id} q={q} design={design} form={form} prefix={p} />)}
+    </fieldset>
+  ));
   const setLink = (i: number, value: string) => form.set('links', values.links.map((l, j) => (j === i ? value : l)));
   return (
     <>
@@ -145,18 +154,21 @@ export default function DesignRequestFields({ options, form, idPrefix }: Props) 
 
       <fieldset style={noBorder}>
         <legend style={requestLabel}>Design requirement *</legend>
+        <p id={`${p}-requirement-hint`} style={{ fontSize: '0.78rem', color: 'var(--text-soft)', margin: '-2px 0 8px' }}>
+          Tick everything you need. Each design becomes its own request, with its own designer and approval.
+        </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {options.design_requirements.map((o, i) => (
             <label key={o} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.88rem' }}>
-              <input type="radio" name={`${p}-requirement`} {...(i === 0 ? a11y(form, p, 'design_requirement') : { 'aria-describedby': form.errors.design_requirement ? `${fieldId(p, 'design_requirement')}-error` : undefined })}
-                checked={values.design_requirement === o} onChange={() => form.set('design_requirement', o)} /> {o}
+              <input type="checkbox" {...(i === 0 ? a11y(form, p, 'design_requirement') : { 'aria-describedby': form.errors.design_requirement ? `${fieldId(p, 'design_requirement')}-error` : undefined })}
+                checked={chosen.includes(o)} onChange={e => form.toggleRequirement(o, e.target.checked)} /> {o}
             </label>
           ))}
         </div>
         <FieldError form={form} prefix={p} name="design_requirement" />
       </fieldset>
 
-      {values.design_requirement === options.other_label && (
+      {chosen.includes(options.other_label) && (
         <div>
           <label htmlFor={fieldId(p, 'other_details')} style={requestLabel}>Please specify the design requirement *</label>
           <input {...a11y(form, p, 'other_details')} className="input-field" maxLength={1000} value={values.other_details} onChange={e => form.set('other_details', e.target.value)} />
@@ -164,15 +176,13 @@ export default function DesignRequestFields({ options, form, idPrefix }: Props) 
         </div>
       )}
 
-      {hasQuestions && (
-        <fieldset aria-label={`Details for ${values.design_requirement}`} style={{ ...noBorder, display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>{questions}</fieldset>
-      )}
+      {questions}
 
       <div>
         <label htmlFor={fieldId(p, 'delivery_date')} style={requestLabel}>Expected delivery date *</label>
         <input {...a11y(form, p, 'delivery_date')} type="date" className="input-field" min={todayISO()} value={values.delivery_date} onChange={e => form.set('delivery_date', e.target.value)} />
         <FieldError form={form} prefix={p} name="delivery_date" />
-        <EstimateNote requirement={values.design_requirement} deliveryDate={values.delivery_date} />
+        <EstimateNote requirements={chosen} deliveryDate={values.delivery_date} />
       </div>
       <div>
         <label htmlFor={fieldId(p, 'num_creatives')} style={requestLabel}>No. of creatives required</label>

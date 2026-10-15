@@ -35,10 +35,11 @@ function Body({ options, onCreated, onCancel, prefill }: Props & { options: Requ
     if (!form.validateAll()) return;
     setBusy(true);
     try {
-      const created = await apiJson<{ id: number; ticket_number: string }>('/api/requests', { method: 'POST', body: buildBody(form.values, form.files, false) });
+      const created = await apiJson<{ id: number; ticket_number: string; tickets?: { ticket_number: string }[] }>('/api/requests', { method: 'POST', body: buildBody(form.values, form.files, false) });
       form.submitted();
       await refresh();
-      onCreated({ id: String(created.id), number: created.ticket_number });
+      // Several designs make several tickets: name them all; "Open ticket" opens the first.
+      onCreated({ id: String(created.id), number: (created.tickets ?? [created]).map(t => t.ticket_number).join(', ') });
     } catch (err) {
       setError(form.showServerError(err instanceof Error ? err.message : 'Could not submit the request.'));
     } finally { setBusy(false); }
