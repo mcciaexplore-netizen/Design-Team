@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, Boolean, ForeignKey, Date, DateTime, Enum, JSON, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, String, Boolean, ForeignKey, Date, DateTime, Enum, JSON, LargeBinary, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, false
 import enum
@@ -352,6 +352,14 @@ class AppSetting(Base):
     key = Column(String, primary_key=True)
     value = Column(JSON, nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class StoredFile(Base):
+    """Uploaded file contents kept in the database: used where there is no lasting disk and no S3 (e.g. Vercel)."""
+    __tablename__ = "stored_files"
+    key = Column(String, primary_key=True)        # same random key the attachment / proof rows point to
+    data = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class SavedView(Base):

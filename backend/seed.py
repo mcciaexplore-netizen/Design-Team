@@ -159,8 +159,9 @@ def seed_demo(db: Session, types: dict[str, models.DesignType]):
     print("Seeded demo accounts and sample tickets.")
 
 
-def seed():
-    migrate()
+def seed(migrate_first: bool = True):
+    if migrate_first:
+        migrate()
     db: Session = SessionLocal()
     try:
         types = ensure_design_types(db)

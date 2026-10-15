@@ -60,7 +60,9 @@ for module in (auth, campaigns_api, users_admin, tickets_api, revisions_api, not
     app.include_router(module.router)
 app.include_router(forecasting.router, dependencies=[Depends(require_staff)])
 
-CRON_SECRET = os.getenv("CRON_SECRET", "default_secret")
+# Local development (SQLite) gets a default; anywhere else the tick is refused until CRON_SECRET is set.
+CRON_SECRET = os.getenv("CRON_SECRET") or (
+    "default_secret" if os.getenv("DATABASE_URL", "sqlite").startswith("sqlite") else None)
 
 @app.get("/")
 def read_root():
@@ -74,7 +76,7 @@ def health_check():
 @app.get("/internal/tick")  # Vercel Cron sends a GET with "Authorization: Bearer $CRON_SECRET"
 def internal_tick(x_cron_secret: str = Header(None), authorization: str = Header(None), db: Session = Depends(get_db)):
     bearer = authorization[7:] if authorization and authorization.startswith("Bearer ") else None
-    if not any(s and secrets.compare_digest(s, CRON_SECRET) for s in (x_cron_secret, bearer)):
+    if not CRON_SECRET or not any(s and secrets.compare_digest(s, CRON_SECRET) for s in (x_cron_secret, bearer)):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     from cron_jobs import run_all_cron_jobs

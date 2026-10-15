@@ -101,9 +101,10 @@ def last_proof_submitter(db: Session, ticket: models.Ticket) -> Optional[models.
 
 # Vercel rejects request bodies over 4.5 MB before they reach the app, so default below that there.
 _ON_VERCEL = bool(os.getenv("VERCEL"))
-MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "4" if _ON_VERCEL else "10")) * 1024 * 1024
+_MB_CAP = 4 if _ON_VERCEL else 1024
+MAX_UPLOAD_BYTES = min(int(os.getenv("MAX_UPLOAD_MB", "10")), _MB_CAP) * 1024 * 1024
 # Source files (CDR, PSD, AI...) are routinely larger than proofs and attachments.
-MAX_CDR_BYTES = int(os.getenv("MAX_CDR_UPLOAD_MB", "4" if _ON_VERCEL else "50")) * 1024 * 1024
+MAX_CDR_BYTES = min(int(os.getenv("MAX_CDR_UPLOAD_MB", "50")), _MB_CAP) * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {
     "png", "jpg", "jpeg", "gif", "webp", "pdf", "txt", "csv",
@@ -127,7 +128,7 @@ _CONTENT_TYPES = {
 
 
 def _upload_dir() -> str:
-    # Only /tmp is writable on Vercel, and it is wiped often: production there must set S3_ENDPOINT_URL.
+    # Local disk: development and servers with a lasting disk (Vercel uses the database instead; see _db_storage).
     default = "/tmp/uploads" if _ON_VERCEL else os.path.join(os.path.dirname(__file__), "uploads")
     path = os.getenv("UPLOAD_DIR", default)
     os.makedirs(path, exist_ok=True)
@@ -171,12 +172,29 @@ def _s3():
     )
 
 
+def _db_storage() -> bool:
+    """Keep file contents in the database when S3 is not set up and the disk does not last (Vercel), or when
+    FILE_STORAGE=database is set explicitly."""
+    if os.getenv("S3_ENDPOINT_URL"):
+        return False
+    mode = os.getenv("FILE_STORAGE", "").strip().lower()
+    return mode == "database" or (mode != "disk" and _ON_VERCEL)
+
+
 def store_bytes(data: bytes, ext: str) -> str:
-    """Persist bytes under a random key (S3 when configured, else local disk) and return the key."""
+    """Persist bytes under a random key (S3, the database or local disk; see _db_storage) and return the key."""
     key = f"{uuid.uuid4().hex}.{ext}"
     client = _s3()
     if client:
         client.put_object(Bucket=os.getenv("S3_BUCKET_NAME", "designflow"), Key=key, Body=data)
+    elif _db_storage():
+        from database import SessionLocal   # its own short session: the caller's transaction may still roll back
+        db = SessionLocal()
+        try:
+            db.add(models.StoredFile(key=key, data=data))
+            db.commit()
+        finally:
+            db.close()
     else:
         with open(os.path.join(_upload_dir(), key), "wb") as fh:
             fh.write(data)
@@ -190,6 +208,16 @@ def load_bytes(key: str) -> bytes:
     try:
         if client:
             return client.get_object(Bucket=os.getenv("S3_BUCKET_NAME", "designflow"), Key=key)["Body"].read()
+        if _db_storage():
+            from database import SessionLocal
+            db = SessionLocal()
+            try:
+                row = db.query(models.StoredFile).filter(models.StoredFile.key == key).first()
+            finally:
+                db.close()
+            if row:
+                return bytes(row.data)
+            raise FileNotFoundError(key)
         with open(os.path.join(_upload_dir(), key), "rb") as fh:
             return fh.read()
     except (FileNotFoundError, OSError):

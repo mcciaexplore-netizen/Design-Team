@@ -1,18 +1,11 @@
 import os
-import boto3
 import models
 from sqlalchemy.orm import Session
 from notifications import notify_user
 
-# Setup MinIO client for secure presigned URLs
-s3_client = boto3.client(
-    's3',
-    endpoint_url=os.getenv('S3_ENDPOINT_URL'),
-    aws_access_key_id=os.getenv('S3_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.getenv('S3_SECRET_ACCESS_KEY'),
-    region_name=os.getenv('S3_REGION_NAME', 'auto')
-)
-BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'designflow-cdr')
+# S3 client for presigned download URLs, made on first use (importing boto3 slows every cold start).
+s3_client = None
+BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'designflow')   # the same bucket as every other upload (common.store_bytes)
 
 def create_cdr_request(db: Session, requester_id: int, ticket_id: int = None, library_item_id: int = None):
     req = models.CdrRequest(
@@ -56,7 +49,9 @@ def generate_download_link(db: Session, request_id: int, user_id: int):
     req = db.query(models.CdrRequest).filter_by(id=request_id).first()
     if req and req.status == models.CdrRequestStatus.UPLOADED:
         # Generate presigned URL valid for 1 hour (3600s)
-        url = s3_client.generate_presigned_url(
+        from common import _s3
+        client = s3_client or _s3()
+        url = client.generate_presigned_url(
             'get_object',
             Params={'Bucket': BUCKET_NAME, 'Key': req.s3_object_key},
             ExpiresIn=3600

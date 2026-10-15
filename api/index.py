@@ -20,6 +20,7 @@ if not os.getenv("SECRET_KEY"):
     raise RuntimeError("SECRET_KEY is not set. Add a long random string to the Vercel project's environment.")
 
 from fastapi import FastAPI  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from database import engine  # noqa: E402
@@ -28,21 +29,53 @@ from main import app as backend  # noqa: E402
 logger = logging.getLogger(__name__)
 
 
+STARTUP_ERROR: str | None = None
+
+
+def _at_head() -> bool:
+    """One cheap query: is the database already on the newest migration?"""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    cfg = Config(os.path.join(BACKEND, "alembic.ini"))
+    cfg.set_main_option("script_location", os.path.join(BACKEND, "alembic"))
+    head = ScriptDirectory.from_config(cfg).get_current_head()
+    try:
+        with engine.connect() as conn:
+            return conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == head
+    except Exception:
+        return False   # no alembic_version table yet: a brand-new database
+
+
 def _prepare_database() -> None:
-    """Render ran `python seed.py` before starting; Vercel has no start command, so each cold start does it.
-    Migrations and seeding are idempotent; the transaction-scoped advisory lock stops parallel cold starts from
-    migrating at the same time (and works through a pgbouncer-style pooler)."""
+    """Render ran `python seed.py` before starting; Vercel has no start command, so cold starts do it. When the
+    schema is already current only the quick seeding runs. The transaction-scoped advisory lock stops parallel cold
+    starts from migrating at the same time (and works through a pgbouncer-style pooler)."""
+    global STARTUP_ERROR
     import seed
     try:
+        if _at_head():
+            seed.seed(migrate_first=False)
+            return
         with engine.begin() as conn:
             if conn.dialect.name == "postgresql":
                 conn.execute(text("SELECT pg_advisory_xact_lock(4207311)"))
             seed.seed()
-    except Exception:
+    except Exception as exc:
+        STARTUP_ERROR = f"{exc.__class__.__name__}: {str(exc)[:200]}"
         logger.exception("Startup migration/seed failed")
 
 
 _prepare_database()
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+
+@app.get("/api/health")
+def health():
+    """Says so when the database could not be prepared, instead of every other request failing unexplained."""
+    if STARTUP_ERROR:
+        return JSONResponse({"status": "error", "detail": "Database setup failed; see the function logs."}, status_code=503)
+    return {"status": "ok"}
+
+
 app.mount("/api", backend)
