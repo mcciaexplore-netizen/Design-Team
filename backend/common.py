@@ -3,11 +3,10 @@ import datetime
 import os
 import re
 import uuid
-from urllib.parse import quote, urlencode
+from urllib.parse import quote
 import logging
 from typing import Annotated, Optional
 
-import httpx
 import pytz
 from pydantic import StringConstraints
 from fastapi import HTTPException, UploadFile
@@ -145,62 +144,12 @@ def _s3():
     )
 
 
-# Vercel Blob, used when the project has a Blob store (Vercel sets BLOB_READ_WRITE_TOKEN) and S3 is not configured.
-# Same requests as the official @vercel/blob SDK. Files are private: the API reads them with the token and serves
-# them through its own access-checked endpoints, exactly as with S3.
-BLOB_API_URL = "https://vercel.com/api/blob"
-BLOB_API_VERSION = "13"
-
-
-def _blob_token() -> Optional[str]:
-    if os.getenv("S3_ENDPOINT_URL"):
-        return None
-    return os.getenv("BLOB_READ_WRITE_TOKEN") or None
-
-
-def _blob_access() -> str:
-    return "public" if os.getenv("BLOB_ACCESS", "").strip().lower() == "public" else "private"
-
-
-def _blob_put(token: str, key: str, data: bytes) -> None:
-    store_id = token.split("_")[3] if token.count("_") >= 3 else ""
-    res = httpx.put(
-        BLOB_API_URL + "/?" + urlencode({"pathname": key}),
-        content=data,
-        headers={
-            "authorization": f"Bearer {token}",
-            "x-api-version": BLOB_API_VERSION,
-            "x-vercel-blob-store-id": store_id,
-            "x-vercel-blob-access": _blob_access(),
-            "x-add-random-suffix": "0",
-            "x-content-length": str(len(data)),
-        },
-        timeout=60.0,
-    )
-    if res.status_code >= 400:
-        logger.error("Vercel Blob upload failed (%s): %s", res.status_code, res.text[:300])
-        raise HTTPException(status_code=502, detail="File storage is unavailable")
-
-
-def _blob_get(token: str, key: str) -> bytes:
-    store_id = token.split("_")[3] if token.count("_") >= 3 else ""
-    res = httpx.get(f"https://{store_id}.{_blob_access()}.blob.vercel-storage.com/{key}",
-                    headers={"authorization": f"Bearer {token}"}, timeout=60.0)
-    if res.status_code == 404:
-        raise FileNotFoundError(key)
-    res.raise_for_status()
-    return res.content
-
-
 def store_bytes(data: bytes, ext: str) -> str:
-    """Persist bytes under a random key (S3 or Vercel Blob when configured, else local disk) and return the key."""
+    """Persist bytes under a random key (S3 when configured, else local disk) and return the key."""
     key = f"{uuid.uuid4().hex}.{ext}"
     client = _s3()
-    blob_token = _blob_token()
     if client:
         client.put_object(Bucket=os.getenv("S3_BUCKET_NAME", "designflow"), Key=key, Body=data)
-    elif blob_token:
-        _blob_put(blob_token, key, data)
     else:
         with open(os.path.join(_upload_dir(), key), "wb") as fh:
             fh.write(data)
@@ -211,12 +160,9 @@ def load_bytes(key: str) -> bytes:
     if not re.fullmatch(r"[0-9a-f]{32}\.[a-z0-9]{1,5}", key):
         raise HTTPException(status_code=404, detail="File not found")
     client = _s3()
-    blob_token = _blob_token()
     try:
         if client:
             return client.get_object(Bucket=os.getenv("S3_BUCKET_NAME", "designflow"), Key=key)["Body"].read()
-        if blob_token:
-            return _blob_get(blob_token, key)
         with open(os.path.join(_upload_dir(), key), "rb") as fh:
             return fh.read()
     except (FileNotFoundError, OSError):

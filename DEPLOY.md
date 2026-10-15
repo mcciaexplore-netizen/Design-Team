@@ -17,9 +17,7 @@
 
 What is different from Render:
 
-* **Uploads go to Vercel Blob.** In the project's Storage tab create a Blob store with **Private** access and connect
-  it; Vercel adds `BLOB_READ_WRITE_TOKEN`, then redeploy. (A public store also works if you set `BLOB_ACCESS=public`.)
-  `S3_*` variables, if set, take precedence. With neither, files are written to `/tmp` and soon lost.
+* **Uploads go to S3/R2.** Without `S3_ENDPOINT_URL`, files are written to `/tmp` and soon lost.
 * **Uploads are capped at 4 MB** (Vercel refuses request bodies over 4.5 MB), including CDR/PSD source files.
 * **No WebSockets:** live toasts are off; pages still refresh every 30 seconds.
 * **Cron** (`/api/internal/tick`: auto-closing expired edit windows, overdue escalations) runs once a day at
