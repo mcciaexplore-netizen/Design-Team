@@ -67,3 +67,28 @@ def test_without_email_setup_says_so(client, monkeypatch):
     monkeypatch.delenv("SMTP_HOST", raising=False)
     r = client.post("/api/auth/forgot-password", json={"email": "lead@x.com"})
     assert r.status_code == 503
+
+
+def test_temporary_password_can_be_changed_when_mounted_under_api(client):
+    """Vercel serves the app mounted at /api (api/index.py); the must-change allowlist must still match."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from test_auth import TestingSessionLocal
+    import models
+    from main import app as backend
+
+    db = TestingSessionLocal()
+    db.query(models.User).filter_by(email="lead@x.com").update({"must_change_password": True})
+    db.commit()
+    db.close()
+
+    outer = FastAPI()
+    outer.mount("/api", backend)
+    c = TestClient(outer)
+    token = c.post("/api/api/auth/token", data={"username": "lead@x.com", "password": "secret-pw"}).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    assert c.get("/api/api/tickets", headers=headers).status_code == 403
+    r = c.post("/api/api/auth/change-password", headers=headers,
+               json={"current_password": "secret-pw", "new_password": "my-own-pw-1"})
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["must_change_password"] is False

@@ -111,7 +111,11 @@ _ALLOWED_WHILE_MUST_CHANGE = ("/api/auth/change-password", "/api/auth/me")
 
 def get_current_user(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
     user = _user_from_token(token, db)
-    if user.must_change_password and request.url.path not in _ALLOWED_WHILE_MUST_CHANGE:
+    # On Vercel the app is mounted under /api, so the full path carries that prefix (root_path); compare without it.
+    path, root = request.url.path, request.scope.get("root_path", "")
+    if root and path.startswith(root):
+        path = path[len(root):]
+    if user.must_change_password and path not in _ALLOWED_WHILE_MUST_CHANGE:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You must change your temporary password first.")
     return user
 
