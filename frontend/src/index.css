@@ -36,6 +36,10 @@
   --background-image-page-gradient:    linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
 }
 
+/* Base text size for the whole app (18px instead of the browser's 16px). Almost every size is in rem, so this scales
+   text and spacing together; a percentage still honours a larger default font set in the browser. */
+html { font-size: 112.5%; }
+
 :root {
   --brand:         #003F8A;
   --brand-2:       #0056B3;
