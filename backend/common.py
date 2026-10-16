@@ -243,6 +243,28 @@ def load_bytes(key: str) -> bytes:
         raise HTTPException(status_code=502, detail="File storage is unavailable")
 
 
+def delete_stored_file(key: str) -> None:
+    """Remove a stored file wherever it lives (S3, the database or local disk). A missing file is not an error."""
+    if not re.fullmatch(r"[0-9a-f]{32}\.[a-z0-9]{1,5}", key):
+        return
+    client = _s3()
+    if client:
+        client.delete_object(Bucket=os.getenv("S3_BUCKET_NAME", "designflow"), Key=key)
+    elif _db_storage():
+        from database import SessionLocal
+        db = SessionLocal()
+        try:
+            db.query(models.StoredFile).filter(models.StoredFile.key == key).delete()
+            db.commit()
+        finally:
+            db.close()
+    else:
+        try:
+            os.remove(os.path.join(_upload_dir(), key))
+        except FileNotFoundError:
+            pass
+
+
 def file_response_headers(name: str, content_type: str) -> dict:
     inline = content_type in INLINE_TYPES
     disposition = "inline" if inline else "attachment"

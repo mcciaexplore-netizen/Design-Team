@@ -1,5 +1,6 @@
 """Tickets: listing, creation, updates, duplication, subtasks and pinpoint comments, plus the lookups the board needs."""
 import datetime
+import logging
 from typing import List
 
 import pytz
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 import auth
 import capacity_engine
+import deletion
 import delivery
 import events
 import integrations
@@ -20,6 +22,7 @@ from database import get_db
 from sla_engine import calculate_due_date
 
 router = APIRouter(tags=["tickets"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/api/users", response_model=List[schemas.UserResponse])
@@ -103,6 +106,17 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), r
     return db_ticket
 
 NOT_BLANK = {"title", "brief", "type_specific_fields", "priority", "status", "tags"}
+
+
+@router.delete("/api/tickets/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_ticket(ticket_id: int, db: Session = Depends(get_db), lead: models.User = Depends(require_lead)):
+    """Design Leads only: delete a ticket with its designs, files, approvals and history. Other versions stay."""
+    ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    number = ticket.ticket_number
+    deletion.delete_ticket(db, ticket)
+    logger.info("ticket_deleted by=%s ticket=%s", lead.email, number)
 
 
 def _check_refs(db: Session, data: dict) -> None:

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, GitBranch, Tag, CheckSquare, Square } from 'lucide-react';
+import { ArrowLeft, ChevronDown, GitBranch, Tag, CheckSquare, Square, Trash2 } from 'lucide-react';
 import { STATUSES, PRIORITIES, PRIORITY_STYLE, DONE_STATUSES } from '../types';
 import { apiJson } from '../api';
 import { useAuth } from '../contexts/AuthContext';
@@ -223,6 +223,15 @@ const TicketDetailPage: React.FC = () => {
                   <select id="d-prio" value={ticket.priority} onChange={e => void run(() => updateTicket(ticket.id, { priority: e.target.value }), 'Could not change priority.')} className="input-field" style={{ width: '100%', fontSize: '0.82rem' }}>
                     {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
+                  <button type="button" className="btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: 14, color: '#B91C1C', gap: 6 }}
+                    onClick={() => {
+                      if (!window.confirm(`Delete ${ticket.number}?
+
+Its designs, files, approvals and history are deleted too. Other versions of this request stay. This can't be undone.`)) return;
+                      void run(async () => { await apiJson(`/api/tickets/${ticket.id}`, { method: 'DELETE' }); await refresh(); navigate('/'); }, 'Could not delete the ticket.');
+                    }}>
+                    <Trash2 size={14} aria-hidden="true" /> Delete ticket
+                  </button>
                 </>
               )}
             </div>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, KeyRound, Pencil, UserPlus, UserX, UserCheck, X } from 'lucide-react';
+import { Check, Copy, KeyRound, Pencil, Trash2, UserPlus, UserX, UserCheck, X } from 'lucide-react';
 import { apiJson } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -132,6 +132,19 @@ export default function UsersAdmin() {
     finally { setBusyId(null); }
   };
 
+  const remove = async (u: AdminUser) => {
+    if (!window.confirm(`Delete ${u.full_name}?
+
+They can never sign in again and are taken off the team list. If they have past work, it stays, `
+      + `marked "(removed)", and any open tickets they had go back to the queue. This can't be undone.`)) return;
+    setBusyId(u.id); setRowError('');
+    try {
+      await apiJson(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+      setUsers(list => list?.filter(x => x.id !== u.id) ?? list);
+    } catch (e) { setRowError(e instanceof Error ? e.message : 'Could not delete the user.'); }
+    finally { setBusyId(null); }
+  };
+
   const resetPassword = async (u: AdminUser) => {
     if (!window.confirm(`Issue a new temporary password for ${u.full_name}? Their current password stops working and they are signed out everywhere.`)) return;
     setBusyId(u.id); setRowError('');
@@ -180,6 +193,11 @@ export default function UsersAdmin() {
                     {!self && (
                       <button type="button" className="btn-ghost" disabled={busyId === u.id} onClick={() => void toggleActive(u)} aria-label={`${u.is_active ? 'Deactivate' : 'Reactivate'} ${u.full_name}`}>
                         {u.is_active ? <><UserX size={13} aria-hidden="true" /> Deactivate</> : <><UserCheck size={13} aria-hidden="true" /> Reactivate</>}
+                      </button>
+                    )}
+                    {!self && (
+                      <button type="button" className="btn-ghost" disabled={busyId === u.id} onClick={() => void remove(u)} aria-label={`Delete ${u.full_name}`} style={{ color: '#B91C1C' }}>
+                        <Trash2 size={13} aria-hidden="true" /> Delete
                       </button>
                     )}
                   </div>

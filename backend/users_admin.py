@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+import deletion
 import models
 from auth import frontend_role, generate_temp_password, hash_password, require_lead
 from common import Email
@@ -56,7 +57,7 @@ def _get(db: Session, user_id: int) -> models.User:
 @router.get("")
 def list_users(db: Session = Depends(get_db), _lead: models.User = Depends(require_lead)):
     users = db.query(models.User).order_by(models.User.is_active.desc(), models.User.full_name).all()
-    return [_row(u) for u in users]
+    return [_row(u) for u in users if not deletion.is_removed(u)]   # removed people stay only on old records
 
 
 class CreateUser(BaseModel):
@@ -156,3 +157,18 @@ def reset_password(user_id: int, db: Session = Depends(get_db), lead: models.Use
     db.refresh(user)
     logger.info("admin_password_reset by=%s email=%s", lead.email, user.email)
     return {"user": _row(user), "temporary_password": temp}
+
+
+@router.delete("/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), lead: models.User = Depends(require_lead)):
+    """Take someone off the team list for good. Erased when they have no history; otherwise removed: they can't sign
+    in, their email is wiped and their open work goes back to the queue, while old records keep their name."""
+    user = _get(db, user_id)
+    if user.id == lead.id:
+        raise HTTPException(status_code=400, detail="You can't delete your own account.")
+    if user.role in _LEAD_ROLES and user.is_active and _active_leads(db) <= 1:
+        raise HTTPException(status_code=400, detail="At least one active Design Lead is required.")
+    email = user.email
+    outcome = deletion.remove_user(db, user)
+    logger.info("admin_user_deleted by=%s email=%s outcome=%s", lead.email, email, outcome)
+    return {"outcome": outcome}
