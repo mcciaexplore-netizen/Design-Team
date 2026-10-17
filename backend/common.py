@@ -398,10 +398,18 @@ def compute_due_at(db: Session, design_type: models.DesignType, priority: models
 
 
 def next_ticket_number(db: Session) -> str:
+    """The next DF-number. Numbers only ever go up, even after "Delete all past data" (when the database may hand out
+    old ids again): settings.ticket_number_floor remembers the last one issued, and a number in use is skipped."""
     last = db.query(models.Ticket).order_by(models.Ticket.id.desc()).first()
     settings = db.query(models.SystemSettings).first()
-    floor = settings.ticket_number_floor if settings else 0
-    return f"DF-{max(last.id if last else 0, floor) + 1:04d}"
+    if settings is None:
+        settings = models.SystemSettings()
+        db.add(settings)
+    n = max(last.id if last else 0, settings.ticket_number_floor or 0) + 1
+    while db.query(models.Ticket.id).filter(models.Ticket.ticket_number == f"DF-{n:04d}").first():
+        n += 1
+    settings.ticket_number_floor = n
+    return f"DF-{n:04d}"
 
 
 def app_url() -> str:

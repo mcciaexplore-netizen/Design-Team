@@ -50,3 +50,12 @@ def test_it_needs_the_phrase_the_password_and_a_design_lead(client):
     assert client.post("/api/admin/delete-all-data", json=GO, headers=auth(client, "des@x.com")).status_code == 403
     assert client.post("/api/admin/delete-all-data", json=GO).status_code == 401
     assert count(models.Ticket) == 1
+
+
+def test_numbers_never_repeat_after_a_reset_even_when_the_database_reuses_ids(client):
+    lead = auth(client, "lead@x.com")
+    old = [make_ticket(client, "a@tata.com", f"Old {i}")["ticket_number"] for i in range(3)]
+    client.post("/api/admin/delete-all-data", json=GO, headers=lead)
+    new = [make_ticket(client, "a@tata.com", f"New {i}")["ticket_number"] for i in range(3)]   # SQLite hands out id 1 again
+    assert len(set(new)) == 3 and not set(new) & set(old)
+    assert sorted(new) == new and new[0] > max(old)

@@ -105,7 +105,9 @@ def test_versions_past_the_free_allowance_are_flagged_but_still_just_versions(cl
     t = make_ticket(client, "a@tata.com")
     upload_proof(client, t["id"])
     db = TestingSessionLocal()
-    db.add(models.SystemSettings(max_free_revisions=0))
+    settings = db.query(models.SystemSettings).first() or models.SystemSettings()   # one row, as in the app
+    settings.max_free_revisions = 0
+    db.add(settings)
     db.commit()
     db.close()
     set_status(client, t["id"], "Delivered")
