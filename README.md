@@ -1,63 +1,73 @@
 # DesignDesk
 
-The MCCIA Applied AI Studio's design request and workflow platform: clients request designs (signed in, or through
-the public `/request` form), the design team works them on a board, sends proofs for approval, and delivers.
+MCCIA Applied AI Studio's design request and workflow platform. Clients ask for designs, the design team works on
+them, sends designs for approval and delivers them.
 
-## Architecture
-- **Frontend**: React + TypeScript, Vite, Tailwind CSS v4, `@fullcalendar/react`, `@dnd-kit/core`
-- **Backend**: FastAPI, SQLAlchemy, Alembic; PostgreSQL (Neon) in production, SQLite locally
-- **Scheduled jobs**: SLA warnings and escalations, review reminders and auto-closing. On Vercel they run off normal
-  traffic every 5 minutes (`cron_jobs.run_if_due`); anywhere, `/internal/tick` runs them on demand (`CRON_SECRET`).
-- **Storage**: S3 / Cloudflare R2 when `S3_ENDPOINT_URL` is set; otherwise the database on Vercel and local disk
-  (`UPLOAD_DIR`) in development. Files are only served through access-checked endpoints, and big files travel in
-  3 MB pieces (Vercel's 4.5 MB body limit).
-- **Deployment**: one Vercel project (`vercel.json`): the built frontend plus the API as a Python function under
-  `/api` (`api/index.py`). See [DEPLOY.md](DEPLOY.md).
+Live on Vercel: every push to `main` deploys. Setup, email (Zoho) and Google Drive: [DEPLOY.md](DEPLOY.md).
 
-## Pages that need no sign-in
-- `/request`: the design request form.
-- `/requests`: every request and where it stands, grouped by organisation (`?org=…` for one organisation). Titles,
-  status and dates only. `PUBLIC_BOARD=off` hides it.
-- `/track/<token>`: one request's progress, linked from the confirmation.
-- `/review/<token>`: approve a design or ask for changes, linked from the review email.
+## Who uses what
 
-## Local Development Setup
+**Design Leads (admin)**
+- **Visual Board**: every ticket by stage or by person; drag to move, tick several to assign or move together.
+- **Performance**: delivery, SLA and workload numbers, with report exports.
+- **Ticket page**: assign a designer, set priority, note the client's changes, upload designs and send them for
+  approval, files, source files, Figma, time.
+- **Settings**: add and remove people (**Users**), check email and file storage (**Email & storage**), and delete
+  all past data (**Danger zone**).
 
-1. **Environment Configuration**
-   Copy `.env.example` to `.env`. Locally everything is optional (SQLite, files on disk):
-   ```powershell
-   cp .env.example .env
-   ```
+**Designers**
+- **My Tasks**: what is assigned to them, soonest deadline first.
+- **Library**: shared folders of logos, brand assets, templates and finished designs, with versions.
+- **Workload** and **Calendar**: who has capacity and what is due when.
 
-2. **Backend Setup (Native Python)**
-   ```powershell
-   cd backend
-   python -m venv venv
-   .\venv\Scripts\activate
-   pip install -r requirements.txt
-   alembic upgrade head      # creates the schema (SQLite by default; set DATABASE_URL for PostgreSQL)
-   python seed.py
-   uvicorn main:app --reload
-   pytest                    # optional: run the backend tests (~45 s)
-   pytest -n 4 --basetemp=.pytest_tmp   # in parallel (~30 s)
-   ```
+**Clients**
+- **Client portal** (signed in): their requests, designs waiting for approval and finished designs.
+- **No sign-in needed:**
+  - `/request`: the design request form (several designs at once, files up to 10 MB).
+  - `/requests`: every request and where it stands, grouped by organisation (`?org=TATA` for one). Titles, status
+    and dates only.
+  - `/track/<link>`: one request's progress (link in the confirmation email).
+  - `/review/<link>`: approve a design or ask for changes (link in the review email).
 
-3. **Frontend Setup (Native NPM)**
-   Open a new terminal:
-   ```powershell
-   cd frontend
-   npm install
-   npm run dev
-   ```
+## Run it on your computer
 
-## Production deployment
-Push to `main`: Vercel builds and deploys it. Setup and environment variables are in [DEPLOY.md](DEPLOY.md).
+Needs Python 3.12 or newer and Node.js 20 or newer. Nothing else: locally it uses SQLite and keeps files on disk.
 
-## Browser tests
-`npm run test:e2e` (in `frontend/`) drives real Microsoft Edge through sign-in, the public request form, the client's
-request dialog and proof approval. It starts its own API and temporary database, so it never touches your data. Set
-`E2E_PYTHON` to the Python that has the backend requirements, e.g. `E2E_PYTHON=../.venv/Scripts/python.exe`.
+```powershell
+# API (first terminal)
+cd backend
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+alembic upgrade head
+python seed.py            # design types, plus demo accounts (only on SQLite)
+uvicorn main:app --reload
 
-## Optional integrations
-Everything below is off until configured (see `.env.example`): Slack alerts (Settings > Integrations), Jira two-way sync
-(`JIRA_*`), confirmation and reminder email (`SMTP_*`) and a CAPTCHA on the public `/request` form (`TURNSTILE_*`).
+# Website (second terminal)
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173. Demo sign-ins: `lead@mccia.in` / `mccia123` (Design Lead), `alice@mccia.in` /
+`mccia123` (Designer), `client@tata.com` / `client123` (Client).
+
+## Tests
+
+```powershell
+cd backend;  .\venv\Scripts\python -m pytest -q        # API tests
+cd frontend; npx tsc -b                                  # type check: the Vercel build fails on any error
+cd frontend; $env:E2E_PYTHON="..\backend\venv\Scripts\python.exe"; npm run test:e2e   # real Edge, own temp database
+```
+
+## Project layout
+
+| Folder | What's in it |
+|---|---|
+| `backend/` | the API, database models, migrations (`alembic/versions`) and tests (`test_*.py`) |
+| `frontend/src/` | the website: `pages/` and `components/` |
+| `frontend/e2e/` | browser tests |
+| `api/index.py`, `vercel.json` | how Vercel serves the API under `/api` next to the website |
+| `.env.example` | every setting, with what it does |
+
+A change to `backend/models.py` needs a new migration in `backend/alembic/versions`; the tests check for it.

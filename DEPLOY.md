@@ -11,50 +11,38 @@
 2. Storage > add a **Neon** Postgres database to the project. It sets `DATABASE_URL` / `POSTGRES_URL` (the pooled
    connection, which is what serverless needs).
 3. Environment variables: `SECRET_KEY` (required: a long random string), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (first
-   deploy only) and `PUBLIC_APP_URL` (the Vercel URL). Optional: `CRON_SECRET`, `S3_*`, `SMTP_*`, `TURNSTILE_*`,
-   `JIRA_*`, `PUBLIC_BOARD`, `AUTO_TICK`, as in the table below.
+   deploy only) and `PUBLIC_APP_URL` (the Vercel URL). Email and Google Drive are below; every other setting is
+   explained in `.env.example`.
 4. Deploy. Migrations and admin/design-type seeding run automatically when the API starts.
 
 How it works on Vercel:
 
-* **Files** are kept in the Postgres database (the `stored_files` table) unless `S3_ENDPOINT_URL` is set, in which
-  case they go to S3/R2. Nothing is written to the function's temporary disk.
+* **Files** go to Google Drive once it is connected (below); until then they are kept in the Postgres database.
 * **Big files** travel in 3 MB pieces, because Vercel refuses request and response bodies over 4.5 MB. Uploads go up
   through `/api/uploads` first, and downloads come down as byte ranges. The limits are 10 MB per file
-  (`MAX_UPLOAD_MB`) and 50 MB per source file (`MAX_CDR_UPLOAD_MB`). Postgres on Neon's free plan holds 0.5 GB, so
-  add S3/R2 if many large files are expected.
+  (`MAX_UPLOAD_MB`) and 50 MB per source file (`MAX_CDR_UPLOAD_MB`). Neon's free plan holds 0.5 GB, so connect
+  Google Drive before many large files arrive.
 * **Scheduled jobs** (SLA warnings and escalations, review reminders, closing reviews after two days, closing
   finished edit windows, recurring tickets) run off normal traffic. After any request, if they last ran more than
   5 minutes ago, they run again. `AUTO_TICK=off` turns this off. The daily cron in `vercel.json` is a backup and needs
   `CRON_SECRET`.
-* **No WebSockets.** Pages refresh every 30 seconds and show a pop-up for what changed ("DES-12 moved → In Review").
+* **No live connection.** Pages refresh every 30 seconds and show a pop-up for what changed ("DES-12 moved → In Review").
 * **Emails** are sent before the request returns, so actions that send email take a moment longer.
 * **Public requests board.** `/requests` lists every request with its title, status and dates, without signing in.
   `PUBLIC_BOARD=off` hides it.
-* The Jira webhook URL becomes `https://<your-app>/api/api/webhooks/jira`.
 
-## Environments
+## Demo accounts
 
-| | Production | Demo (optional, separate service + database) |
-|---|---|---|
-| `DATABASE_URL` | your real Postgres (e.g. Neon) | a different, disposable database |
-| `SEED_DEMO_DATA` | `false` (the default for any non-SQLite database) | `true` |
-| `SEED_STAFF_PASSWORD` / `SEED_CLIENT_PASSWORD` | not set | set to random values |
-| `ADMIN_EMAIL` | the first admin's email | optional |
-| `ADMIN_PASSWORD` | only needed once, to create that admin | optional |
-| `SECRET_KEY` | **required**, long random string | required |
-| `ALLOWED_ORIGINS`, `PUBLIC_APP_URL` | your Vercel production URL | the demo site's URL |
-
-Never point a demo deployment at the production database: demo seeding adds `lead@mccia.in`, `alice@mccia.in`,
-`bob@mccia.in`, `client@tata.com`, `client@acme.com` and two sample tickets.
+The demo accounts (`lead@mccia.in`, `alice@mccia.in`, `bob@mccia.in`, `client@tata.com`, `client@acme.com`) are only
+created on a local SQLite database, or when `SEED_DEMO_DATA=true`. Never set that on the live site. If they exist on
+the live site, remove them in **Settings > Users**.
 
 ## What `python seed.py` does on every deploy
 
 1. Runs migrations.
 2. Creates the default design types if there are none (ticket creation needs at least one).
 3. Creates / promotes `ADMIN_EMAIL` as a Design Lead (idempotent).
-4. Only if `SEED_DEMO_DATA=true`: adds the demo accounts and sample tickets. On a non-SQLite database it refuses
-   to do this unless both `SEED_*_PASSWORD` variables are set.
+4. Only on SQLite, or with `SEED_DEMO_DATA=true`: adds the demo accounts and sample tickets.
 
 ## Accounts and passwords
 
@@ -64,37 +52,21 @@ Never point a demo deployment at the production database: demo seeding adds `lea
   Resetting signs the user out everywhere.
 * Anyone can change their own password under **Settings > Password**.
 
-## Removing demo data from an existing production database
-
-If demo accounts were seeded earlier, remove them in the database console (check the `SELECT` first):
-
-```sql
-SELECT id, email FROM users WHERE email IN ('lead@mccia.in','alice@mccia.in','bob@mccia.in','client@tata.com','client@acme.com');
--- Deactivating is the safe option and keeps ticket history intact:
-UPDATE users SET is_active = false
-WHERE email IN ('lead@mccia.in','alice@mccia.in','bob@mccia.in','client@tata.com','client@acme.com');
-```
-
-Or deactivate them from **Settings > Users**.
-
 ## Admin locked out
 
 Set `ADMIN_RESET_PASSWORD` (with `ADMIN_EMAIL`) in the hosting environment and redeploy. On start the API makes it
 that account's temporary password (creating or reactivating the account), and asks for a new password at sign-in.
 Each value is applied once, so a later restart does not undo the new password; still, delete the variable afterwards.
 
-## Forgot password (email)
+## Forgot password
 
-"Forgot your password?" on the sign-in page emails a reset link that works once, for 30 minutes. It needs SMTP:
-`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`. With Gmail: host `smtp.gmail.com`, port `587`,
-user = the Gmail address, password = a Google **App Password** (Google Account > Security > 2-Step Verification >
-App passwords; the normal Gmail password does not work). Links point at `PUBLIC_APP_URL` (on Vercel, the production
-domain if that is unset). Without SMTP the page says to ask the Design Lead instead.
+"Forgot your password?" on the sign-in page emails a reset link that works once, for 30 minutes. It needs email set
+up (Zoho Mail, below). Without it the page says to ask the Design Lead, who uses **Reset password** in Settings > Users.
 
 ## Google Drive for files (Workspace Shared Drive)
 
 New uploads go to a folder in a Shared Drive when both variables below are set. Files uploaded before that stay where
-they were (the database) and keep working. Settings > Integrations shows where new uploads go.
+they were (the database) and keep working. Settings > Email & storage shows where new uploads go.
 
 1. In Google Drive (a Google Workspace account), create a **Shared drive**, e.g. "DesignDesk files", and a folder in it.
    Copy the folder's id from its URL (`https://drive.google.com/drive/folders/<this part>`).
@@ -113,7 +85,7 @@ A personal My Drive does not work: Google gives service accounts no storage spac
 
 ## Zoho Mail for email
 
-Set these in Vercel, redeploy, then use **Settings > Integrations > Send me a test email**:
+Set these in Vercel, redeploy, then use **Settings > Email & storage > Send me a test email**:
 
 | Variable | Value |
 |---|---|
