@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent, ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Clock, Download, FileWarning, Loader2, MessageSquare, Ban, WifiOff } from 'lucide-react';
-import { publicJson, ApiError, API_BASE } from '../api';
+import { publicJson, ApiError, fetchPublicBlobUrl } from '../api';
 
 type Status = 'pending' | 'approved' | 'changes_requested' | 'revoked' | 'expired';
 interface Review {
@@ -70,7 +70,19 @@ export default function ReviewPage() {
   const [formErr, setFormErr] = useState('');
   const [done, setDone] = useState<null | 'approved' | 'changes_requested'>(null);
   const [imgErr, setImgErr] = useState(false);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
   const busy = useRef(false);
+
+  // The design is fetched in pieces (big files exceed the host's response limit) and shown from memory.
+  const proofVersion = data?.proof?.version;
+  useEffect(() => {
+    if (proofVersion === undefined) return;
+    let live = true, made: string | null = null;
+    fetchPublicBlobUrl(`/api/public/review/${encodeURIComponent(token ?? '')}/file`)
+      .then(u => { made = u; if (live) setFileUrl(u); else URL.revokeObjectURL(u); })
+      .catch(() => { if (live) setImgErr(true); });
+    return () => { live = false; if (made) URL.revokeObjectURL(made); };
+  }, [proofVersion, token]);
 
   const load = useCallback(async () => {
     setLoadErr(null);
@@ -139,7 +151,6 @@ export default function ReviewPage() {
   }
 
   const { ticket, proof } = data;
-  const fileUrl = `${API_BASE}/api/public/review/${encodeURIComponent(token ?? '')}/file`;
   const isImage = !!proof?.content_type?.startsWith('image/');
   const effective: Status | 'just_done' = done ? 'just_done' : data.status;
 
@@ -203,14 +214,16 @@ export default function ReviewPage() {
             <span style={{ display: 'inline-block', background: '#e0ecfb', color: BLUE, fontWeight: 700, fontSize: 13, padding: '4px 10px', borderRadius: 999 }}>Version {proof.version}</span>
             {proof.note && <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', borderRadius: 10, padding: '10px 12px', margin: '12px 0 0', fontSize: 15 }}><strong>Note from the designer:</strong> {proof.note}</p>}
             <div style={{ marginTop: 12 }}>
-              {isImage ? (imgErr ? (
-                <p role="alert" style={{ color: '#B91C1C', background: '#fef2f2', borderRadius: 10, padding: 12, margin: 0 }}>We couldn't load the preview. Try refreshing, or ask the design team to resend the link.</p>
-              ) : (
-                <a href={fileUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${proof.file_name} full size in a new tab`}>
-                  <img src={fileUrl} alt={proof.file_name} onError={() => setImgErr(true)} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto', borderRadius: 10, border: '1px solid #e2e8f0' }} />
+              {!fileUrl && !imgErr ? (
+                <p role="status" style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Loading the design…</p>
+              ) : imgErr ? (
+                <p role="alert" style={{ color: '#B91C1C', background: '#fef2f2', borderRadius: 10, padding: 12, margin: 0 }}>We couldn't load the design. Try refreshing, or ask the design team to resend the link.</p>
+              ) : isImage ? (
+                <a href={fileUrl ?? undefined} target="_blank" rel="noopener noreferrer" aria-label={`Open ${proof.file_name} full size in a new tab`}>
+                  <img src={fileUrl ?? undefined} alt={proof.file_name} onError={() => setImgErr(true)} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto', borderRadius: 10, border: '1px solid #e2e8f0' }} />
                 </a>
-              )) : (
-                <a href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ ...btn, background: BLUE, color: '#fff', textDecoration: 'none', boxSizing: 'border-box', overflowWrap: 'anywhere' }}>
+              ) : (
+                <a href={fileUrl ?? undefined} download={proof.file_name} style={{ ...btn, background: BLUE, color: '#fff', textDecoration: 'none', boxSizing: 'border-box', overflowWrap: 'anywhere' }}>
                   <Download size={18} aria-hidden="true" /> Download {proof.file_name}
                 </a>
               )}

@@ -8,7 +8,7 @@ export interface UploadLimits {
   max_request_mb: number | null;  // all files sent together in one request, when the host caps it
 }
 
-const FALLBACK: UploadLimits = { max_upload_mb: 4, max_cdr_upload_mb: 4, max_request_mb: 4 };
+const FALLBACK: UploadLimits = { max_upload_mb: 10, max_cdr_upload_mb: 50, max_request_mb: null };
 let pending: Promise<UploadLimits> | null = null;
 
 function load(): Promise<UploadLimits> {
@@ -16,7 +16,7 @@ function load(): Promise<UploadLimits> {
   return pending;
 }
 
-/** Loaded once per page; until then (or if it fails) the strictest limits are assumed. */
+/** Loaded once per page; until then (or if it fails) the server's usual limits are assumed (it checks again anyway). */
 export function useUploadLimits(): UploadLimits {
   const [limits, setLimits] = useState<UploadLimits>(FALLBACK);
   useEffect(() => { let live = true; void load().then(l => { if (live) setLimits(l); }); return () => { live = false; }; }, []);

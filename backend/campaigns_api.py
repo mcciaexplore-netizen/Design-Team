@@ -2,13 +2,13 @@
 import datetime
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 import models
 from auth import get_current_user, is_client
-from common import file_response_headers, load_bytes, read_upload, store_bytes
+from common import file_response, load_bytes, read_upload, store_bytes
 from database import get_db
 
 IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
@@ -166,12 +166,11 @@ async def upload_post_image(post_id: int, file: UploadFile = File(...), db: Sess
 
 
 @router.get("/api/social-posts/{post_id}/image")
-def get_post_image(post_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def get_post_image(post_id: int, request: Request, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     p = db.query(models.SocialPost).filter(models.SocialPost.id == post_id).first()
     if not p or not p.image_key or (is_client(user) and p.owner_key != _owner_key(user)):
         raise HTTPException(status_code=404, detail="Not found")
-    return Response(content=load_bytes(p.image_key), media_type=p.image_type or "application/octet-stream",
-                    headers=file_response_headers(p.image_name or "image", p.image_type or ""))
+    return file_response(request, load_bytes(p.image_key), p.image_name or "image", p.image_type or "application/octet-stream")
 
 
 @router.delete("/api/social-posts/{post_id}/image", status_code=204)

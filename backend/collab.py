@@ -1,14 +1,14 @@
 """Ticket comments with @mentions, file attachments, and Figma link previews."""
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import events
 import models
 from auth import can_access_ticket, get_current_user, get_ticket_for_user
-from common import as_utc, file_response_headers, load_bytes, log_audit, parse_figma_url, read_upload, store_bytes
+from common import as_utc, file_response, load_bytes, log_audit, parse_figma_url, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["collaboration"])
@@ -157,11 +157,10 @@ def _get_attachment(db: Session, attachment_id: int, user: models.User) -> model
 
 
 @router.get("/api/attachments/{attachment_id}/download")
-def download_attachment(attachment_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def download_attachment(attachment_id: int, request: Request, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     att = _get_attachment(db, attachment_id, user)
     content_type = att.content_type or "application/octet-stream"
-    return Response(content=load_bytes(att.file_url), media_type=content_type,
-                    headers=file_response_headers(att.file_name, content_type))
+    return file_response(request, load_bytes(att.file_url), att.file_name, content_type)
 
 
 @router.delete("/api/attachments/{attachment_id}", status_code=204)

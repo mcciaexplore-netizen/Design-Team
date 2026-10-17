@@ -1,5 +1,5 @@
 """Source-file (CDR) requests: a client asks for the editable file, a lead approves, a designer uploads, the client downloads."""
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -7,7 +7,7 @@ import cdr_engine
 import events
 import models
 from auth import LEAD_ROLES, can_access_ticket, get_current_user, get_ticket_for_user, require_lead, require_staff
-from common import MAX_CDR_BYTES, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
+from common import MAX_CDR_BYTES, file_response, load_bytes, log_audit, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["cdr"])
@@ -111,12 +111,12 @@ async def upload(request_id: int, file: UploadFile = File(...), db: Session = De
 
 
 @router.get("/api/cdr-requests/{request_id}/download")
-def download(request_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def download(request_id: int, request: Request, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     req, ticket = _get(db, request_id, user)
     if req.status != models.CdrRequestStatus.UPLOADED or not req.s3_object_key:
         raise HTTPException(status_code=409, detail="The file is not ready yet.")
     data = load_bytes(req.s3_object_key)
-    cdr_engine.record_download(db, req, user.id)
+    if request.headers.get("range", "bytes=0-").startswith("bytes=0-"):   # count a download once, not per piece
+        cdr_engine.record_download(db, req, user.id)
     ext = req.s3_object_key.rsplit(".", 1)[-1]
-    return Response(content=data, media_type="application/octet-stream",
-                    headers=file_response_headers(f"{ticket.ticket_number}-source.{ext}", "application/octet-stream"))
+    return file_response(request, data, f"{ticket.ticket_number}-source.{ext}", "application/octet-stream")

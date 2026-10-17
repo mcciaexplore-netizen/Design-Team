@@ -362,6 +362,17 @@ class StoredFile(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class UploadPart(Base):
+    """One piece of a file sent in pieces (Vercel refuses request bodies over 4.5 MB). The pieces are joined when the
+    form that uses the file is submitted, then deleted; leftovers are cleared by the scheduled jobs."""
+    __tablename__ = "upload_parts"
+    id = Column(Integer, primary_key=True)
+    upload_id = Column(String(32), nullable=False, index=True)
+    part = Column(Integer, nullable=False)
+    data = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+
+
 class SavedView(Base):
     __tablename__ = "saved_views"
     id = Column(Integer, primary_key=True, index=True)

@@ -366,8 +366,8 @@ def _send_confirmation(requester: models.User, tickets: list, f: "RequestFields"
 def form_options():
     return {"design_requirements": list(REQUIREMENTS), "other_label": OTHER, "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
             "max_cdr_upload_mb": MAX_CDR_BYTES // (1024 * 1024),
-            # Vercel refuses any request body over 4.5 MB, so files sent together must fit in that.
-            "max_request_mb": 4 if os.getenv("VERCEL") else None,
+            # No cap on all files together: the browser sends big files in pieces first (uploads.py).
+            "max_request_mb": None,
             "max_files": MAX_FILES, "max_reference_links": MAX_REFERENCE_LINKS, "questions": QUESTIONS,
             "turnstile_site_key": os.getenv("TURNSTILE_SITE_KEY") if delivery.turnstile_enabled() else None}
 

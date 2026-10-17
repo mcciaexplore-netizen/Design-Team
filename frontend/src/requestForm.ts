@@ -8,7 +8,7 @@ export interface RequestFormOptions {
   design_requirements: string[];
   other_label: string;
   max_upload_mb: number;
-  max_request_mb?: number | null;   // all files together (Vercel caps a request at 4.5 MB)
+  max_request_mb?: number | null;   // all files together, if the server caps it (big files go ahead in pieces, so normally not)
   max_files: number;
   max_reference_links: number;
   questions: Record<string, Question[]>;

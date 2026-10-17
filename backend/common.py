@@ -9,7 +9,7 @@ from typing import Annotated, Optional
 
 import pytz
 from pydantic import StringConstraints
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException, Request, Response, UploadFile
 from sqlalchemy.orm import Session
 
 import models
@@ -115,12 +115,15 @@ def last_proof_submitter(db: Session, ticket: models.Ticket) -> Optional[models.
 
 # ── File storage ─────────────────────────────────────────────────────────────
 
-# Vercel rejects request bodies over 4.5 MB before they reach the app, so default below that there.
+# Vercel rejects request and response bodies over 4.5 MB, so big files travel in pieces of PART_BYTES: uploads via
+# uploads.py, downloads as byte ranges (file_response).
 _ON_VERCEL = bool(os.getenv("VERCEL"))
-_MB_CAP = 4 if _ON_VERCEL else 1024
-MAX_UPLOAD_BYTES = min(int(os.getenv("MAX_UPLOAD_MB", "10")), _MB_CAP) * 1024 * 1024
+PART_BYTES = 3 * 1024 * 1024
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "10")) * 1024 * 1024
 # Source files (CDR, PSD, AI...) are routinely larger than proofs and attachments.
-MAX_CDR_BYTES = min(int(os.getenv("MAX_CDR_UPLOAD_MB", "50")), _MB_CAP) * 1024 * 1024
+MAX_CDR_BYTES = int(os.getenv("MAX_CDR_UPLOAD_MB", "50")) * 1024 * 1024
+# What the browser sends in a file's place once the file itself has gone up in pieces: prefix, upload id, part count.
+STAGED_PREFIX = b"DESIGNDESK-STAGED-UPLOAD:"
 
 ALLOWED_EXTENSIONS = {
     "png", "jpg", "jpeg", "gif", "webp", "pdf", "txt", "csv",
@@ -157,6 +160,27 @@ def safe_filename(name: str) -> str:
     return base[:120]
 
 
+def _join_staged(marker: bytes) -> bytes:
+    """The file sent earlier in pieces (uploads.py), joined; the pieces are deleted once used."""
+    m = re.fullmatch(rb"([0-9a-f]{32}):(\d{1,4})", marker[len(STAGED_PREFIX):].strip())
+    if not m:
+        raise HTTPException(status_code=400, detail="The file did not arrive. Please attach it again.")
+    upload_id, count = m.group(1).decode(), int(m.group(2))
+    from database import SessionLocal   # its own session, like store_bytes
+    db = SessionLocal()
+    try:
+        parts = db.query(models.UploadPart).filter(models.UploadPart.upload_id == upload_id) \
+            .order_by(models.UploadPart.part).all()
+        if [p.part for p in parts] != list(range(count)):
+            raise HTTPException(status_code=400, detail="Part of the file did not arrive. Please attach it again.")
+        data = b"".join(bytes(p.data) for p in parts)
+        db.query(models.UploadPart).filter(models.UploadPart.upload_id == upload_id).delete(synchronize_session=False)
+        db.commit()
+        return data
+    finally:
+        db.close()
+
+
 async def read_upload(file: UploadFile, max_bytes: Optional[int] = None) -> tuple[bytes, str, str]:
     """Validate an upload and return (data, safe_name, content_type). Raises HTTPException on bad input."""
     limit = max_bytes or MAX_UPLOAD_BYTES
@@ -165,6 +189,8 @@ async def read_upload(file: UploadFile, max_bytes: Optional[int] = None) -> tupl
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=415, detail=f"File type .{ext or '?'} is not allowed")
     data = await file.read(limit + 1)
+    if data.startswith(STAGED_PREFIX):
+        data = _join_staged(data)
     if len(data) > limit:
         raise HTTPException(status_code=413, detail=f"File is larger than {limit // (1024 * 1024)} MB")
     if not data:
@@ -263,6 +289,21 @@ def delete_stored_file(key: str) -> None:
             os.remove(os.path.join(_upload_dir(), key))
         except FileNotFoundError:
             pass
+
+
+def file_response(request: Request, data: bytes, name: str, content_type: str) -> Response:
+    """A stored file, or the byte range asked for ("Range: bytes=0-3145727"), so the browser can fetch a file bigger
+    than Vercel's 4.5 MB response limit in pieces."""
+    headers = {**file_response_headers(name, content_type), "Accept-Ranges": "bytes"}
+    m = re.fullmatch(r"bytes=(\d+)-(\d*)", request.headers.get("range", "").strip())
+    if not m:
+        return Response(content=data, media_type=content_type, headers=headers)
+    start = int(m.group(1))
+    end = min(int(m.group(2)) if m.group(2) else len(data) - 1, len(data) - 1)
+    if start >= len(data) or end < start:
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{len(data)}"})
+    headers["Content-Range"] = f"bytes {start}-{end}/{len(data)}"
+    return Response(content=data[start:end + 1], status_code=206, media_type=content_type, headers=headers)
 
 
 def file_response_headers(name: str, content_type: str) -> dict:

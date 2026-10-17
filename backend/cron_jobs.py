@@ -116,7 +116,15 @@ def run_all_cron_jobs(db: Session):
                 models.Ticket.is_locked == False).all()  # noqa: E712
     _each(db, pending, "review", review_step)
 
-    # 5. Recurring tickets (idempotent per tick)
+    # 5. Pieces of large uploads nobody finished.
+    from uploads import clear_stale_parts
+    try:
+        clear_stale_parts(db)
+    except Exception:
+        db.rollback()
+        logger.exception("Clearing upload pieces failed")
+
+    # 6. Recurring tickets (idempotent per tick)
     from templates_recurring import run_due_rules
     try:
         run_due_rules(db, now)

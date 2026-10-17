@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 import approvals, auth, campaigns_api, cdr_api, collab, cron_jobs, forecasting, integrations, live, notify_api, reports, request_form
-import revisions_api, templates_recurring, thread, tickets_api, timetracking, tracking, users_admin, views_bulk
+import revisions_api, templates_recurring, thread, tickets_api, timetracking, tracking, uploads, users_admin, views_bulk
 from auth import require_staff
 from database import get_db
 
@@ -44,7 +44,7 @@ class SelectiveGZip(GZipMiddleware):
     squeezing them again only burns CPU on a small server."""
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] == "http" and scope["path"].endswith(("/file", "/download")):
+        if scope["type"] == "http" and scope["path"].endswith(("/file", "/download", "/image")):
             await self.app(scope, receive, send)
             return
         await super().__call__(scope, receive, send)
@@ -63,10 +63,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition", "Content-Range"],   # file names and ranged downloads, when cross-origin
 )
 
 for module in (auth, campaigns_api, users_admin, tickets_api, revisions_api, notify_api, collab, views_bulk, templates_recurring,
-               timetracking, approvals, reports, request_form, cdr_api, tracking, thread, live):
+               timetracking, approvals, reports, request_form, cdr_api, tracking, thread, uploads, live):
     app.include_router(module.router)
 app.include_router(forecasting.router, dependencies=[Depends(require_staff)])
 

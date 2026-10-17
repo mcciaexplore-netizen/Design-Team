@@ -6,7 +6,7 @@ import time
 from typing import Literal, Optional
 
 import pytz
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -15,7 +15,7 @@ import events
 import revision_engine
 import models
 from auth import get_current_user, get_ticket_for_user, is_client, require_staff
-from common import app_url, as_utc, ensure_changes_allowed, mark_delivered, file_response_headers, load_bytes, log_audit, read_upload, store_bytes
+from common import app_url, as_utc, ensure_changes_allowed, mark_delivered, file_response, load_bytes, log_audit, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["approvals"])
@@ -123,13 +123,13 @@ def list_proofs(ticket_id: int, db: Session = Depends(get_db), user: models.User
 
 
 @router.get("/api/proofs/{proof_id}/file")
-def proof_file(proof_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def proof_file(proof_id: int, request: Request, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     proof = db.query(models.ProofVersion).filter(models.ProofVersion.id == proof_id).first()
     if not proof:
         raise HTTPException(status_code=404, detail="Proof not found")
     get_ticket_for_user(db, proof.ticket_id, user)
     ct = proof.content_type or "application/octet-stream"
-    return Response(content=load_bytes(proof.storage_key), media_type=ct, headers=file_response_headers(proof.file_name, ct))
+    return file_response(request, load_bytes(proof.storage_key), proof.file_name, ct)
 
 
 # ── Approval requests (staff) ────────────────────────────────────────────────
@@ -229,7 +229,7 @@ def public_review_file(token: str, request: Request, db: Session = Depends(get_d
     if not proof:
         raise HTTPException(status_code=404, detail="File not found")
     ct = proof.content_type or "application/octet-stream"
-    return Response(content=load_bytes(proof.storage_key), media_type=ct, headers=file_response_headers(proof.file_name, ct))
+    return file_response(request, load_bytes(proof.storage_key), proof.file_name, ct)
 
 
 class Decision(BaseModel):
