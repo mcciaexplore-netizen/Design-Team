@@ -129,9 +129,9 @@ def test_whatsapp_instagram_and_linkedin_are_separate_choices_with_their_own_que
     for name in ("Flyer (Email / Print)", "WhatsApp creative", "Instagram post", "LinkedIn post", "Twitter / X post"):
         assert name in choices
     assert "Flyer (Email/Whatsapp)" not in choices and not any("Insta, LinkedIn" in c for c in choices)   # no more bundles
-    formats = {c: next(q for q in o["questions"][c] if q["id"] == "format")["options"] for c in ("WhatsApp creative", "Instagram post", "LinkedIn post")}
-    assert "Status (9:16)" in formats["WhatsApp creative"] and "Carousel" in formats["Instagram post"] and "Page banner (4:1)" in formats["LinkedIn post"]
-    assert len({tuple(v) for v in formats.values()}) == 3                    # genuinely different questions
+    for c in ("WhatsApp creative", "Instagram post", "LinkedIn post", "Twitter / X post"):   # free text, not a fixed list
+        q = next(q for q in o["questions"][c] if q["id"] == "format")
+        assert (q["label"], q["type"], q["required"]) == ("Format details", "text", False)
 
 
 def test_each_channel_creates_its_own_design_type(client):
@@ -151,7 +151,7 @@ def test_each_channel_creates_its_own_design_type(client):
 
 def test_a_choice_must_match_its_own_questions_and_old_bundled_names_are_rejected(client):
     assert post(client, design_requirement="Instagram post", details=json.dumps({})).status_code == 201                     # format is optional
-    assert post(client, design_requirement="Instagram post", details=json.dumps({"format": "Status (9:16)"})).status_code == 422   # a WhatsApp format
+    assert post(client, design_requirement="Instagram post", details=json.dumps({"format": "Story, 9:16, with a swipe-up"})).status_code == 201   # any wording
     assert post(client, design_requirement="Flyer (Email / Print)", details=json.dumps({"size": "A4", "channel": "WhatsApp"})).status_code == 422
     assert post(client, design_requirement="Flyer (Email/Whatsapp)").status_code == 422
     assert post(client, design_requirement="Social Media Post (Insta, LinkedIn, Twitter)").status_code == 422

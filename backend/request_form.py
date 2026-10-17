@@ -61,22 +61,22 @@ QUESTIONS = {
         _q("channel", "Where will it be shared?", "select", ["Email", "Print"], required=True),
     ],
     "WhatsApp creative": [
-        _q("format", "Format", "select", ["Message image (1:1)", "Status (9:16)", "Broadcast banner (16:9)"]),
+        _q("format", "Format details"),
         _q("message", "Message or call-to-action to show on it"),
         _q("language", "Language"),
     ],
     "Instagram post": [
-        _q("format", "Format", "select", ["Feed post (1:1)", "Portrait post (4:5)", "Story (9:16)", "Reel cover (9:16)", "Carousel"]),
+        _q("format", "Format details"),
         _q("slides", "Number of slides (for a carousel)", "number"),
         _q("tag", "Account or people to tag"),
     ],
     "LinkedIn post": [
-        _q("format", "Format", "select", ["Single image (1:1)", "Landscape image (1.91:1)", "Carousel (PDF)", "Page banner (4:1)", "Event banner"]),
+        _q("format", "Format details"),
         _q("slides", "Number of slides (for a carousel)", "number"),
         _q("tag", "Page or people to tag"),
     ],
     "Twitter / X post": [
-        _q("format", "Format", "select", ["Image (16:9)", "Square image (1:1)", "Header banner (3:1)"]),
+        _q("format", "Format details"),
     ],
     "Flex/Banner/Standee": [
         _q("size", "Size (width x height)", required=True),
