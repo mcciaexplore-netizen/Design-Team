@@ -35,19 +35,112 @@ class DriveError(Exception):
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 
+# ── Connected from Settings ("Connect Google Drive") ─────────────────────────
+# GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET name the OAuth client; the sign-in itself (refresh token, folder,
+# when, by whom) is kept in app_settings under this key, so nobody pastes tokens into Vercel. While the Google project
+# is in "Testing", Google ends the sign-in after 7 days: Settings shows when, leads get a reminder, and once it has
+# lapsed new uploads go to the database until someone reconnects.
+CONNECTION_KEY = "google_drive_connection"
+CONNECTION_DAYS = 7
+_cache: dict = {"value": None, "at": 0.0}
+
+
+def oauth_client() -> Optional[tuple[str, str]]:
+    cid, secret = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip(), os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
+    return (cid, secret) if cid and secret else None
+
+
+def _session():
+    from database import SessionLocal   # tests swap this for their own database
+    return SessionLocal()
+
+
+def _fernet():
+    """The refresh token is kept encrypted with a key derived from SECRET_KEY, so a copy of the database alone doesn't
+    give access to the Drive. Changing SECRET_KEY means connecting Drive again."""
+    import hashlib
+    from cryptography.fernet import Fernet
+    from auth import SECRET_KEY
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(f"google-drive:{SECRET_KEY}".encode()).digest()))
+
+
+def _sealed(value: dict) -> dict:
+    stored = {k: v for k, v in value.items() if k != "refresh_token"}
+    if value.get("refresh_token"):
+        stored["refresh_token_enc"] = _fernet().encrypt(value["refresh_token"].encode()).decode()
+    return stored
+
+
+def _opened(stored: dict) -> dict:
+    from cryptography.fernet import InvalidToken
+    value = {k: v for k, v in stored.items() if k != "refresh_token_enc"}
+    if stored.get("refresh_token_enc"):
+        try:
+            value["refresh_token"] = _fernet().decrypt(stored["refresh_token_enc"].encode()).decode()
+        except InvalidToken:   # SECRET_KEY changed since it was saved: treat it as ended, so Settings asks to reconnect
+            value["lapsed"] = True
+    return value
+
+
+def connection(fresh: bool = False) -> Optional[dict]:
+    """The sign-in saved from Settings, or None. Cached for 30 seconds: it is read on every upload."""
+    if not oauth_client():
+        return None
+    if fresh or time.time() - _cache["at"] > 30:
+        import models
+        db = _session()
+        try:
+            row = db.query(models.AppSetting).filter(models.AppSetting.key == CONNECTION_KEY).first()
+            _cache.update(value=_opened(row.value) if row and row.value else None, at=time.time())
+        finally:
+            db.close()
+    return dict(_cache["value"]) if _cache["value"] else None   # a copy: callers change it before saving
+
+
+def save_connection(value: Optional[dict]) -> None:
+    import models
+    db = _session()
+    try:
+        row = db.query(models.AppSetting).filter(models.AppSetting.key == CONNECTION_KEY).first()
+        if row is None:
+            row = models.AppSetting(key=CONNECTION_KEY)
+            db.add(row)
+        row.value = _sealed(value) if value else value
+        db.commit()
+    finally:
+        db.close()
+    _cache.update(value=dict(value) if value else None, at=time.time())
+    _token.update(value=None, expires=0.0)   # the next request signs in with the new refresh token
+
+
+def _usable_connection() -> Optional[dict]:
+    c = connection()
+    return c if c and c.get("refresh_token") and c.get("folder_id") and not c.get("lapsed") else None
+
+
 def enabled() -> bool:
-    return bool((os.getenv("GOOGLE_DRIVE_OAUTH") or os.getenv("GOOGLE_DRIVE_CREDENTIALS")) and os.getenv("GOOGLE_DRIVE_FOLDER_ID"))
+    if os.getenv("GOOGLE_DRIVE_FOLDER_ID") and (os.getenv("GOOGLE_DRIVE_OAUTH") or os.getenv("GOOGLE_DRIVE_CREDENTIALS")):
+        return True
+    return _usable_connection() is not None
 
 
 def _personal() -> Optional[dict]:
     """client_id, client_secret and refresh_token for a person's own Drive, when that way is set up."""
     raw = os.getenv("GOOGLE_DRIVE_OAUTH", "").strip()
-    return json.loads(raw) if raw else None
+    if raw:
+        return json.loads(raw)
+    c = _usable_connection() if not os.getenv("GOOGLE_DRIVE_CREDENTIALS") else None
+    if c:
+        cid, secret = oauth_client()
+        return {"client_id": cid, "client_secret": secret, "refresh_token": c["refresh_token"], "saved": True}
+    return None
 
 
 def _folder_id() -> str:
     """The folder id, also when the whole folder link was pasted (…/folders/<id>?usp=sharing)."""
-    raw = os.environ["GOOGLE_DRIVE_FOLDER_ID"].strip()
+    raw = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "").strip()
+    if not raw:
+        return (_usable_connection() or {}).get("folder_id", "")
     if "/folders/" in raw:
         raw = raw.split("/folders/", 1)[1]
     return raw.split("?", 1)[0].strip("/")
@@ -81,6 +174,11 @@ def _access_token(http: httpx.Client) -> str:
                                    creds["private_key"], algorithm="RS256")
             r = http.post(token_uri, data={"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": assertion})
         if r.status_code != 200:
+            if personal and personal.get("saved") and "invalid_grant" in r.text:
+                # The saved sign-in has run out: stop using Drive (uploads go to the database) until someone reconnects.
+                current = connection(fresh=True)
+                if current and not current.get("lapsed"):
+                    save_connection({**current, "lapsed": True})
             raise DriveError(f"Google sign-in failed ({r.status_code}): {r.text[:200]}")
         body = r.json()
         _token.update(value=body["access_token"], expires=time.time() + int(body.get("expires_in", 3600)))
@@ -133,12 +231,17 @@ def delete(file_id: str) -> None:
 def check() -> tuple[bool, str]:
     """Sign in and look at the folder, without storing anything: is Drive really ready for uploads? (Settings)"""
     if not enabled():
-        return False, ("Google Drive is not set up: add GOOGLE_DRIVE_OAUTH (or GOOGLE_DRIVE_CREDENTIALS) and "
-                       "GOOGLE_DRIVE_FOLDER_ID in Vercel, then redeploy.")
+        c = connection(fresh=True)
+        if c and c.get("lapsed"):
+            return False, "Google ended the Drive sign-in. Click Reconnect Google Drive; until then new uploads go to the database."
+        if oauth_client():
+            return False, "Google Drive is not connected yet. Click Connect Google Drive."
+        return False, ("Google Drive is not set up: add GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in Vercel "
+                       "and redeploy, then click Connect Google Drive here (DEPLOY.md has the steps).")
     try:
         personal = _personal()
         if personal:
-            who = "your Google account"
+            who = personal.get("email") or (connection() or {}).get("email") or "your Google account"
             personal["client_id"], personal["client_secret"], personal["refresh_token"]
         else:
             creds = _credentials()
@@ -154,6 +257,8 @@ def check() -> tuple[bool, str]:
             r = http.get(f"{API}/{_folder_id()}?supportsAllDrives=true&fields=name,mimeType,driveId,capabilities(canAddChildren)",
                          headers=headers)
     except DriveError:
+        if personal and personal.get("saved"):
+            return False, "Google ended the Drive sign-in. Click Reconnect Google Drive; until then new uploads go to the database."
         if personal:
             return False, "Google no longer accepts the sign-in in GOOGLE_DRIVE_OAUTH. Run drive_connect.py again and paste the new line."
         return False, f"Google refused the key for {who}. Make a new JSON key for it and paste the whole file again."
@@ -161,6 +266,8 @@ def check() -> tuple[bool, str]:
         return False, f"Could not reach Google: {exc.__class__.__name__}"
     if r.status_code == 404:
         if personal:
+            if personal.get("saved"):
+                return False, "DesignDesk can't open its Drive folder any more (deleted?). Click Reconnect Google Drive to make a new one."
             return False, (f"DesignDesk can't open the folder {_folder_id()}. With your own Drive it can only use the folder "
                            "drive_connect.py made: put the GOOGLE_DRIVE_FOLDER_ID it printed in Vercel.")
         return False, (f"The folder {_folder_id()} was not found, or {who} is not a member of its Shared Drive. "

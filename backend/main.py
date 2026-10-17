@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 import approvals, auth, campaigns_api, cdr_api, collab, cron_jobs, forecasting, integrations, library_api, live, notify_api, reports, request_form
-import revisions_api, templates_recurring, tickets_api, timetracking, tracking, uploads, users_admin, views_bulk
+import drive_connect_api, revisions_api, templates_recurring, tickets_api, timetracking, tracking, uploads, users_admin, views_bulk
 from auth import require_staff
 from database import get_db
 
@@ -67,7 +67,7 @@ app.add_middleware(
 )
 
 for module in (auth, campaigns_api, users_admin, tickets_api, revisions_api, notify_api, collab, views_bulk, templates_recurring,
-               timetracking, approvals, reports, request_form, cdr_api, tracking, uploads, library_api, live):
+               timetracking, approvals, reports, request_form, cdr_api, tracking, uploads, library_api, live, drive_connect_api):
     app.include_router(module.router)
 app.include_router(forecasting.router, dependencies=[Depends(require_staff)])
 

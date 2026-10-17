@@ -132,6 +132,40 @@ def run_all_cron_jobs(db: Session):
         db.rollback()
         logger.exception("Recurring rules failed")
 
+    # 7. Google Drive connected from Settings, when Google limits the sign-in (project in "Testing": 7 days).
+    try:
+        drive_sign_in(db, now)
+    except Exception:
+        db.rollback()
+        logger.exception("Google Drive reminder failed")
+
+
+def drive_sign_in(db: Session, now: datetime.datetime) -> None:
+    """A day before the sign-in ends, remind the leads to reconnect; once it has ended, stop using Drive (new uploads go
+    to the database) and tell them. Each message once per connection."""
+    import gdrive
+    c = gdrive.connection(fresh=True)
+    if not c or not c.get("expires_at"):
+        return
+    ends = datetime.datetime.fromisoformat(c["expires_at"])
+    if now >= ends:
+        step, text = "lapse_told", ("Google Drive is disconnected: Google ended the sign-in. New uploads are kept in the "
+                                    "database meanwhile. Reconnect in Settings > Email & storage.")
+        changes = {step: True, "lapsed": True}
+    elif now >= ends - datetime.timedelta(days=1):
+        step, text = "reminded", (f"Google Drive disconnects on {ends.astimezone(IST):%d %b at %I:%M %p} IST. Reconnect in "
+                                  "Settings > Email & storage (it takes a minute).")
+        changes = {step: True}
+    else:
+        return
+    if c.get(step):
+        return
+    gdrive.save_connection({**c, **changes})
+    leads = db.query(models.User).filter(models.User.role.in_([models.RoleEnum.DESIGN_LEAD, models.RoleEnum.ADMIN]),
+                                         models.User.is_active.is_(True)).all()
+    for lead in leads:
+        notify_user(db, lead, text, "DRIVE_SIGN_IN")
+
 
 # ── Running the jobs without a frequent cron ─────────────────────────────────
 # Vercel's Hobby plan runs a cron once a day, which is far too rarely for a 6-hour SLA warning or a 2-day review.

@@ -12,7 +12,22 @@ const HINT: React.CSSProperties = { fontSize: '0.72rem', color: '#64748b', margi
 
 interface IntegrationSettings {
   email_configured: boolean; email_from: string | null; email_host: string | null; file_storage: string;
+  drive_connect_ready: boolean; drive_redirect_uri: string; drive_connected_as: string | null;
+  drive_connected_at: string | null; drive_expires_at: string | null; drive_lapsed: boolean;
 }
+
+/* What Google's sign-in came back with (?drive=… on the way back to Settings). */
+const DRIVE_RETURN: Record<string, Result> = {
+  connected: { ok: true, text: 'Google Drive is connected. New uploads go to the folder "DesignDesk files" in that Drive.' },
+  refused: { ok: false, text: 'Google Drive was not connected: access was not allowed on the Google page.' },
+  expired: { ok: false, text: 'That sign-in took too long. Click Connect Google Drive again.' },
+  failed: { ok: false, text: 'Google did not complete the sign-in. Check the redirect URI below is on the OAuth client, then try again.' },
+  'no-folder': { ok: false, text: 'Signed in, but Google would not let DesignDesk make its folder. Check the Google Drive API is enabled.' },
+  'not-set-up': { ok: false, text: 'Add GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in Vercel first.' },
+  'other-account': { ok: false, text: 'That is a different Google account from the one connected, so nothing changed: files saved so far only open with the connected account. Sign in with that account, or use Switch Google account.' },
+};
+const SWITCH_WARNING = 'Switch to a different Google account?\n\nFiles already saved to the current Drive will stop opening in DesignDesk. New uploads go to the new account\'s Drive.';
+const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 interface Prefs {
   in_app_enabled: boolean;
   muted_events: string[]; available_events: Record<string, string>;
@@ -35,13 +50,16 @@ function ResultLine({ r }: { r: Result }) {
 }
 
 /* ── Email & file storage (leads) ─────────────── */
-function IntegrationsTab() {
+interface IntegrationsTabProps { driveReturn: string | null }
+
+function IntegrationsTab({ driveReturn }: IntegrationsTabProps) {
   const [cfg, setCfg] = useState<IntegrationSettings | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [emailResult, setEmailResult] = useState<Result>(null);
   const [checkingDrive, setCheckingDrive] = useState(false);
-  const [driveResult, setDriveResult] = useState<Result>(null);
+  const [driveResult, setDriveResult] = useState<Result>(driveReturn ? DRIVE_RETURN[driveReturn] ?? null : null);
+  const [connecting, setConnecting] = useState(false);
 
   const load = useCallback(async () => {
     try { setCfg(await apiJson<IntegrationSettings>('/api/settings/integrations')); setLoadError(null); }
@@ -56,6 +74,13 @@ function IntegrationsTab() {
       setEmailResult({ ok: r.ok, text: r.detail });
     } catch (e) { setEmailResult({ ok: false, text: e instanceof Error ? e.message : 'Test failed.' }); }
     finally { setTesting(false); }
+  };
+
+  const connectDrive = async (switchAccount = false) => {
+    if (switchAccount && !window.confirm(SWITCH_WARNING)) return;
+    setConnecting(true); setDriveResult(null);
+    try { window.location.href = (await apiJson<{ url: string }>(`/api/integrations/drive/connect?switch=${switchAccount}`, { method: 'POST' })).url; }
+    catch (e) { setDriveResult({ ok: false, text: e instanceof Error ? e.message : 'Could not start the Google sign-in.' }); setConnecting(false); }
   };
 
   const testDrive = async () => {
@@ -91,9 +116,32 @@ function IntegrationsTab() {
         <div className="icon-tile"><HardDrive size={16} /></div>
         <div>
           <h2 style={SECTION_LABEL}>File storage</h2>
-          <p style={{ fontSize: '0.75rem', color: '#64748b' }}>New uploads are saved to: <strong>{cfg.file_storage}</strong>. Set Google Drive in Vercel with GOOGLE_DRIVE_FOLDER_ID plus GOOGLE_DRIVE_OAUTH (your own Drive) or GOOGLE_DRIVE_CREDENTIALS (a Shared Drive); DEPLOY.md has the steps.</p>
+          <p style={{ fontSize: '0.75rem', color: '#64748b' }}>New uploads are saved to: <strong>{cfg.file_storage}</strong>. Google Drive needs GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in Vercel, then Connect Google Drive below; DEPLOY.md has the steps.</p>
         </div>
       </div>
+      {cfg.drive_connect_ready && (
+        <div style={{ marginTop: 10 }}>
+          {cfg.drive_lapsed ? (
+            <p style={{ ...HINT, color: '#b91c1c' }}><strong>Google Drive is disconnected</strong>: Google ended the sign-in. New uploads are kept in the database until you reconnect.</p>
+          ) : cfg.drive_connected_at ? (
+            <p style={HINT}>
+              Connected to the Drive of <strong>{cfg.drive_connected_as ?? 'a Google account'}</strong> on {when(cfg.drive_connected_at)}.
+              {cfg.drive_expires_at && <> Google ends this sign-in on <strong>{when(cfg.drive_expires_at)}</strong>: reconnect before then (you'll get a reminder a day ahead).</>}
+            </p>
+          ) : (
+            <p style={HINT}>Not connected yet. Sign in with the Google account whose Drive should hold the files.</p>
+          )}
+          <button type="button" className="btn-primary" onClick={() => void connectDrive()} disabled={connecting} style={{ marginTop: 6 }}>
+            <HardDrive size={14} /> {connecting ? 'Opening Google…' : cfg.drive_connected_at ? 'Reconnect Google Drive' : 'Connect Google Drive'}
+          </button>
+          {cfg.drive_connected_at && (
+            <button type="button" className="btn-ghost" onClick={() => void connectDrive(true)} disabled={connecting} style={{ marginTop: 6, marginLeft: 8 }}>
+              Switch Google account
+            </button>
+          )}
+        </div>
+      )}
+      <p style={{ ...HINT, marginTop: 8 }}>Redirect URI for the Google OAuth client: <code style={{ userSelect: 'all' }}>{cfg.drive_redirect_uri}</code></p>
       <div style={{ marginTop: 10 }}>
         <button type="button" className="btn-ghost" onClick={() => void testDrive()} disabled={checkingDrive}>
           <HardDrive size={14} /> {checkingDrive ? 'Checking…' : 'Check Google Drive'}
@@ -175,8 +223,13 @@ type TabKey = 'me' | 'account' | 'users' | 'integrations' | 'danger';
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
-  const isLead = user?.role === 'Design Lead';
-  const [tab, setTab] = useState<TabKey>('me');
+  const isLead = user?.role === 'Design Lead';   // an Admin arrives as 'Design Lead' too (auth.frontend_role)
+  // What Google's sign-in came back with, read once per visit to Settings, so coming back later doesn't repeat it.
+  const [driveReturn] = useState(() => new URLSearchParams(window.location.search).get('drive'));
+  const [tab, setTab] = useState<TabKey>(driveReturn && isLead ? 'integrations' : 'me');
+  useEffect(() => {   // drop ?drive=… so a reload doesn't show the message again
+    if (driveReturn) window.history.replaceState(null, '', window.location.pathname);
+  }, [driveReturn]);
   const revealRef = useReveal<HTMLDivElement>(tab);
   const tabs: [TabKey, string][] = [
     ['me', 'My notifications'],
@@ -196,7 +249,7 @@ const SettingsPage: React.FC = () => {
       </div>
       {tab === 'account' ? <AccountTab />
         : tab === 'users' && isLead ? <UsersAdmin />
-        : tab === 'integrations' && isLead ? <IntegrationsTab />
+        : tab === 'integrations' && isLead ? <IntegrationsTab driveReturn={driveReturn} />
         : tab === 'danger' && isLead ? <DeleteAllData />
         : <MyNotificationsTab />}
     </div>

@@ -251,10 +251,11 @@ def store_bytes(data: bytes, ext: str, name: Optional[str] = None) -> str:
     if gdrive.enabled():
         try:
             file_id = gdrive.upload(data, safe_filename(name or f"file.{ext}"), _CONTENT_TYPES.get(ext, "application/octet-stream"))
+            return f"gd-{file_id}.{ext}"
         except Exception as exc:   # never lose an upload silently
             logger.exception("Google Drive upload failed")
-            raise HTTPException(status_code=502, detail="Could not save the file to Google Drive. Please try again.") from exc
-        return f"gd-{file_id}.{ext}"
+            if gdrive.enabled():   # still connected: a real failure. Otherwise the sign-in just lapsed: store it below.
+                raise HTTPException(status_code=502, detail="Could not save the file to Google Drive. Please try again.") from exc
     key = f"{uuid.uuid4().hex}.{ext}"
     client = _s3()
     if client:

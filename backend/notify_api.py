@@ -1,7 +1,7 @@
 import os
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -56,8 +56,9 @@ class IntegrationSettingsUpdate(BaseModel):
 
 
 @router.get("/api/settings/integrations")
-def get_integration_settings(db: Session = Depends(get_db), _user: models.User = Depends(require_lead)):
-    return _public_settings(delivery.get_integrations(db))
+def get_integration_settings(request: Request, db: Session = Depends(get_db), _user: models.User = Depends(require_lead)):
+    import drive_connect_api
+    return {**_public_settings(delivery.get_integrations(db)), **drive_connect_api.status(request)}
 
 
 @router.put("/api/settings/integrations")
