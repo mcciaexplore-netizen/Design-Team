@@ -50,11 +50,11 @@ def _request_out(r: models.ApprovalRequest, version: Optional[int] = None) -> di
 
 # ── Proof versions (staff upload; anyone with ticket access can view) ────────
 
-def _email_review(ticket: models.Ticket, version: int, link: str) -> None:
-    """Tell the client by email (if SMTP is configured). The link opens the review page: it asks for a name and a
-    confirming click, so a mail scanner opening the link can't approve anything."""
+def _email_review(ticket: models.Ticket, version: int, link: str) -> Optional[str]:
+    """Tell the client by email (if SMTP is configured) and return the address it went to, else None. The link opens
+    the review page: it asks for a name and a confirming click, so a mail scanner opening the link can't approve anything."""
     if not delivery.email_configured() or not ticket.requester:
-        return
+        return None
     body = "\n".join([
         f"Hi {ticket.requester.full_name},", "",
         f"The design team has sent version {version} of \"{ticket.title}\" ({ticket.ticket_number}) for your review.", "",
@@ -62,6 +62,7 @@ def _email_review(ticket: models.Ticket, version: int, link: str) -> None:
         "You can also review it any time from your DesignDesk portal.", "", "MCCIA Applied AI Studio",
     ])
     delivery.run_in_background(delivery.send_email, ticket.requester.email, f"Design ready for your review: {ticket.ticket_number}", body)
+    return ticket.requester.email
 
 
 def _open_review(db: Session, ticket: models.Ticket, proof: models.ProofVersion, user: models.User, ttl_hours: int):
@@ -107,8 +108,8 @@ async def upload_proof(ticket_id: int, file: UploadFile = File(...), note: Optio
     if approval:
         db.refresh(approval[0])
         events.emit(db, "approval_requested", ticket, user, {"version": proof.version})
-        _email_review(ticket, proof.version, approval[1])
-        out["approval"] = {**_request_out(approval[0], proof.version), "review_url": approval[1]}
+        emailed = _email_review(ticket, proof.version, approval[1])
+        out["approval"] = {**_request_out(approval[0], proof.version), "review_url": approval[1], "emailed_to": emailed}
     else:
         out["approval"] = None
     return out
@@ -153,9 +154,9 @@ def create_approval_request(ticket_id: int, body: ApprovalCreate, db: Session = 
     db.commit()
     db.refresh(req)
     events.emit(db, "approval_requested", ticket, user, {"version": proof.version})
-    _email_review(ticket, proof.version, link)
+    emailed = _email_review(ticket, proof.version, link)
     # The link is returned exactly once; only its hash is stored.
-    return {**_request_out(req, proof.version), "review_url": link}
+    return {**_request_out(req, proof.version), "review_url": link, "emailed_to": emailed}
 
 
 @router.get("/api/tickets/{ticket_id}/approval-requests")

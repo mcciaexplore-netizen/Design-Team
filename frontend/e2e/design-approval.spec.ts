@@ -17,7 +17,7 @@ test('the designer uploads once; the client is notified, reviews in the portal, 
   await page.getByRole('tab', { name: 'Proofs & approval' }).click();
   await expect(page.getByLabel('Send to the client for approval when uploaded')).toBeChecked();
   await page.getByLabel('Choose proof file').setInputFiles({ name: 'poster-v1.png', mimeType: 'image/png', buffer: PNG });
-  await expect(page.getByRole('status').first()).toContainText('sent to the client for approval');
+  await expect(page.getByRole('status').first()).toContainText('was sent for approval');
 
   // Client: notified, opens the design from the bell.
   const clientPage = await (await browser.newContext()).newPage();
@@ -46,7 +46,7 @@ test('the designer uploads once; the client is notified, reviews in the portal, 
   await page.goto(`/tickets/${v2Id}`);
   await page.getByRole('tab', { name: 'Proofs & approval' }).click();
   await page.getByLabel('Choose proof file').setInputFiles({ name: 'poster-v2.png', mimeType: 'image/png', buffer: PNG });
-  await expect(page.getByRole('status').first()).toContainText('was sent to the client');
+  await expect(page.getByRole('status').first()).toContainText('was sent for approval');
 
   await clientPage.reload();
   await clientPage.getByRole('button', { name: /^Notifications/ }).click();

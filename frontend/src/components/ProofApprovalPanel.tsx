@@ -15,7 +15,7 @@ interface ApprovalReq {
   id: number; proof_version_id?: number; proof_version: number | null; status: 'pending' | 'approved' | 'changes_requested' | 'expired' | 'revoked';
   expires_at: string; decided_at: string | null; decided_by_name: string | null; decision_comment: string | null; created_at: string | null;
 }
-interface Created extends ApprovalReq { review_url: string }
+interface Created extends ApprovalReq { review_url: string; emailed_to: string | null }
 
 const STATUS_LABEL: Record<ApprovalReq['status'], { text: string; cls: string }> = {
   pending: { text: 'Awaiting client', cls: 'badge-blue' },
@@ -103,7 +103,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
       setNote('');
       if (out.approval) {
         setCreated(out.approval); setSendFor(null);
-        setInfo(`Version ${out.version} was sent to the client for approval. They have been notified.`);
+        setInfo(sentText(out.version, out.approval.emailed_to));
       } else {
         setInfo(`Version ${out.version} saved as a draft. It has not been sent to the client.`);
       }
@@ -119,6 +119,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
         method: 'POST', json: { proof_version_id: proof.id, ttl_hours: Number(days) * 24 },
       });
       setCreated(res); setSendFor(null);
+      setInfo(sentText(proof.version, res.emailed_to));
       await load(); void refresh();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not create the review link.'); }
     finally { setBusy(false); }
@@ -370,4 +371,11 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
       )}
     </div>
   );
+}
+
+/** What happened when a design went out for review: emailed (and to whom), or not, so the link must be shared by hand. */
+function sentText(version: number, emailedTo: string | null): string {
+  return emailedTo
+    ? `Version ${version} was sent for approval. The review link was emailed to ${emailedTo}, and it is in their portal.`
+    : `Version ${version} was sent for approval and is in the client's portal. Email isn't set up, so copy the review link below and send it to them.`;
 }
