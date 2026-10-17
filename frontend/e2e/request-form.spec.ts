@@ -120,20 +120,20 @@ test('each design type asks its own questions', async ({ page }) => {
   // WhatsApp, Instagram and LinkedIn are separate choices, each with its own formats.
   await only(page, 'WhatsApp creative');
   await expect(page.getByLabel('Where will it be shared? *')).toHaveCount(0);
-  await expect(page.getByLabel('Format *').locator('option', { hasText: 'Status (9:16)' })).toHaveCount(1);
+  await expect(page.getByLabel('Format', { exact: true }).locator('option', { hasText: 'Status (9:16)' })).toHaveCount(1);
   await expect(page.getByLabel('Message or call-to-action to show on it')).toBeVisible();
 
   await only(page, 'Instagram post');
-  await expect(page.getByLabel('Format *').locator('option', { hasText: 'Carousel' })).toHaveCount(1);
+  await expect(page.getByLabel('Format', { exact: true }).locator('option', { hasText: 'Carousel' })).toHaveCount(1);
   await expect(page.getByLabel('Number of slides (for a carousel)')).toBeVisible();
   await expect(page.getByLabel('Message or call-to-action to show on it')).toHaveCount(0);
 
   await only(page, 'LinkedIn post');
-  await expect(page.getByLabel('Format *').locator('option', { hasText: 'Page banner (4:1)' })).toHaveCount(1);
-  await expect(page.getByLabel('Format *').locator('option', { hasText: 'Reel cover' })).toHaveCount(0);
+  await expect(page.getByLabel('Format', { exact: true }).locator('option', { hasText: 'Page banner (4:1)' })).toHaveCount(1);
+  await expect(page.getByLabel('Format', { exact: true }).locator('option', { hasText: 'Reel cover' })).toHaveCount(0);
 
   await only(page, 'Twitter / X post');
-  await expect(page.getByLabel('Format *').locator('option', { hasText: 'Header banner (3:1)' })).toHaveCount(1);
+  await expect(page.getByLabel('Format', { exact: true }).locator('option', { hasText: 'Header banner (3:1)' })).toHaveCount(1);
   await expect(page.getByRole('checkbox', { name: /Insta, LinkedIn/ })).toHaveCount(0);   // the old bundled choice is gone
 
   await only(page, 'Flex/Banner/Standee');
@@ -145,7 +145,7 @@ test('each design type asks its own questions', async ({ page }) => {
   await expect(page.getByLabel('Number of slides *')).toBeVisible();
   await expect(page.getByLabel('Aspect ratio *')).toBeVisible();
 
-  await only(page, 'Directory');
+  await only(page, 'Book');
   await expect(page.getByLabel('Number of pages *')).toBeVisible();
   await expect(page.getByLabel('Is the content ready? *')).toBeVisible();
 
@@ -187,7 +187,7 @@ test('several files can be added, previewed and removed, and bad files are rejec
 
 test('a date earlier than the usual turnaround shows a warning', async ({ page }) => {
   await page.goto('/request');
-  await box(page, 'Directory').check();
+  await box(page, 'Book').check();
   await expect(page.getByText('earlier than usual')).toHaveCount(0);
   await expect(page.getByText('Standard turnaround')).toHaveCount(0);   // only the warning is ever shown
 
@@ -349,12 +349,12 @@ test('ticking several designs makes one ticket per design, each with its own que
 
   const flyer = page.getByRole('group', { name: `Details for ${FLYER}` });
   const insta = page.getByRole('group', { name: 'Details for Instagram post' });
-  await flyer.getByLabel('Size *', { exact: true }).selectOption('A4');
   await flyer.getByLabel('Where will it be shared? *').selectOption('Email');
   await page.getByRole('button', { name: 'Submit request' }).click();
-  await expect(page.getByRole('alert')).toContainText('Instagram post: Choose an option for “Format”');   // each design's own required question
+  await expect(page.getByRole('alert')).toContainText(`${FLYER}: Choose an option for “Size”`);   // each design's own required question
 
-  await insta.getByLabel('Format *').selectOption('Story (9:16)');
+  await flyer.getByLabel('Size *', { exact: true }).selectOption('A4');
+  await insta.getByLabel('Format', { exact: true }).selectOption('Story (9:16)');   // optional, but kept when given
   await page.getByRole('button', { name: 'Submit request' }).click();
   const done = page.getByRole('status').filter({ hasText: 'Request received' });
   await expect(done).toContainText('split into 2 tickets');

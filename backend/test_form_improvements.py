@@ -91,18 +91,18 @@ def test_reference_links_must_be_https_and_are_stored(client):
 def test_estimate_reports_standard_date_rush_and_priority(client):
     today = datetime.date.today()
     far = (today + datetime.timedelta(days=60)).isoformat()
-    r = client.get("/api/public/request-form/estimate", params={"design_requirement": "Directory", "delivery_date": far})
+    r = client.get("/api/public/request-form/estimate", params={"design_requirement": "Book", "delivery_date": far})
     assert r.status_code == 200, r.text
     body = r.json()
     ready = datetime.date.fromisoformat(body["standard_ready_by"])
     assert ready > today and body["rush"] is False and body["priority"] == "Low"
     soon = client.get("/api/public/request-form/estimate",
-                      params={"design_requirement": "Directory", "delivery_date": today.isoformat()}).json()
+                      params={"design_requirement": "Book", "delivery_date": today.isoformat()}).json()
     assert soon["rush"] is True and soon["priority"] == "Urgent"
-    assert client.get("/api/public/request-form/estimate", params={"design_requirement": "Directory"}).json()["rush"] is False
+    assert client.get("/api/public/request-form/estimate", params={"design_requirement": "Book"}).json()["rush"] is False
     assert client.get("/api/public/request-form/estimate", params={"design_requirement": "Nope"}).status_code == 422
     db = TestingSessionLocal()
-    assert db.query(models.DesignType).filter_by(name="Directory").count() == 0   # an estimate creates nothing
+    assert db.query(models.DesignType).filter_by(name="Book").count() == 0   # an estimate creates nothing
     db.close()
 
 
@@ -150,7 +150,7 @@ def test_each_channel_creates_its_own_design_type(client):
 
 
 def test_a_choice_must_match_its_own_questions_and_old_bundled_names_are_rejected(client):
-    assert post(client, design_requirement="Instagram post", details=json.dumps({})).status_code == 422                     # format is required
+    assert post(client, design_requirement="Instagram post", details=json.dumps({})).status_code == 201                     # format is optional
     assert post(client, design_requirement="Instagram post", details=json.dumps({"format": "Status (9:16)"})).status_code == 422   # a WhatsApp format
     assert post(client, design_requirement="Flyer (Email / Print)", details=json.dumps({"size": "A4", "channel": "WhatsApp"})).status_code == 422
     assert post(client, design_requirement="Flyer (Email/Whatsapp)").status_code == 422
@@ -191,10 +191,10 @@ def test_ticking_several_designs_creates_one_ticket_each(client, monkeypatch):
 
 
 def test_each_design_must_answer_its_own_required_questions(client):
-    data = form(details=json.dumps({FLYER: {"size": "A4", "channel": "Print"}, INSTA: {}}))
-    data["design_requirement"] = [FLYER, INSTA]
+    data = form(details=json.dumps({FLYER: {"size": "A4", "channel": "Print"}, "Book": {"content_ready": "Partly"}}))
+    data["design_requirement"] = [FLYER, "Book"]
     r = client.post("/api/public/requests", data=data)
-    assert r.status_code == 422 and r.json()["detail"] == "Instagram post – Format is required"
+    assert r.status_code == 422 and r.json()["detail"] == "Book – Number of pages is required"
     flat = form(details=json.dumps({"size": "A4", "channel": "Print"}))   # ungrouped answers only fit one design
     flat["design_requirement"] = [FLYER, INSTA]
     assert client.post("/api/public/requests", data=flat).status_code == 422
@@ -215,6 +215,6 @@ def test_portal_request_with_several_designs(client):
 def test_estimate_for_several_designs_uses_the_slowest(client):
     soon = (datetime.date.today() + datetime.timedelta(days=2)).isoformat()
     one = client.get("/api/public/request-form/estimate", params={"design_requirement": FLYER}).json()
-    both = client.get("/api/public/request-form/estimate", params=[("design_requirement", FLYER), ("design_requirement", "Directory"),
+    both = client.get("/api/public/request-form/estimate", params=[("design_requirement", FLYER), ("design_requirement", "Book"),
                                                                    ("delivery_date", soon)]).json()
     assert both["standard_ready_by"] > one["standard_ready_by"] and both["rush"] is True

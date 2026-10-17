@@ -219,6 +219,7 @@ function currentRequirement(old: string, details: Answers): { requirement: strin
     const first = Array.isArray(details.platforms) ? details.platforms[0] : '';
     return { requirement: first === 'LinkedIn' ? 'LinkedIn post' : first === 'Twitter' ? 'Twitter / X post' : 'Instagram post', details: {} };
   }
+  if (old === 'Directory') return { requirement: 'Book', details };   // renamed
   return { requirement: old, details };
 }
 
