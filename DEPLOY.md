@@ -89,7 +89,7 @@ Set these in Vercel, redeploy, then use **Settings > Email & storage > Send me a
 
 | Variable | Value |
 |---|---|
-| `SMTP_HOST` | `smtp.zoho.in` if the account is on zoho.in (India), otherwise `smtp.zoho.com` |
+| `SMTP_HOST` | `smtppro.zoho.in` for a company-domain mailbox (e.g. @mcciapune.com) on zoho.in; `smtppro.zoho.com` on zoho.com. (`smtp.zoho.in` is only for personal Zoho accounts.) |
 | `SMTP_PORT` | `465` |
 | `SMTP_SSL` | `true` |
 | `SMTP_USER` | the full mailbox address, e.g. `design@mcciapune.com` |
@@ -98,3 +98,8 @@ Set these in Vercel, redeploy, then use **Settings > Email & storage > Send me a
 
 Port `587` with `SMTP_SSL` unset also works. A "553 Sender is not allowed to relay" error means `SMTP_FROM` does not
 match the mailbox.
+
+"SMTPAuthenticationError" means Zoho refused the sign-in. Check, in order: the host (`smtppro.` for company
+domains), `SMTP_USER` is the full address, the password is an app-specific password when two-factor sign-in is on,
+and IMAP/SMTP access is allowed for the mailbox (Zoho Mail > Settings > Mail Accounts > IMAP Access; for an
+organisation, the Zoho Mail admin may also need to allow it in the Admin Console).
