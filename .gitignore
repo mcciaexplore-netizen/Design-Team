@@ -22,3 +22,4 @@ _smoke*
 # Google service account keys: never commit
 *.iam.gserviceaccount.json
 designdesk-*.json
+client_secret_*.json
