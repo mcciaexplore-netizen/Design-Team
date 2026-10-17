@@ -60,6 +60,9 @@ class SystemSettings(Base):
     edit_window_hours = Column(Integer, default=48, nullable=False)
     edit_window_uses_working_hours = Column(Boolean, default=True, nullable=False)
     max_free_revisions = Column(Integer, default=2, nullable=False)
+    # Ticket numbers never go below this, so after "Delete all past data" new tickets don't reuse old numbers (old
+    # tracking links are tied to the number and would otherwise show someone else's new request).
+    ticket_number_floor = Column(Integer, default=0, nullable=False, server_default="0")
 
 class User(Base):
     __tablename__ = "users"

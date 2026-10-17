@@ -399,7 +399,9 @@ def compute_due_at(db: Session, design_type: models.DesignType, priority: models
 
 def next_ticket_number(db: Session) -> str:
     last = db.query(models.Ticket).order_by(models.Ticket.id.desc()).first()
-    return f"DF-{(last.id + 1 if last else 1):04d}"
+    settings = db.query(models.SystemSettings).first()
+    floor = settings.ticket_number_floor if settings else 0
+    return f"DF-{max(last.id if last else 0, floor) + 1:04d}"
 
 
 def app_url() -> str:

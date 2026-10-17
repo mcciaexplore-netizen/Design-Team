@@ -106,3 +106,54 @@ def remove_user(db: Session, user: models.User) -> str:
     user.must_change_password = False
     db.commit()
     return "removed"
+
+
+# ── Starting afresh ──────────────────────────────────────────────────────────
+
+FILE_DELETE_BUDGET_SECONDS = 40   # stay inside the host's time limit; files left over are only unused copies
+
+
+def delete_all_past_data(db: Session, remove_clients: bool = False) -> dict:
+    """Delete every request and everything that exists because of one: designs, approvals, attachments, source files,
+    time, history, notifications, campaigns and social posts. Keeps the team, design types, settings, templates,
+    recurring rules and the library. With remove_clients, client accounts go too. Commits. Returns counts."""
+    import time
+
+    tickets = db.query(models.Ticket.id).count()
+    keys = {k for (k,) in db.query(models.Attachment.file_url)} | {k for (k,) in db.query(models.ProofVersion.storage_key)}
+    keys |= {k for (k,) in db.query(models.CdrRequest.s3_object_key) if k}
+    keys |= {k for (k,) in db.query(models.SocialPost.image_key) if k}
+    highest = db.query(models.Ticket.id).order_by(models.Ticket.id.desc()).first()
+
+    # Children before parents, as in delete_ticket, but for everything at once.
+    for model in (models.ApprovalRequest, models.Attachment, models.TicketComment, models.PinComment, models.PinpointComment,
+                  models.Subtask, models.TimeEntry, models.AuditLog, models.NotificationLog, models.Notification,
+                  models.ProofVersion, models.CdrDownloadLog, models.CdrRequest, models.SocialPost, models.Campaign,
+                  models.UploadPart):
+        db.query(model).delete(synchronize_session=False)
+    db.query(models.LibraryItem).update({"ticket_source_id": None}, synchronize_session=False)
+    db.query(models.Ticket).update({"parent_id": None}, synchronize_session=False)
+    db.query(models.Ticket).delete(synchronize_session=False)
+    # New tickets carry on from the highest number used, so an old tracking link never opens a new request.
+    settings = db.query(models.SystemSettings).first() or models.SystemSettings()
+    settings.ticket_number_floor = max(settings.ticket_number_floor or 0, highest[0] if highest else 0)
+    db.add(settings)
+    db.commit()
+
+    clients = 0
+    if remove_clients:
+        for user in db.query(models.User).filter(models.User.role == models.RoleEnum.REQUESTER).all():
+            if not is_removed(user):
+                remove_user(db, user)
+                clients += 1
+
+    deadline, left = time.monotonic() + FILE_DELETE_BUDGET_SECONDS, 0
+    for key in keys:
+        if time.monotonic() > deadline or _file_in_use(db, key):
+            left += time.monotonic() > deadline
+            continue
+        try:
+            delete_stored_file(key)
+        except Exception:
+            logger.exception("Could not delete stored file %s", key)
+    return {"tickets": tickets, "files": len(keys) - left, "clients_removed": clients}

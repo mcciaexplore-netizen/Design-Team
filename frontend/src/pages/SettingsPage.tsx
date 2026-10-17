@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordForm from '../components/ChangePasswordForm';
 import { useReveal } from '../hooks/useReveal';
 import UsersAdmin from '../components/UsersAdmin';
+import DeleteAllData from '../components/DeleteAllData';
 
 const SECTION_LABEL: React.CSSProperties = { fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', marginBottom: 2 };
 const FIELD_LABEL: React.CSSProperties = { fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: 6 };
@@ -240,7 +241,7 @@ function AccountTab() {
   );
 }
 
-type TabKey = 'me' | 'account' | 'users' | 'integrations';
+type TabKey = 'me' | 'account' | 'users' | 'integrations' | 'danger';
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -250,7 +251,7 @@ const SettingsPage: React.FC = () => {
   const tabs: [TabKey, string][] = [
     ['me', 'My notifications'],
     ['account', 'Password'],
-    ...(isLead ? [['users', 'Users'], ['integrations', 'Integrations & alerts']] as [TabKey, string][] : []),
+    ...(isLead ? [['users', 'Users'], ['integrations', 'Integrations & alerts'], ['danger', 'Danger zone']] as [TabKey, string][] : []),
   ];
 
   return (
@@ -266,6 +267,7 @@ const SettingsPage: React.FC = () => {
       {tab === 'account' ? <AccountTab />
         : tab === 'users' && isLead ? <UsersAdmin />
         : tab === 'integrations' && isLead ? <IntegrationsTab />
+        : tab === 'danger' && isLead ? <DeleteAllData />
         : <MyNotificationsTab />}
     </div>
   );

@@ -365,3 +365,25 @@ def delete_subtask(ticket_id: int, subtask_id: int, db: Session = Depends(get_db
     db.delete(db_subtask)
     db.commit()
     return None
+
+
+DELETE_ALL_PHRASE = "DELETE ALL DATA"
+
+
+class DeleteAllData(BaseModel):
+    confirm: str = Field(max_length=40)
+    password: str = Field(min_length=1, max_length=128)
+    remove_clients: bool = False
+
+
+@router.post("/api/admin/delete-all-data")
+def delete_all_data(body: DeleteAllData, db: Session = Depends(get_db), user: models.User = Depends(require_lead)):
+    """Start afresh: delete every request and what belongs to it (see deletion.delete_all_past_data). Cannot be
+    undone, so it needs the typed phrase and the Design Lead's own password."""
+    if body.confirm.strip() != DELETE_ALL_PHRASE:
+        raise HTTPException(status_code=422, detail=f'Type "{DELETE_ALL_PHRASE}" to confirm.')
+    if not auth.pwd_context.verify(body.password, user.hashed_password):
+        raise HTTPException(status_code=403, detail="That password is not right.")
+    result = deletion.delete_all_past_data(db, remove_clients=body.remove_clients)
+    logger.warning("All past data deleted by %s (%s): %s", user.email, user.id, result)
+    return result
