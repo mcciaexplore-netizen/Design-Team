@@ -3,12 +3,13 @@ import os
 import secrets
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-import approvals, auth, campaigns_api, cdr_api, collab, forecasting, integrations, live, notify_api, reports, request_form
+import approvals, auth, campaigns_api, cdr_api, collab, cron_jobs, forecasting, integrations, live, notify_api, reports, request_form
 import revisions_api, templates_recurring, thread, tickets_api, timetracking, tracking, users_admin, views_bulk
 from auth import require_staff
 from database import get_db
@@ -27,6 +28,15 @@ async def json_errors(request: Request, call_next):
     except Exception:
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         return JSONResponse({"detail": "The server had a problem. Please try again."}, status_code=500)
+
+
+@app.middleware("http")
+async def scheduled_jobs(request: Request, call_next):
+    """Run the reminders, SLA checks and auto-closing every few minutes off normal traffic (see cron_jobs.run_if_due)."""
+    response = await call_next(request)
+    if cron_jobs.auto_tick_enabled() and not request.url.path.endswith("/internal/tick"):
+        await run_in_threadpool(cron_jobs.run_if_due)
+    return response
 
 
 class SelectiveGZip(GZipMiddleware):

@@ -1,7 +1,10 @@
 import datetime
 import logging
+import os
+import time
 
 import pytz
+from sqlalchemy import text
 from sqlalchemy.orm import Session, joinedload
 
 import delivery
@@ -120,3 +123,49 @@ def run_all_cron_jobs(db: Session):
     except Exception:
         db.rollback()
         logger.exception("Recurring rules failed")
+
+
+# ── Running the jobs without a frequent cron ─────────────────────────────────
+# Vercel's Hobby plan runs a cron once a day, which is far too rarely for a 6-hour SLA warning or a 2-day review.
+# So ordinary traffic runs the jobs: after a request, if they last ran more than AUTO_TICK_SECONDS ago, they run again.
+# The last run is a row in rate_limit_hits (shared by every server instance); on Postgres an advisory lock stops two
+# instances starting together.
+
+AUTO_TICK_SECONDS = 300
+AUTO_TICK_KEY = "cron:auto-tick"
+_next_check = 0.0   # per process: skip even the database check until then
+
+
+def auto_tick_enabled() -> bool:
+    return os.getenv("AUTO_TICK", "on" if os.getenv("VERCEL") else "off").strip().lower() in ("on", "true", "1", "yes")
+
+
+def run_if_due() -> bool:
+    """Run every job if they are due. Returns whether they ran. Never raises: it runs after someone's request."""
+    global _next_check
+    if time.monotonic() < _next_check:
+        return False
+    _next_check = time.monotonic() + 60
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        now = datetime.datetime.now(pytz.UTC)
+        if db.bind.dialect.name == "postgresql" and not db.execute(text("SELECT pg_try_advisory_xact_lock(4207312)")).scalar():
+            return False   # another instance is checking right now
+        recent = db.query(models.RateLimitHit.id).filter(
+            models.RateLimitHit.key == AUTO_TICK_KEY,
+            models.RateLimitHit.created_at >= now - datetime.timedelta(seconds=AUTO_TICK_SECONDS)).first()
+        if recent:
+            db.rollback()
+            return False
+        db.query(models.RateLimitHit).filter(models.RateLimitHit.key == AUTO_TICK_KEY).delete(synchronize_session=False)
+        db.add(models.RateLimitHit(key=AUTO_TICK_KEY, created_at=now))
+        db.commit()   # releases the lock; other instances now see this run
+        run_all_cron_jobs(db)
+        return True
+    except Exception:
+        db.rollback()
+        logger.exception("Scheduled jobs failed")
+        return False
+    finally:
+        db.close()
