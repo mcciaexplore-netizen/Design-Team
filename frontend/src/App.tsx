@@ -42,7 +42,7 @@ const STAFF: UserRole[] = ['Design Lead', 'Designer'];
 const NAV_GROUPS: NavGroup[] = [
   { title: 'Workspace', items: [
     { to: '/my-tasks', label: 'My Tasks',     icon: ListChecks,      roles: STAFF },
-    { to: '/',         label: 'Kanban Board', icon: LayoutDashboard, roles: STAFF },
+    { to: '/',         label: 'Visual Board', icon: LayoutDashboard, roles: STAFF },
     { to: '/workload', label: 'Workload',     icon: Gauge,           roles: STAFF },
     { to: '/calendar', label: 'Calendar',     icon: CalendarDays,    roles: ['Design Lead', 'Designer', 'Client'] },
   ] },
@@ -67,7 +67,7 @@ const PAGE_TITLES: [string, string][] = [
   ['/campaigns',     'Campaigns'],
   ['/tickets',      'Ticket'],
   ['/settings',      'Settings'],
-  ['/',              'Board'],
+  ['/',              'Visual Board'],
 ];
 
 const PAGE_SUBTITLES: Record<string, string> = {

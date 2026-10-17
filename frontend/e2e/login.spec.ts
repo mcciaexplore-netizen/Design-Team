@@ -12,7 +12,7 @@ test('a wrong password shows an error and stays on the sign-in page', async ({ p
 
 test('a lead signs in, sees the board and signs out', async ({ page }) => {
   await login(page, ACCOUNTS.lead);
-  await expect(page.getByRole('heading', { name: 'Board', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Visual Board', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /sign out/i }).click();
   await expect(page.getByLabel('Email address')).toBeVisible();
 });
@@ -21,7 +21,7 @@ test('a client sees only their requests and notifications: no sidebar, calendar 
   await login(page, ACCOUNTS.client);
   await expect(page).toHaveURL(/client-portal/);
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Kanban Board' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Visual Board' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Calendar' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Search the workspace/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^Notifications/ })).toBeVisible();

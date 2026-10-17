@@ -549,7 +549,7 @@ body { background-image: none; background: var(--surface-alt); }
   border-radius: 8px;
 }
 
-/* ── Kanban column status dots ── */
+/* ── Visual Board column status dots ── */
 .kanban-status-dot {
   width: 8px;
   height: 8px;

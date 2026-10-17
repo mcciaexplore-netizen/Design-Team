@@ -60,7 +60,7 @@ const MyTasksPage = () => {
           <CheckCircle2 size={28} style={{ color: '#059669', margin: '0 auto 0.75rem' }} />
           <h3 style={{ fontWeight: 700 }}>You're all caught up</h3>
           <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: 6 }}>
-            Nothing is assigned to you. <Link to="/" style={{ color: 'var(--brand)', fontWeight: 700 }}>Pick something up from the board →</Link>
+            Nothing is assigned to you. <Link to="/" style={{ color: 'var(--brand)', fontWeight: 700 }}>Pick something up from the Visual Board →</Link>
           </p>
         </div>
       )}

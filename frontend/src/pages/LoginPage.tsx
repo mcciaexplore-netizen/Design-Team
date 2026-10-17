@@ -12,7 +12,7 @@ const DEMO_ACCOUNTS = [
 /** Demo shortcuts only exist in local dev builds; the deployed seed passwords are generated. */
 const SHOW_DEMO = import.meta.env.DEV;
 
-const FEATURES = ['Kanban Board', 'SLA Tracking', 'CDR Approval', 'Design Proofing', 'Capacity Forecast', 'Client Portal'];
+const FEATURES = ['Visual Board', 'SLA Tracking', 'CDR Approval', 'Design Proofing', 'Capacity Forecast', 'Client Portal'];
 
 const LoginPage: React.FC = () => {
   const { login, register } = useAuth();

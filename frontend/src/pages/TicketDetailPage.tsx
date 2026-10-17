@@ -112,7 +112,7 @@ const TicketDetailPage: React.FC = () => {
     <div style={{ padding: '0 0 3rem', height: '100%', overflowY: 'auto' }}>
       <div style={{ marginBottom: '1.5rem' }}>
         <Link to={isClient ? '/client-portal' : '/'} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textDecoration: 'none', marginBottom: '0.75rem' }}>
-          <ArrowLeft size={14} /> {isClient ? 'Back to my requests' : 'Back to board'}
+          <ArrowLeft size={14} /> {isClient ? 'Back to my requests' : 'Back to Visual Board'}
         </Link>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>

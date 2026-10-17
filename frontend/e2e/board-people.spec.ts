@@ -19,12 +19,12 @@ test('two accounts with the same name get separate columns, and a ticket sits un
   await login(page, ACCOUNTS.lead);
   await page.getByRole('group', { name: 'Group board by' }).getByRole('button', { name: 'By person' }).click();
 
-  const original = page.getByText('Alice Fernandez (alice@mccia.in)', { exact: true });
-  const second = page.getByText('Alice Fernandez (alice.twin@mccia.in)', { exact: true });
+  const original = page.getByRole('heading', { name: 'Alice Fernandez (alice@mccia.in)', exact: true });
+  const second = page.getByRole('heading', { name: 'Alice Fernandez (alice.twin@mccia.in)', exact: true });
   await expect(original).toBeVisible();
   await expect(second).toBeVisible();                                    // two columns, not one merged column
 
-  const column = (label: ReturnType<typeof page.getByText>) => label.locator('xpath=ancestor::div[contains(@class,"glass-card")][1]');
+  const column = (label: ReturnType<typeof page.getByRole>) => label.locator('xpath=ancestor::div[contains(@class,"glass-card")][1]');
   await expect(column(second)).toContainText('E2E twin ticket');         // under the account it is assigned to...
   await expect(column(original)).not.toContainText('E2E twin ticket');   // ...and not under the same-named one
 });

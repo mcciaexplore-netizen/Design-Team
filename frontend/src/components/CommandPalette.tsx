@@ -8,7 +8,7 @@ interface CommandPaletteProps { isOpen: boolean; onClose: () => void }
 interface Entry { key: string; icon: LucideIcon; label: string; sub?: string; to: string; color?: string; group: 'Pages' | 'Tickets' }
 
 const PAGES: (Omit<Entry, 'key' | 'group'> & { roles: string[] })[] = [
-  { icon: LayoutDashboard, label: 'Kanban board',          sub: 'Move work between stages',        to: '/',              roles: ['Design Lead', 'Designer'] },
+  { icon: LayoutDashboard, label: 'Visual board',          sub: 'Move work between stages',        to: '/',              roles: ['Design Lead', 'Designer'] },
   { icon: Gauge,           label: 'Team workload',         sub: 'Capacity versus planned effort',  to: '/workload',      roles: ['Design Lead', 'Designer'] },
   { icon: BarChart3,       label: 'Performance dashboard', sub: 'Last 30 days',                    to: '/dashboard',     roles: ['Design Lead'] },
   { icon: Users,           label: 'Client portal',         sub: 'Requests and reviews',            to: '/client-portal', roles: ['Design Lead', 'Designer', 'Client'] },
