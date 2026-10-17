@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Bell, CheckCircle2, HardDrive, Mail, MessageSquare, Save, Send } from 'lucide-react';
+import { AlertTriangle, Bell, CheckCircle2, HardDrive, Mail, Save, Send } from 'lucide-react';
 import { apiJson } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordForm from '../components/ChangePasswordForm';
@@ -8,12 +8,9 @@ import UsersAdmin from '../components/UsersAdmin';
 import DeleteAllData from '../components/DeleteAllData';
 
 const SECTION_LABEL: React.CSSProperties = { fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', marginBottom: 2 };
-const FIELD_LABEL: React.CSSProperties = { fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: 6 };
 const HINT: React.CSSProperties = { fontSize: '0.72rem', color: '#64748b', marginTop: 5, lineHeight: 1.5 };
 
 interface IntegrationSettings {
-  slack_configured: boolean; slack_webhook_masked: string; slack_channel: string;
-  slack_events: { breach: boolean; escalate: boolean; new: boolean };
   email_configured: boolean; email_from: string | null; email_host: string | null; file_storage: string;
 }
 interface Prefs {
@@ -37,140 +34,56 @@ function ResultLine({ r }: { r: Result }) {
   return <p role="status" style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: '0.78rem', marginTop: 8, color: r.ok ? '#059669' : '#b91c1c' }}><Icon size={14} style={{ flexShrink: 0, marginTop: 2 }} /> {r.text}</p>;
 }
 
-/* ── Integrations (leads) ─────────────────────── */
+/* ── Email & file storage (leads) ─────────────── */
 function IntegrationsTab() {
   const [cfg, setCfg] = useState<IntegrationSettings | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [webhook, setWebhook] = useState('');
-  const [channel, setChannel] = useState('');
-  const [events, setEvents] = useState({ breach: true, escalate: true, new: true });
-  const [saving, setSaving] = useState(false);
-  const [saveResult, setSaveResult] = useState<Result>(null);
-  const [slackResult, setSlackResult] = useState<Result>(null);
-  const [testing, setTesting] = useState<'slack' | 'email' | null>(null);
+  const [testing, setTesting] = useState(false);
   const [emailResult, setEmailResult] = useState<Result>(null);
 
-  const apply = (c: IntegrationSettings) => {
-    setCfg(c); setChannel(c.slack_channel); setEvents(c.slack_events); setWebhook('');
-  };
-
   const load = useCallback(async () => {
-    try { apply(await apiJson<IntegrationSettings>('/api/settings/integrations')); setLoadError(null); }
+    try { setCfg(await apiJson<IntegrationSettings>('/api/settings/integrations')); setLoadError(null); }
     catch (e) { setLoadError(e instanceof Error ? e.message : 'Could not load settings.'); }
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const save = async () => {
-    setSaving(true); setSaveResult(null);
-    try {
-      const body: Record<string, unknown> = { slack_channel: channel.trim(), slack_events: events };
-      if (webhook.trim()) body.slack_webhook = webhook.trim();
-      apply(await apiJson<IntegrationSettings>('/api/settings/integrations', { method: 'PUT', json: body }));
-      setSaveResult({ ok: true, text: 'Settings saved.' });
-    } catch (e) { setSaveResult({ ok: false, text: e instanceof Error ? e.message : 'Could not save.' }); }
-    finally { setSaving(false); }
-  };
-
-  const removeWebhook = async () => {
-    setSaving(true); setSaveResult(null);
-    try { apply(await apiJson<IntegrationSettings>('/api/settings/integrations', { method: 'PUT', json: { slack_webhook: '' } })); setSaveResult({ ok: true, text: 'Slack webhook removed.' }); }
-    catch (e) { setSaveResult({ ok: false, text: e instanceof Error ? e.message : 'Could not remove it.' }); }
-    finally { setSaving(false); }
-  };
-
-  const testSlack = async () => {
-    setTesting('slack'); setSlackResult(null);
-    try {
-      const r = await apiJson<{ ok: boolean; detail: string }>('/api/integrations/slack/test', { method: 'POST', json: { webhook_url: webhook.trim() || null, channel: channel.trim() } });
-      setSlackResult({ ok: r.ok, text: r.detail });
-    } catch (e) { setSlackResult({ ok: false, text: e instanceof Error ? e.message : 'Test failed.' }); }
-    finally { setTesting(null); }
-  };
-
   const testEmail = async () => {
-    setTesting('email'); setEmailResult(null);
+    setTesting(true); setEmailResult(null);
     try {
       const r = await apiJson<{ ok: boolean; detail: string }>('/api/integrations/email/test', { method: 'POST' });
       setEmailResult({ ok: r.ok, text: r.detail });
     } catch (e) { setEmailResult({ ok: false, text: e instanceof Error ? e.message : 'Test failed.' }); }
-    finally { setTesting(null); }
+    finally { setTesting(false); }
   };
 
   if (loadError) return <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{loadError} <button type="button" className="chip" onClick={() => void load()}>Retry</button></p>;
   if (!cfg) return <p role="status" style={{ color: '#64748B', fontSize: '0.85rem' }}>Loading…</p>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <section className="glass-card" style={{ padding: '1.5rem' }} aria-labelledby="email-h">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <div className="icon-tile"><Mail size={16} /></div>
-          <div>
-            <h2 id="email-h" style={SECTION_LABEL}>Email</h2>
-            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Confirmations, review links and reminders. Set in Vercel with the SMTP_* settings (e.g. Zoho Mail).</p>
-          </div>
-          <span className={cfg.email_configured ? 'badge-green' : 'badge-red'} style={{ marginLeft: 'auto' }}>{cfg.email_configured ? 'Connected' : 'Not set up'}</span>
+    <section className="glass-card" style={{ padding: '1.5rem' }} aria-labelledby="email-h">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <div className="icon-tile"><Mail size={16} /></div>
+        <div>
+          <h2 id="email-h" style={SECTION_LABEL}>Email</h2>
+          <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Confirmations, review links and reminders. Set in Vercel with the SMTP_* settings (e.g. Zoho Mail).</p>
         </div>
-        {cfg.email_configured && <p style={HINT}>Sending as <strong>{cfg.email_from}</strong> through {cfg.email_host}.</p>}
-        <div style={{ marginTop: 10 }}>
-          <button type="button" className="btn-ghost" onClick={() => void testEmail()} disabled={testing !== null || !cfg.email_configured}>
-            <Send size={14} /> {testing === 'email' ? 'Sending…' : 'Send me a test email'}
-          </button>
-          <ResultLine r={emailResult} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid rgba(226,232,240,0.85)' }}>
-          <div className="icon-tile"><HardDrive size={16} /></div>
-          <div>
-            <h2 style={SECTION_LABEL}>File storage</h2>
-            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>New uploads are saved to: <strong>{cfg.file_storage}</strong>. Set Google Drive with GOOGLE_DRIVE_CREDENTIALS and GOOGLE_DRIVE_FOLDER_ID in Vercel.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="glass-card" style={{ padding: '1.5rem' }} aria-labelledby="slack-h">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <div className="icon-tile" style={{ background: 'rgba(74,21,75,0.07)', borderColor: 'rgba(74,21,75,0.15)', color: '#4a154b' }}><MessageSquare size={16} /></div>
-          <div>
-            <h2 id="slack-h" style={SECTION_LABEL}>Slack integration</h2>
-            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Post new tickets, SLA breaches and escalations to a Slack channel via an Incoming Webhook.</p>
-          </div>
-          <span className={cfg.slack_configured ? 'badge-green' : 'badge-red'} style={{ marginLeft: 'auto' }}>{cfg.slack_configured ? 'Connected' : 'Not set up'}</span>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div>
-            <label htmlFor="slack-url" style={FIELD_LABEL}>Webhook URL</label>
-            <input id="slack-url" className="input-field" type="url" autoComplete="off" value={webhook} onChange={e => setWebhook(e.target.value)}
-              placeholder={cfg.slack_configured ? `Saved: ${cfg.slack_webhook_masked} — paste a new URL to replace it` : 'https://hooks.slack.com/services/T…/B…/…'} />
-            <p style={HINT}>Create one at <strong>api.slack.com/apps</strong> → Incoming Webhooks. The URL is stored on the server and never shown again.
-              {cfg.slack_configured && <> <button type="button" className="chip" onClick={() => void removeWebhook()} disabled={saving}>Remove saved webhook</button></>}</p>
-          </div>
-          <div>
-            <label htmlFor="slack-ch" style={FIELD_LABEL}>Channel (optional)</label>
-            <input id="slack-ch" className="input-field" value={channel} maxLength={80} onChange={e => setChannel(e.target.value)} placeholder="#design-alerts" style={{ maxWidth: 260 }} />
-            <p style={HINT}>Modern Slack apps post to the channel chosen when the webhook was created; this only applies to legacy webhooks.</p>
-          </div>
-          <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
-            <legend style={FIELD_LABEL}>Send alerts for…</legend>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <Toggle id="ev-breach" checked={events.breach} onChange={v => setEvents(e => ({ ...e, breach: v }))} label="SLA breach" />
-              <Toggle id="ev-esc" checked={events.escalate} onChange={v => setEvents(e => ({ ...e, escalate: v }))} label="Client changes requested" />
-              <Toggle id="ev-new" checked={events.new} onChange={v => setEvents(e => ({ ...e, new: v }))} label="New ticket created / design approved" />
-            </div>
-          </fieldset>
-          <div>
-            <button type="button" className="btn-ghost" onClick={() => void testSlack()} disabled={testing !== null || (!webhook.trim() && !cfg.slack_configured)}>
-              <Send size={14} /> {testing === 'slack' ? 'Sending…' : 'Send test message'}
-            </button>
-            <ResultLine r={slackResult} />
-          </div>
-        </div>
-      </section>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button type="button" className="btn-primary" onClick={() => void save()} disabled={saving}><Save size={14} /> {saving ? 'Saving…' : 'Save settings'}</button>
-        <ResultLine r={saveResult} />
+        <span className={cfg.email_configured ? 'badge-green' : 'badge-red'} style={{ marginLeft: 'auto' }}>{cfg.email_configured ? 'Connected' : 'Not set up'}</span>
       </div>
-    </div>
+      {cfg.email_configured && <p style={HINT}>Sending as <strong>{cfg.email_from}</strong> through {cfg.email_host}.</p>}
+      <div style={{ marginTop: 10 }}>
+        <button type="button" className="btn-ghost" onClick={() => void testEmail()} disabled={testing || !cfg.email_configured}>
+          <Send size={14} /> {testing ? 'Sending…' : 'Send me a test email'}
+        </button>
+        <ResultLine r={emailResult} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid rgba(226,232,240,0.85)' }}>
+        <div className="icon-tile"><HardDrive size={16} /></div>
+        <div>
+          <h2 style={SECTION_LABEL}>File storage</h2>
+          <p style={{ fontSize: '0.75rem', color: '#64748b' }}>New uploads are saved to: <strong>{cfg.file_storage}</strong>. Set Google Drive with GOOGLE_DRIVE_CREDENTIALS and GOOGLE_DRIVE_FOLDER_ID in Vercel.</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -251,7 +164,7 @@ const SettingsPage: React.FC = () => {
   const tabs: [TabKey, string][] = [
     ['me', 'My notifications'],
     ['account', 'Password'],
-    ...(isLead ? [['users', 'Users'], ['integrations', 'Integrations & alerts'], ['danger', 'Danger zone']] as [TabKey, string][] : []),
+    ...(isLead ? [['users', 'Users'], ['integrations', 'Email & storage'], ['danger', 'Danger zone']] as [TabKey, string][] : []),
   ];
 
   return (
