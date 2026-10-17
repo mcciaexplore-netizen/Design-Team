@@ -1,7 +1,8 @@
 """Google Drive file storage, in one folder (GOOGLE_DRIVE_FOLDER_ID: its id from the URL, or the whole link). Two ways in:
 
 * A person's own Drive (My Drive works): GOOGLE_DRIVE_OAUTH, the JSON that `python drive_connect.py` prints after that
-  person signs in to Google once. Files count against that person's storage.
+  person signs in to Google once, with the folder that script makes (it only grants access to DesignDesk's own files).
+  Files count against that person's storage.
 * A Workspace Shared Drive: GOOGLE_DRIVE_CREDENTIALS, a service account's JSON key (as-is or base64-encoded); the service
   account must be a member of the Shared Drive as Content manager. It cannot use a My Drive: Google gives service
   accounts no storage of their own.
@@ -160,7 +161,8 @@ def check() -> tuple[bool, str]:
         return False, f"Could not reach Google: {exc.__class__.__name__}"
     if r.status_code == 404:
         if personal:
-            return False, f"The folder {_folder_id()} was not found in the Drive of the account that signed in. Check the folder link."
+            return False, (f"DesignDesk can't open the folder {_folder_id()}. With your own Drive it can only use the folder "
+                           "drive_connect.py made: put the GOOGLE_DRIVE_FOLDER_ID it printed in Vercel.")
         return False, (f"The folder {_folder_id()} was not found, or {who} is not a member of its Shared Drive. "
                        "In Drive: the Shared Drive > Manage members > add that address as Content manager.")
     if r.status_code != 200:

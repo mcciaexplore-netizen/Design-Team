@@ -3,9 +3,14 @@
     python drive_connect.py path\\to\\client_secret.json
 
 The JSON file is an OAuth client of type "Desktop app" from Google Cloud Console (DEPLOY.md has the steps). Your
-browser opens; sign in with the Google account whose Drive should hold the files and allow access. The script then
-prints one line: paste it into Vercel as GOOGLE_DRIVE_OAUTH. It works until you remove DesignDesk's access in your
-Google account (Security > Third-party connections)."""
+browser opens; sign in with the Google account whose Drive should hold the files and allow access. The script creates
+the folder "DesignDesk files" in that Drive and prints the two values for Vercel: GOOGLE_DRIVE_OAUTH and
+GOOGLE_DRIVE_FOLDER_ID. It works until you remove DesignDesk's access in your Google account (Security > Third-party
+connections).
+
+It asks only for drive.file: access to the files DesignDesk itself creates, nothing else in the Drive. That permission
+needs no Google review, so the consent screen can be "In production" (in "Testing", Google ends the sign-in after 7
+days). The flip side: DesignDesk can only use a folder it made, which is why the script makes one."""
 import http.server
 import json
 import secrets
@@ -17,7 +22,8 @@ import httpx
 
 AUTH = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN = "https://oauth2.googleapis.com/token"
-SCOPE = "https://www.googleapis.com/auth/drive"
+SCOPE = "https://www.googleapis.com/auth/drive.file"
+FILES = "https://www.googleapis.com/drive/v3/files"
 
 
 def main(path: str) -> None:
@@ -58,10 +64,18 @@ def main(path: str) -> None:
                                 "redirect_uri": redirect, "grant_type": "authorization_code"})
     if r.status_code != 200 or "refresh_token" not in r.json():
         sys.exit(f"Google refused the sign-in ({r.status_code}): {r.text[:300]}")
-    value = json.dumps({"client_id": client_id, "client_secret": client_secret, "refresh_token": r.json()["refresh_token"]})
-    print("Connected. In Vercel > Settings > Environment Variables, add GOOGLE_DRIVE_OAUTH with this value "
-          "(the whole line, and keep it private):\n")
+    tokens = r.json()
+    folder = httpx.post(f"{FILES}?fields=id,name", headers={"Authorization": f"Bearer {tokens['access_token']}"},
+                        json={"name": "DesignDesk files", "mimeType": "application/vnd.google-apps.folder"})
+    if folder.status_code != 200:
+        sys.exit(f"Signed in, but could not create the folder ({folder.status_code}): {folder.text[:300]}")
+    value = json.dumps({"client_id": client_id, "client_secret": client_secret, "refresh_token": tokens["refresh_token"]})
+    print('Connected, and made the folder "DesignDesk files" in your Drive (rename or move it any time).\n'
+          "In Vercel > Settings > Environment Variables, add these two (keep the first one private):\n")
+    print("GOOGLE_DRIVE_OAUTH =")
     print(value)
+    print("\nGOOGLE_DRIVE_FOLDER_ID =")
+    print(folder.json()["id"])
 
 
 if __name__ == "__main__":
