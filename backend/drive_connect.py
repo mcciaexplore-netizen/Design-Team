@@ -24,13 +24,20 @@ AUTH = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN = "https://oauth2.googleapis.com/token"
 SCOPE = "https://www.googleapis.com/auth/drive.file"
 FILES = "https://www.googleapis.com/drive/v3/files"
+WEB_PORT = 8765
+WEB_REDIRECT = f"http://127.0.0.1:{WEB_PORT}/"
 
 
 def main(path: str) -> None:
     with open(path, encoding="utf-8") as f:
         client = json.load(f)
+    web = "web" in client
     client = client.get("installed") or client.get("web") or client
     client_id, client_secret = client["client_id"], client["client_secret"]
+    if web:
+        # A "Web application" client only accepts addresses listed on it, so use a fixed one and say where to add it.
+        print(f"This is a Web application client. In Google Cloud Console > Credentials > this client > Authorized "
+              f"redirect URIs, add {WEB_REDIRECT} and save (it can take a few minutes to apply).\n")
 
     state, got = secrets.token_urlsafe(16), {}
 
@@ -47,7 +54,7 @@ def main(path: str) -> None:
         def log_message(self, *args):
             pass
 
-    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    server = http.server.HTTPServer(("127.0.0.1", WEB_PORT if web else 0), Handler)
     redirect = f"http://127.0.0.1:{server.server_port}/"
     url = AUTH + "?" + urllib.parse.urlencode({
         "client_id": client_id, "redirect_uri": redirect, "response_type": "code", "scope": SCOPE,
