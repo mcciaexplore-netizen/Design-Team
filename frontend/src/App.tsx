@@ -18,6 +18,7 @@ const RequestFormPage = lazy(() => import('./pages/RequestFormPage'));
 const TrackPage = lazy(() => import('./pages/TrackPage'));
 const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
 const MyRequestsPage = lazy(() => import('./pages/MyRequestsPage'));
+const RequestsBoardPage = lazy(() => import('./pages/RequestsBoardPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const CampaignsPage = lazy(() => import('./pages/CampaignsPage'));
 
@@ -335,6 +336,7 @@ function AppContent() {
 
   /* So does the design request form. */
   if (location.pathname === '/request') return <Suspense fallback={<PageLoading />}><RequestFormPage /></Suspense>;
+  if (location.pathname === '/requests') return <Suspense fallback={<PageLoading />}><RequestsBoardPage /></Suspense>;
   if (location.pathname === '/my-requests') return <Suspense fallback={<PageLoading />}><MyRequestsPage /></Suspense>;
   if (location.pathname === '/forgot-password' || location.pathname === '/reset-password') {
     return <Suspense fallback={<PageLoading />}><PasswordResetPage /></Suspense>;

@@ -19,7 +19,7 @@ export default function RequestFormPage() {
         <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-strong)' }}>Request for Creative / Graphic Design work</h1>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-soft)', margin: '6px 0 20px' }}>
           Fill in the form and attach the circular or file. Please submit a separate request for each recurring creative.
-          {' '}Already sent some? <a className="login-link-btn" href="/my-requests">See all your requests</a>
+          {' '}Already sent some? <a className="login-link-btn" href="/requests">See where all requests stand</a>
         </p>
         {loadError && <p role="alert" style={{ color: '#b91c1c' }}>{loadError}</p>}
         {options && <RequestFormBody options={options} />}
@@ -87,6 +87,7 @@ function RequestFormBody({ options }: { options: RequestFormOptions }) {
             {done.tickets[0] && (
               <p style={{ fontSize: '0.85rem', marginTop: 10 }}>
                 <a href={done.tickets[0].tracking_url} style={{ fontWeight: 700 }}>Track this request</a> any time. Bookmark the link, no sign-in needed.
+                {' '}Or <a href="/requests" style={{ fontWeight: 700 }}>see all requests</a> and where each one stands.
               </p>
             )}
           </>

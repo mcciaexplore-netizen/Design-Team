@@ -2,11 +2,13 @@
 import datetime
 import hashlib
 import hmac
+import os
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload
 
 import models
 from auth import ALGORITHM, SECRET_KEY
@@ -107,6 +109,43 @@ def email_my_requests_link(body: MyRequestsLink, request: Request, db: Session =
             f"Hi {user.full_name},\n\nSee all your design requests and where each one stands:\n\n{my_requests_url(user)}\n\n"
             "The link works for 30 days. Don't forward it: anyone with it can see your requests.\n\nMCCIA Applied AI Studio\n"))
     return {"detail": LINK_SENT}
+
+
+# ── Public board: every request, grouped by organisation ─────────────────────
+# Anyone can open it, so it carries only what a tracking link already shows: no brief, names, emails or files.
+# PUBLIC_BOARD=off turns it off.
+
+BOARD_FINISHED_DAYS = 90   # finished requests stay on the board this long
+FINISHED = (models.TicketStatus.DELIVERED, models.TicketStatus.CLOSED, models.TicketStatus.CLOSED_WITHOUT_APPROVAL)
+
+
+@router.get("/api/public/requests-board")
+def requests_board(db: Session = Depends(get_db)):
+    if os.getenv("PUBLIC_BOARD", "on").strip().lower() in ("off", "false", "0", "no"):
+        raise HTTPException(status_code=404, detail="The public requests board is turned off.")
+    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=BOARD_FINISHED_DAYS)
+    tickets = db.query(models.Ticket).options(joinedload(models.Ticket.requester), joinedload(models.Ticket.design_type)) \
+        .filter(or_(models.Ticket.status.notin_(FINISHED),
+                    func.coalesce(models.Ticket.delivered_at, models.Ticket.updated_at) >= cutoff)) \
+        .order_by(models.Ticket.created_at.desc(), models.Ticket.id.desc()).limit(500).all()
+    return {
+        "steps": STEPS,
+        "finished_days": BOARD_FINISHED_DAYS,
+        "requests": [{
+            "ticket_number": t.ticket_number,
+            "title": t.title,
+            # A public-form ticket has no organisation of its own; use the one the team set on the account.
+            "organisation": t.client_org or (t.requester.client_org if t.requester else None),
+            "design_type": t.design_type.name if t.design_type else None,
+            "status": t.status.value,
+            "current_step": STATUS_STEP.get(t.status.value, 0),
+            "finished": t.status in FINISHED,
+            "due_at": as_utc(t.due_at).isoformat() if t.due_at else None,
+            "delivered_at": as_utc(t.delivered_at).isoformat() if t.delivered_at else None,
+            "created_at": as_utc(t.created_at).isoformat() if t.created_at else None,
+            "tracking_url": tracking_url(t.ticket_number),
+        } for t in tickets],
+    }
 
 
 @router.get("/api/public/my-requests")
