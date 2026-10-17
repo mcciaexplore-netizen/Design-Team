@@ -15,7 +15,7 @@ import events
 import revision_engine
 import models
 from auth import get_current_user, get_ticket_for_user, is_client, require_staff
-from common import app_url, as_utc, ensure_changes_allowed, mark_delivered, file_response, load_bytes, log_audit, read_upload, store_bytes
+from common import app_url, as_utc, ensure_changes_allowed, mark_delivered, stored_file_response, log_audit, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["approvals"])
@@ -89,7 +89,7 @@ async def upload_proof(ticket_id: int, file: UploadFile = File(...), note: Optio
     if ticket.is_locked:
         raise HTTPException(status_code=409, detail="This version is closed. Upload the design on the newest version of the request.")
     data, name, content_type = await read_upload(file)
-    key = store_bytes(data, name.rsplit(".", 1)[-1].lower())
+    key = store_bytes(data, name.rsplit(".", 1)[-1].lower(), name)
     last = db.query(models.ProofVersion).filter(models.ProofVersion.ticket_id == ticket.id) \
         .order_by(models.ProofVersion.version.desc()).first()
     proof = models.ProofVersion(ticket_id=ticket.id, version=(last.version + 1) if last else 1, file_name=name,
@@ -129,7 +129,7 @@ def proof_file(proof_id: int, request: Request, db: Session = Depends(get_db), u
         raise HTTPException(status_code=404, detail="Proof not found")
     get_ticket_for_user(db, proof.ticket_id, user)
     ct = proof.content_type or "application/octet-stream"
-    return file_response(request, load_bytes(proof.storage_key), proof.file_name, ct)
+    return stored_file_response(request, proof.storage_key, proof.file_name, ct)
 
 
 # ── Approval requests (staff) ────────────────────────────────────────────────
@@ -229,7 +229,7 @@ def public_review_file(token: str, request: Request, db: Session = Depends(get_d
     if not proof:
         raise HTTPException(status_code=404, detail="File not found")
     ct = proof.content_type or "application/octet-stream"
-    return file_response(request, load_bytes(proof.storage_key), proof.file_name, ct)
+    return stored_file_response(request, proof.storage_key, proof.file_name, ct)
 
 
 class Decision(BaseModel):

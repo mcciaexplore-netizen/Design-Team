@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 import models
 from auth import get_current_user, is_client
-from common import file_response, load_bytes, read_upload, store_bytes
+from common import stored_file_response, read_upload, store_bytes
 from database import get_db
 
 IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
@@ -160,7 +160,7 @@ async def upload_post_image(post_id: int, file: UploadFile = File(...), db: Sess
     ext = name.rsplit(".", 1)[-1].lower()
     if ext not in IMAGE_EXTENSIONS:
         raise HTTPException(status_code=415, detail="Upload a PNG, JPG, GIF or WebP image")
-    p.image_key, p.image_name, p.image_type = store_bytes(data, ext), name, content_type
+    p.image_key, p.image_name, p.image_type = store_bytes(data, ext, name), name, content_type
     db.commit()
     return _post_out(p)
 
@@ -170,7 +170,7 @@ def get_post_image(post_id: int, request: Request, db: Session = Depends(get_db)
     p = db.query(models.SocialPost).filter(models.SocialPost.id == post_id).first()
     if not p or not p.image_key or (is_client(user) and p.owner_key != _owner_key(user)):
         raise HTTPException(status_code=404, detail="Not found")
-    return file_response(request, load_bytes(p.image_key), p.image_name or "image", p.image_type or "application/octet-stream")
+    return stored_file_response(request, p.image_key, p.image_name or "image", p.image_type or "application/octet-stream")
 
 
 @router.delete("/api/social-posts/{post_id}/image", status_code=204)

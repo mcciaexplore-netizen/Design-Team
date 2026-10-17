@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Bell, CheckCircle2, MessageSquare, Save, Send } from 'lucide-react';
+import { AlertTriangle, Bell, CheckCircle2, HardDrive, Mail, MessageSquare, Save, Send } from 'lucide-react';
 import { apiJson } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import ChangePasswordForm from '../components/ChangePasswordForm';
@@ -13,6 +13,7 @@ const HINT: React.CSSProperties = { fontSize: '0.72rem', color: '#64748b', margi
 interface IntegrationSettings {
   slack_configured: boolean; slack_webhook_masked: string; slack_channel: string;
   slack_events: { breach: boolean; escalate: boolean; new: boolean };
+  email_configured: boolean; email_from: string | null; email_host: string | null; file_storage: string;
 }
 interface Prefs {
   in_app_enabled: boolean;
@@ -45,7 +46,8 @@ function IntegrationsTab() {
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<Result>(null);
   const [slackResult, setSlackResult] = useState<Result>(null);
-  const [testing, setTesting] = useState<'slack' | null>(null);
+  const [testing, setTesting] = useState<'slack' | 'email' | null>(null);
+  const [emailResult, setEmailResult] = useState<Result>(null);
 
   const apply = (c: IntegrationSettings) => {
     setCfg(c); setChannel(c.slack_channel); setEvents(c.slack_events); setWebhook('');
@@ -84,11 +86,45 @@ function IntegrationsTab() {
     finally { setTesting(null); }
   };
 
+  const testEmail = async () => {
+    setTesting('email'); setEmailResult(null);
+    try {
+      const r = await apiJson<{ ok: boolean; detail: string }>('/api/integrations/email/test', { method: 'POST' });
+      setEmailResult({ ok: r.ok, text: r.detail });
+    } catch (e) { setEmailResult({ ok: false, text: e instanceof Error ? e.message : 'Test failed.' }); }
+    finally { setTesting(null); }
+  };
+
   if (loadError) return <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{loadError} <button type="button" className="chip" onClick={() => void load()}>Retry</button></p>;
   if (!cfg) return <p role="status" style={{ color: '#64748B', fontSize: '0.85rem' }}>Loading…</p>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <section className="glass-card" style={{ padding: '1.5rem' }} aria-labelledby="email-h">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <div className="icon-tile"><Mail size={16} /></div>
+          <div>
+            <h2 id="email-h" style={SECTION_LABEL}>Email</h2>
+            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Confirmations, review links and reminders. Set in Vercel with the SMTP_* settings (e.g. Zoho Mail).</p>
+          </div>
+          <span className={cfg.email_configured ? 'badge-green' : 'badge-red'} style={{ marginLeft: 'auto' }}>{cfg.email_configured ? 'Connected' : 'Not set up'}</span>
+        </div>
+        {cfg.email_configured && <p style={HINT}>Sending as <strong>{cfg.email_from}</strong> through {cfg.email_host}.</p>}
+        <div style={{ marginTop: 10 }}>
+          <button type="button" className="btn-ghost" onClick={() => void testEmail()} disabled={testing !== null || !cfg.email_configured}>
+            <Send size={14} /> {testing === 'email' ? 'Sending…' : 'Send me a test email'}
+          </button>
+          <ResultLine r={emailResult} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid rgba(226,232,240,0.85)' }}>
+          <div className="icon-tile"><HardDrive size={16} /></div>
+          <div>
+            <h2 style={SECTION_LABEL}>File storage</h2>
+            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>New uploads are saved to: <strong>{cfg.file_storage}</strong>. Set Google Drive with GOOGLE_DRIVE_CREDENTIALS and GOOGLE_DRIVE_FOLDER_ID in Vercel.</p>
+          </div>
+        </div>
+      </section>
+
       <section className="glass-card" style={{ padding: '1.5rem' }} aria-labelledby="slack-h">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <div className="icon-tile" style={{ background: 'rgba(74,21,75,0.07)', borderColor: 'rgba(74,21,75,0.15)', color: '#4a154b' }}><MessageSquare size={16} /></div>

@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,7 +9,7 @@ import models
 import delivery
 import events
 from auth import get_current_user, require_lead
-from common import as_utc
+from common import as_utc, storage_name
 from database import get_db
 
 router = APIRouter(tags=["notifications"])
@@ -26,6 +27,11 @@ def _public_settings(cfg: dict) -> dict:
         "slack_webhook_masked": _mask(cfg["slack_webhook"]),
         "slack_channel": cfg["slack_channel"],
         "slack_events": cfg["slack_events"],
+        # Email and file storage are set in the hosting environment (SMTP_*, GOOGLE_DRIVE_*), so only shown here.
+        "email_configured": delivery.email_configured(),
+        "email_from": (os.getenv("SMTP_FROM") or os.getenv("SMTP_USER") or None) if delivery.email_configured() else None,
+        "email_host": os.getenv("SMTP_HOST") or None,
+        "file_storage": storage_name(),
     }
 
 
@@ -87,6 +93,16 @@ def test_slack(body: SlackTest = SlackTest(), db: Session = Depends(get_db), use
         body.channel if body.channel is not None else cfg["slack_channel"],
     )
     return {"ok": ok, "detail": detail}
+
+
+@router.post("/api/integrations/email/test")
+def test_email(user: models.User = Depends(require_lead)):
+    """Send a test email to the signed-in Design Lead, to check the SMTP settings (e.g. Zoho Mail)."""
+    if not delivery.email_configured():
+        raise HTTPException(status_code=422, detail="Email is not set up: add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD and SMTP_FROM in Vercel.")
+    ok, detail = delivery.send_email(user.email, "DesignDesk test email",
+                                     f"Hi {user.full_name},\n\nThis is a test from DesignDesk. Email is working.\n\nMCCIA Applied AI Studio\n")
+    return {"ok": ok, "detail": f"Sent to {user.email}. Check the inbox (and spam)." if ok else detail}
 
 
 # ── Per-user preferences ─────────────────────────────────────────────────────

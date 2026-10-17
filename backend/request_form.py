@@ -316,7 +316,7 @@ def _new_ticket(db: Session, requester: models.User, f: RequestFields, requireme
 def create_tickets_from_form(db: Session, requester: models.User, f: RequestFields, uploads: list, via: str) -> list:
     """One ticket per chosen design, created together, then assigned and announced. Files are stored once and
     attached to every ticket."""
-    stored = [(store_bytes(data, fname.rsplit(".", 1)[-1].lower()), fname, ctype, len(data)) for data, fname, ctype in uploads]
+    stored = [(store_bytes(data, fname.rsplit(".", 1)[-1].lower(), fname), fname, ctype, len(data)) for data, fname, ctype in uploads]
     tickets = [_new_ticket(db, requester, f, r, via) for r in f.requirements]
     for ticket in tickets:
         for key, fname, ctype, size in stored:

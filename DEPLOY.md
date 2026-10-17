@@ -90,3 +90,39 @@ Each value is applied once, so a later restart does not undo the new password; s
 user = the Gmail address, password = a Google **App Password** (Google Account > Security > 2-Step Verification >
 App passwords; the normal Gmail password does not work). Links point at `PUBLIC_APP_URL` (on Vercel, the production
 domain if that is unset). Without SMTP the page says to ask the Design Lead instead.
+
+## Google Drive for files (Workspace Shared Drive)
+
+New uploads go to a folder in a Shared Drive when both variables below are set. Files uploaded before that stay where
+they were (the database) and keep working. Settings > Integrations shows where new uploads go.
+
+1. In Google Drive (a Google Workspace account), create a **Shared drive**, e.g. "DesignDesk files", and a folder in it.
+   Copy the folder's id from its URL (`https://drive.google.com/drive/folders/<this part>`).
+2. In [Google Cloud Console](https://console.cloud.google.com): create a project, enable the **Google Drive API**, then
+   IAM & Admin > Service Accounts > **Create service account** (no roles needed) > Keys > Add key > **JSON**. A `.json`
+   key file downloads.
+3. Back in the Shared drive: Manage members > add the service account's email (`…@….iam.gserviceaccount.com`) as
+   **Content manager**.
+4. In Vercel > Settings > Environment Variables:
+   * `GOOGLE_DRIVE_CREDENTIALS` = the whole contents of the JSON key file (paste it as-is).
+   * `GOOGLE_DRIVE_FOLDER_ID` = the folder id from step 1.
+5. Redeploy. Files appear in the folder under their original names. Deleting a ticket moves its files to the Shared
+   drive's trash (recoverable for 30 days).
+
+A personal My Drive does not work: Google gives service accounts no storage space of their own.
+
+## Zoho Mail for email
+
+Set these in Vercel, redeploy, then use **Settings > Integrations > Send me a test email**:
+
+| Variable | Value |
+|---|---|
+| `SMTP_HOST` | `smtp.zoho.in` if the account is on zoho.in (India), otherwise `smtp.zoho.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_SSL` | `true` |
+| `SMTP_USER` | the full mailbox address, e.g. `design@mcciapune.com` |
+| `SMTP_PASSWORD` | the mailbox password, or an **app-specific password** if two-factor sign-in is on (Zoho Mail > My Account > Security > App Passwords) |
+| `SMTP_FROM` | the same address as `SMTP_USER` (Zoho refuses to send as any other address unless it is an alias of that mailbox) |
+
+Port `587` with `SMTP_SSL` unset also works. A "553 Sender is not allowed to relay" error means `SMTP_FROM` does not
+match the mailbox.

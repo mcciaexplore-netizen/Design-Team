@@ -223,8 +223,38 @@ def _db_storage() -> bool:
     return mode == "database" or (mode != "disk" and _ON_VERCEL)
 
 
-def store_bytes(data: bytes, ext: str) -> str:
-    """Persist bytes under a random key (S3, the database or local disk; see _db_storage) and return the key."""
+# A file kept in Google Drive: "gd-<Drive file id>.<ext>". Everything else is "<32 hex>.<ext>" in S3, the database or
+# on disk, so files stored before Drive was switched on keep working from where they are.
+_LOCAL_KEY = r"[0-9a-f]{32}\.[a-z0-9]{1,5}"
+_DRIVE_KEY = r"gd-([A-Za-z0-9_-]{10,200})\.[a-z0-9]{1,5}"
+
+
+def storage_name() -> str:
+    """Where new uploads go, in words (shown in Settings)."""
+    import gdrive
+    if gdrive.enabled():
+        return "Google Drive"
+    if _s3():
+        return "S3 / Cloudflare R2"
+    return "The database" if _db_storage() else "The server's disk"
+
+
+def _drive_id(key: str) -> Optional[str]:
+    m = re.fullmatch(_DRIVE_KEY, key or "")
+    return m.group(1) if m else None
+
+
+def store_bytes(data: bytes, ext: str, name: Optional[str] = None) -> str:
+    """Persist bytes and return their key: Google Drive when GOOGLE_DRIVE_* is set (named after the uploaded file,
+    so the folder is easy to browse), else S3, the database or local disk (see _db_storage)."""
+    import gdrive
+    if gdrive.enabled():
+        try:
+            file_id = gdrive.upload(data, safe_filename(name or f"file.{ext}"), _CONTENT_TYPES.get(ext, "application/octet-stream"))
+        except Exception as exc:   # never lose an upload silently
+            logger.exception("Google Drive upload failed")
+            raise HTTPException(status_code=502, detail="Could not save the file to Google Drive. Please try again.") from exc
+        return f"gd-{file_id}.{ext}"
     key = f"{uuid.uuid4().hex}.{ext}"
     client = _s3()
     if client:
@@ -244,7 +274,9 @@ def store_bytes(data: bytes, ext: str) -> str:
 
 
 def load_bytes(key: str) -> bytes:
-    if not re.fullmatch(r"[0-9a-f]{32}\.[a-z0-9]{1,5}", key):
+    if _drive_id(key):
+        return _load_drive(key)[0]
+    if not re.fullmatch(_LOCAL_KEY, key):
         raise HTTPException(status_code=404, detail="File not found")
     client = _s3()
     try:
@@ -269,9 +301,24 @@ def load_bytes(key: str) -> bytes:
         raise HTTPException(status_code=502, detail="File storage is unavailable")
 
 
+def _load_drive(key: str, start: Optional[int] = None, end: Optional[int] = None) -> tuple[bytes, int]:
+    import gdrive
+    try:
+        return gdrive.download(_drive_id(key), start, end)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found")
+    except Exception:
+        logger.exception("Google Drive read failed for %s", key)
+        raise HTTPException(status_code=502, detail="File storage is unavailable")
+
+
 def delete_stored_file(key: str) -> None:
-    """Remove a stored file wherever it lives (S3, the database or local disk). A missing file is not an error."""
-    if not re.fullmatch(r"[0-9a-f]{32}\.[a-z0-9]{1,5}", key):
+    """Remove a stored file wherever it lives (Drive, S3, the database or local disk). A missing file is not an error."""
+    if _drive_id(key):
+        import gdrive
+        gdrive.delete(_drive_id(key))
+        return
+    if not re.fullmatch(_LOCAL_KEY, key):
         return
     client = _s3()
     if client:
@@ -289,6 +336,20 @@ def delete_stored_file(key: str) -> None:
             os.remove(os.path.join(_upload_dir(), key))
         except FileNotFoundError:
             pass
+
+
+def stored_file_response(request: Request, key: str, name: str, content_type: str) -> Response:
+    """file_response for a stored file. A Drive file's byte range is fetched from Drive alone, not the whole file."""
+    m = re.fullmatch(r"bytes=(\d+)-(\d*)", request.headers.get("range", "").strip())
+    if not (_drive_id(key) and m):
+        return file_response(request, load_bytes(key), name, content_type)
+    start, end = int(m.group(1)), int(m.group(2)) if m.group(2) else None
+    data, total = _load_drive(key, start, end)
+    if not data:
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
+    headers = {**file_response_headers(name, content_type), "Accept-Ranges": "bytes",
+               "Content-Range": f"bytes {start}-{start + len(data) - 1}/{total}"}
+    return Response(content=data, status_code=206, media_type=content_type, headers=headers)
 
 
 def file_response(request: Request, data: bytes, name: str, content_type: str) -> Response:

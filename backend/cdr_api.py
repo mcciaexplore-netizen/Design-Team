@@ -7,7 +7,7 @@ import cdr_engine
 import events
 import models
 from auth import LEAD_ROLES, can_access_ticket, get_current_user, get_ticket_for_user, require_lead, require_staff
-from common import MAX_CDR_BYTES, file_response, load_bytes, log_audit, read_upload, store_bytes
+from common import MAX_CDR_BYTES, stored_file_response, log_audit, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["cdr"])
@@ -101,7 +101,7 @@ async def upload(request_id: int, file: UploadFile = File(...), db: Session = De
     if req.status != models.CdrRequestStatus.APPROVED:
         raise HTTPException(status_code=409, detail="A lead must approve the request before the file is uploaded.")
     data, name, _ = await read_upload(file, MAX_CDR_BYTES)
-    key = store_bytes(data, name.rsplit(".", 1)[-1].lower())
+    key = store_bytes(data, name.rsplit(".", 1)[-1].lower(), name)
     if not cdr_engine.upload_cdr(db, req.id, key, ""):
         raise HTTPException(status_code=409, detail="This request is no longer waiting for a file.")
     log_audit(db, ticket.id, user, "Source file uploaded", {"request_id": req.id, "file_name": name})
@@ -115,8 +115,8 @@ def download(request_id: int, request: Request, db: Session = Depends(get_db), u
     req, ticket = _get(db, request_id, user)
     if req.status != models.CdrRequestStatus.UPLOADED or not req.s3_object_key:
         raise HTTPException(status_code=409, detail="The file is not ready yet.")
-    data = load_bytes(req.s3_object_key)
+    ext = req.s3_object_key.rsplit(".", 1)[-1]
+    response = stored_file_response(request, req.s3_object_key, f"{ticket.ticket_number}-source.{ext}", "application/octet-stream")
     if request.headers.get("range", "bytes=0-").startswith("bytes=0-"):   # count a download once, not per piece
         cdr_engine.record_download(db, req, user.id)
-    ext = req.s3_object_key.rsplit(".", 1)[-1]
-    return file_response(request, data, f"{ticket.ticket_number}-source.{ext}", "application/octet-stream")
+    return response

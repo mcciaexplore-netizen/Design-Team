@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 import models
 from auth import can_access_ticket, get_current_user, get_ticket_for_user
-from common import as_utc, file_response, load_bytes, log_audit, parse_figma_url, read_upload, store_bytes
+from common import as_utc, stored_file_response, log_audit, parse_figma_url, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["collaboration"])
@@ -42,7 +42,7 @@ async def upload_attachment(
 ):
     ticket = get_ticket_for_user(db, ticket_id, user)
     data, name, content_type = await read_upload(file)
-    key = store_bytes(data, name.rsplit(".", 1)[-1].lower())
+    key = store_bytes(data, name.rsplit(".", 1)[-1].lower(), name)
     att = models.Attachment(ticket_id=ticket.id, file_name=name, file_url=key,
                             content_type=content_type, size_bytes=len(data), uploaded_by_id=user.id)
     db.add(att)
@@ -65,7 +65,7 @@ def _get_attachment(db: Session, attachment_id: int, user: models.User) -> model
 def download_attachment(attachment_id: int, request: Request, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     att = _get_attachment(db, attachment_id, user)
     content_type = att.content_type or "application/octet-stream"
-    return file_response(request, load_bytes(att.file_url), att.file_name, content_type)
+    return stored_file_response(request, att.file_url, att.file_name, content_type)
 
 
 @router.delete("/api/attachments/{attachment_id}", status_code=204)
