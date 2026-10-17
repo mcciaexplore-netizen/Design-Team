@@ -16,7 +16,7 @@ from database import get_db
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="DesignFlow API", version="1.0.0")
+app = FastAPI(title="DesignDesk API", version="1.0.0")
 
 
 @app.middleware("http")
@@ -77,7 +77,7 @@ CRON_SECRET = os.getenv("CRON_SECRET") or (
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to DesignFlow API"}
+    return {"message": "Welcome to the DesignDesk API"}
 
 @app.get("/health")
 def health_check():

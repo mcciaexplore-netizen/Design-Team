@@ -10,19 +10,27 @@
    `VITE_API_URL` variable.
 2. Storage > add a **Neon** Postgres database to the project. It sets `DATABASE_URL` / `POSTGRES_URL` (the pooled
    connection, which is what serverless needs).
-3. Environment variables: `SECRET_KEY` (required: a long random string), `CRON_SECRET` (a random string),
-   `ADMIN_EMAIL`, `ADMIN_PASSWORD` (first deploy only), `PUBLIC_APP_URL` (the Vercel URL), and the `S3_*` storage
-   variables. Optional: `SMTP_*`, `TURNSTILE_*`, `JIRA_*`, as in the table below.
+3. Environment variables: `SECRET_KEY` (required: a long random string), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (first
+   deploy only) and `PUBLIC_APP_URL` (the Vercel URL). Optional: `CRON_SECRET`, `S3_*`, `SMTP_*`, `TURNSTILE_*`,
+   `JIRA_*`, `PUBLIC_BOARD`, `AUTO_TICK`, as in the table below.
 4. Deploy. Migrations and admin/design-type seeding run automatically when the API starts.
 
-What is different from Render:
+How it works on Vercel:
 
-* **Uploads go to S3/R2.** Without `S3_ENDPOINT_URL`, files are written to `/tmp` and soon lost.
-* **Uploads are capped at 4 MB** (Vercel refuses request bodies over 4.5 MB), including CDR/PSD source files.
-* **No WebSockets:** live toasts are off; pages still refresh every 30 seconds.
-* **Cron** (`/api/internal/tick`: auto-closing expired edit windows, overdue escalations) runs once a day at
-  09:00 IST, the Hobby plan's limit. On Pro, change the schedule in `vercel.json` (e.g. `0 * * * *` for hourly).
+* **Files** are kept in the Postgres database (the `stored_files` table) unless `S3_ENDPOINT_URL` is set, in which
+  case they go to S3/R2. Nothing is written to the function's temporary disk.
+* **Big files** travel in 3 MB pieces, because Vercel refuses request and response bodies over 4.5 MB. Uploads go up
+  through `/api/uploads` first, and downloads come down as byte ranges. The limits are 10 MB per file
+  (`MAX_UPLOAD_MB`) and 50 MB per source file (`MAX_CDR_UPLOAD_MB`). Postgres on Neon's free plan holds 0.5 GB, so
+  add S3/R2 if many large files are expected.
+* **Scheduled jobs** (SLA warnings and escalations, review reminders, closing reviews after two days, closing
+  finished edit windows, recurring tickets) run off normal traffic. After any request, if they last ran more than
+  5 minutes ago, they run again. `AUTO_TICK=off` turns this off. The daily cron in `vercel.json` is a backup and needs
+  `CRON_SECRET`.
+* **No WebSockets.** Pages refresh every 30 seconds and show a pop-up for what changed ("DES-12 moved → In Review").
 * **Emails** are sent before the request returns, so actions that send email take a moment longer.
+* **Public requests board.** `/requests` lists every request with its title, status and dates, without signing in.
+  `PUBLIC_BOARD=off` hides it.
 * The Jira webhook URL becomes `https://<your-app>/api/api/webhooks/jira`.
 
 ## Environments
