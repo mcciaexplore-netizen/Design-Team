@@ -86,7 +86,8 @@ def send_email(to: str, subject: str, body: str) -> tuple[bool, str]:
     if not host:
         return False, "Email is not configured"
     port = int(os.getenv("SMTP_PORT", "587"))
-    user, password = os.getenv("SMTP_USER", ""), os.getenv("SMTP_PASSWORD", "")
+    # Stray spaces or a trailing newline pasted into Vercel make the server refuse the login.
+    user, password = os.getenv("SMTP_USER", "").strip(), os.getenv("SMTP_PASSWORD", "").strip()
     try:
         msg = EmailMessage()  # rejects newlines in headers, so user text can't inject extra headers
         msg["From"] = os.getenv("SMTP_FROM") or user
@@ -104,8 +105,12 @@ def send_email(to: str, subject: str, body: str) -> tuple[bool, str]:
             server.send_message(msg)
         return True, "Sent"
     except (smtplib.SMTPException, OSError, ValueError) as exc:
-        logger.warning("Email to %s failed: %s", to, exc.__class__.__name__)
-        return False, f"Could not send email: {exc.__class__.__name__}"
+        detail = exc.__class__.__name__
+        if isinstance(exc, smtplib.SMTPResponseException):   # the mail server's own reason (never contains the password)
+            reason = exc.smtp_error.decode(errors="replace") if isinstance(exc.smtp_error, bytes) else str(exc.smtp_error)
+            detail += f" ({exc.smtp_code} {reason.strip()[:200]})"
+        logger.warning("Email to %s failed: %s", to, detail)
+        return False, f"Could not send email: {detail}"
 
 
 # ── CAPTCHA (Cloudflare Turnstile) ───────────────────────────────────────────

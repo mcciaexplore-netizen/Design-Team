@@ -319,3 +319,25 @@ def test_a_draft_upload_is_not_sent(client):
     assert db_ticket(t["id"]).status == models.TicketStatus.ASSIGNED
     assert client.get(f"/api/tickets/{t['id']}/approval-requests", headers=auth(client, "a@tata.com")).json() == []
     assert not any("sent a design" in n for n in notes("a@tata.com"))
+
+
+def test_email_failure_shows_the_servers_reason_and_trims_pasted_credentials(monkeypatch):
+    import smtplib
+    seen = {}
+
+    class Refusing:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def starttls(self): pass
+        def login(self, user, password):
+            seen["login"] = (user, password)
+            raise smtplib.SMTPAuthenticationError(535, b"Authentication Failed")
+
+    monkeypatch.setattr(smtplib, "SMTP", Refusing)
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USER", " me@x.com\n")
+    monkeypatch.setenv("SMTP_PASSWORD", "app-pass \n")
+    ok, detail = delivery.send_email("a@b.com", "s", "b")
+    assert ok is False and detail == "Could not send email: SMTPAuthenticationError (535 Authentication Failed)"
+    assert seen["login"] == ("me@x.com", "app-pass")
