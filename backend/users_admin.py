@@ -96,6 +96,7 @@ def create_user(body: CreateUser, db: Session = Depends(get_db), lead: models.Us
 
 class UpdateUser(BaseModel):
     full_name: Optional[str] = Field(default=None, min_length=2, max_length=80)
+    email: Optional[Email] = None
     role: Optional[UiRole] = None
     client_org: Optional[str] = Field(default=None, max_length=80)
     is_active: Optional[bool] = None
@@ -123,6 +124,14 @@ def update_user(user_id: int, body: UpdateUser, db: Session = Depends(get_db), l
             new_org = " ".join(body.client_org.split()) or None
         if not new_org:
             raise HTTPException(status_code=422, detail="Clients need a company name.")
+
+    new_email = body.email.strip().lower() if body.email else user.email
+    if new_email != user.email:
+        taken = db.query(models.User).filter(func.lower(models.User.email) == new_email, models.User.id != user.id).first()
+        if taken:
+            raise HTTPException(status_code=409, detail="An account with this email already exists.")
+        user.email = new_email   # they sign in with it from now on; tickets and emails follow the account
+        changes.append("email")
 
     if body.full_name is not None and " ".join(body.full_name.split()) != user.full_name:
         user.full_name = " ".join(body.full_name.split())

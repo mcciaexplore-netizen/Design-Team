@@ -78,6 +78,7 @@ function AddUserForm({ onCreated, onCancel }: { onCreated: (i: Issued) => void; 
 
 function EditRow({ u, onSaved, onCancel }: { u: AdminUser; onSaved: (u: AdminUser) => void; onCancel: () => void }) {
   const [name, setName] = useState(u.full_name);
+  const [email, setEmail] = useState(u.email);
   const [role, setRole] = useState<Role>(u.role);
   const [org, setOrg] = useState(u.client_org ?? '');
   const [busy, setBusy] = useState(false);
@@ -86,7 +87,7 @@ function EditRow({ u, onSaved, onCancel }: { u: AdminUser; onSaved: (u: AdminUse
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError('');
     try {
-      onSaved(await apiJson<AdminUser>(`/api/admin/users/${u.id}`, { method: 'PATCH', json: { full_name: name, role, client_org: role === 'Client' ? org : undefined } }));
+      onSaved(await apiJson<AdminUser>(`/api/admin/users/${u.id}`, { method: 'PATCH', json: { full_name: name, email, role, client_org: role === 'Client' ? org : undefined } }));
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not save.'); }
     finally { setBusy(false); }
   };
@@ -94,6 +95,7 @@ function EditRow({ u, onSaved, onCancel }: { u: AdminUser; onSaved: (u: AdminUse
   return (
     <form onSubmit={e => void save(e)} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', width: '100%' }}>
       <div style={{ flex: '1 1 160px' }}><label htmlFor={`en-${u.id}`} style={LABEL}>Name</label><input id={`en-${u.id}`} className="input-field" required minLength={2} maxLength={80} value={name} onChange={e => setName(e.target.value)} style={{ width: '100%' }} /></div>
+      <div style={{ flex: '1 1 200px' }}><label htmlFor={`ee-${u.id}`} style={LABEL}>Email (used to sign in)</label><input id={`ee-${u.id}`} type="email" className="input-field" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%' }} /></div>
       <div style={{ flex: '0 1 150px' }}>
         <label htmlFor={`er-${u.id}`} style={LABEL}>Role</label>
         <select id={`er-${u.id}`} className="input-field" value={role} onChange={e => setRole(e.target.value as Role)} style={{ width: '100%' }}>{ROLES.map(r => <option key={r}>{r}</option>)}</select>

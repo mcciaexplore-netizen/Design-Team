@@ -163,3 +163,18 @@ def test_last_active_lead_cannot_be_removed_by_another_lead(client):
     lead_id = user_id(client, lead, "lead@x.com")
     assert client.patch(f"/api/admin/users/{lead_id}", headers=lead, json={"is_active": False}).status_code == 400
     assert client.patch(f"/api/admin/users/{old_id}", headers=lead, json={"is_active": True}).status_code == 200
+
+
+def test_lead_changes_an_email_including_their_own(client):
+    lead = login(client, "lead@x.com")
+    me = user_id(client, lead, "lead@x.com")
+    r = client.patch(f"/api/admin/users/{me}", headers=lead, json={"email": "Creative@MCCIA.com"})
+    assert r.status_code == 200 and r.json()["email"] == "creative@mccia.com"
+    assert client.get("/api/admin/users", headers=lead).status_code == 200      # still signed in
+    login(client, "creative@mccia.com")                                          # same password, new address
+    assert client.post("/api/auth/token", data={"username": "lead@x.com", "password": "secret-pw"}).status_code == 401
+
+    des = user_id(client, lead, "des@x.com")
+    assert client.patch(f"/api/admin/users/{des}", headers=lead, json={"email": "A@tata.com"}).status_code == 409
+    assert client.patch(f"/api/admin/users/{des}", headers=lead, json={"email": "not-an-email"}).status_code == 422
+    assert client.patch(f"/api/admin/users/{me}", headers=login(client, "des@x.com"), json={"email": "x@x.com"}).status_code == 403
