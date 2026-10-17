@@ -12,7 +12,7 @@ test('a wrong password shows an error and stays on the sign-in page', async ({ p
 
 test('a lead signs in, sees the board and signs out', async ({ page }) => {
   await login(page, ACCOUNTS.lead);
-  await expect(page.getByRole('heading', { name: 'Board' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Board', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /sign out/i }).click();
   await expect(page.getByLabel('Email address')).toBeVisible();
 });
