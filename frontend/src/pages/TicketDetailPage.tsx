@@ -8,6 +8,7 @@ import { useTickets } from '../contexts/TicketsContext';
 import { useNewRequest } from '../contexts/NewRequestContext';
 import { prefillFromTicket } from '../requestForm';
 import AnnotatePanel from '../components/AnnotatePanel';
+import AttachmentsPanel from '../components/AttachmentsPanel';
 import FigmaEmbed from '../components/FigmaEmbed';
 import ProofApprovalPanel from '../components/ProofApprovalPanel';
 import CdrPanel from '../components/CdrPanel';
@@ -161,6 +162,7 @@ const TicketDetailPage: React.FC = () => {
                   </dl>
                 )}
               </div>
+              <AttachmentsPanel ticketId={ticket.id} />
             </div>
           )}
 
