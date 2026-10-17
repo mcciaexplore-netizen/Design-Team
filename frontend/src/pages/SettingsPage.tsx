@@ -91,7 +91,7 @@ function IntegrationsTab() {
         <div className="icon-tile"><HardDrive size={16} /></div>
         <div>
           <h2 style={SECTION_LABEL}>File storage</h2>
-          <p style={{ fontSize: '0.75rem', color: '#64748b' }}>New uploads are saved to: <strong>{cfg.file_storage}</strong>. Set Google Drive with GOOGLE_DRIVE_CREDENTIALS and GOOGLE_DRIVE_FOLDER_ID in Vercel.</p>
+          <p style={{ fontSize: '0.75rem', color: '#64748b' }}>New uploads are saved to: <strong>{cfg.file_storage}</strong>. Set Google Drive in Vercel with GOOGLE_DRIVE_FOLDER_ID plus GOOGLE_DRIVE_OAUTH (your own Drive) or GOOGLE_DRIVE_CREDENTIALS (a Shared Drive); DEPLOY.md has the steps.</p>
         </div>
       </div>
       <div style={{ marginTop: 10 }}>

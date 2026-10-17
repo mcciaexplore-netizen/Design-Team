@@ -1,10 +1,13 @@
-"""Google Drive file storage: a folder in a Google Workspace Shared Drive, reached with a service account.
+"""Google Drive file storage, in one folder (GOOGLE_DRIVE_FOLDER_ID: its id from the URL, or the whole link). Two ways in:
 
-Set GOOGLE_DRIVE_CREDENTIALS (the service account's JSON key, as-is or base64-encoded) and GOOGLE_DRIVE_FOLDER_ID (the
-folder's id from its URL, or the Shared Drive's own id). The service account must be a member of that Shared Drive as
-Content manager. A plain My Drive does not work: Google gives service accounts no storage of their own.
+* A person's own Drive (My Drive works): GOOGLE_DRIVE_OAUTH, the JSON that `python drive_connect.py` prints after that
+  person signs in to Google once. Files count against that person's storage.
+* A Workspace Shared Drive: GOOGLE_DRIVE_CREDENTIALS, a service account's JSON key (as-is or base64-encoded); the service
+  account must be a member of the Shared Drive as Content manager. It cannot use a My Drive: Google gives service
+  accounts no storage of their own.
 
-Talks to the Drive REST API directly with httpx; the token is a JWT signed with the key (RS256, via cryptography)."""
+Talks to the Drive REST API directly with httpx. A service account signs a JWT with its key (RS256, via cryptography);
+the personal way swaps its refresh token for an access token."""
 import base64
 import json
 import os
@@ -28,8 +31,17 @@ class DriveError(Exception):
     pass
 
 
+TOKEN_URI = "https://oauth2.googleapis.com/token"
+
+
 def enabled() -> bool:
-    return bool(os.getenv("GOOGLE_DRIVE_CREDENTIALS") and os.getenv("GOOGLE_DRIVE_FOLDER_ID"))
+    return bool((os.getenv("GOOGLE_DRIVE_OAUTH") or os.getenv("GOOGLE_DRIVE_CREDENTIALS")) and os.getenv("GOOGLE_DRIVE_FOLDER_ID"))
+
+
+def _personal() -> Optional[dict]:
+    """client_id, client_secret and refresh_token for a person's own Drive, when that way is set up."""
+    raw = os.getenv("GOOGLE_DRIVE_OAUTH", "").strip()
+    return json.loads(raw) if raw else None
 
 
 def _folder_id() -> str:
@@ -56,12 +68,17 @@ def _access_token(http: httpx.Client) -> str:
     with _lock:
         if _token["value"] and time.time() < _token["expires"] - 60:
             return _token["value"]
-        creds = _credentials()
-        now = int(time.time())
-        token_uri = creds.get("token_uri", "https://oauth2.googleapis.com/token")
-        assertion = jwt.encode({"iss": creds["client_email"], "scope": SCOPE, "aud": token_uri, "iat": now, "exp": now + 3600},
-                               creds["private_key"], algorithm="RS256")
-        r = http.post(token_uri, data={"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": assertion})
+        personal = _personal()
+        if personal:
+            r = http.post(TOKEN_URI, data={"grant_type": "refresh_token", "refresh_token": personal["refresh_token"],
+                                           "client_id": personal["client_id"], "client_secret": personal["client_secret"]})
+        else:
+            creds = _credentials()
+            now = int(time.time())
+            token_uri = creds.get("token_uri", TOKEN_URI)
+            assertion = jwt.encode({"iss": creds["client_email"], "scope": SCOPE, "aud": token_uri, "iat": now, "exp": now + 3600},
+                                   creds["private_key"], algorithm="RS256")
+            r = http.post(token_uri, data={"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer", "assertion": assertion})
         if r.status_code != 200:
             raise DriveError(f"Google sign-in failed ({r.status_code}): {r.text[:200]}")
         body = r.json()
@@ -115,12 +132,20 @@ def delete(file_id: str) -> None:
 def check() -> tuple[bool, str]:
     """Sign in and look at the folder, without storing anything: is Drive really ready for uploads? (Settings)"""
     if not enabled():
-        return False, "Google Drive is not set up: add GOOGLE_DRIVE_CREDENTIALS and GOOGLE_DRIVE_FOLDER_ID in Vercel, then redeploy."
+        return False, ("Google Drive is not set up: add GOOGLE_DRIVE_OAUTH (or GOOGLE_DRIVE_CREDENTIALS) and "
+                       "GOOGLE_DRIVE_FOLDER_ID in Vercel, then redeploy.")
     try:
-        creds = _credentials()
-        robot = creds["client_email"]
-        creds["private_key"]
+        personal = _personal()
+        if personal:
+            who = "your Google account"
+            personal["client_id"], personal["client_secret"], personal["refresh_token"]
+        else:
+            creds = _credentials()
+            who = creds["client_email"]
+            creds["private_key"]
     except (ValueError, KeyError, TypeError):
+        if os.getenv("GOOGLE_DRIVE_OAUTH"):
+            return False, "GOOGLE_DRIVE_OAUTH is not what drive_connect.py printed. Paste that whole line again, from { to }."
         return False, "GOOGLE_DRIVE_CREDENTIALS is not the service account's JSON key. Paste the whole .json file, from { to }."
     try:
         with _client() as http:
@@ -128,19 +153,25 @@ def check() -> tuple[bool, str]:
             r = http.get(f"{API}/{_folder_id()}?supportsAllDrives=true&fields=name,mimeType,driveId,capabilities(canAddChildren)",
                          headers=headers)
     except DriveError:
-        return False, f"Google refused the key for {robot}. Make a new JSON key for it and paste the whole file again."
+        if personal:
+            return False, "Google no longer accepts the sign-in in GOOGLE_DRIVE_OAUTH. Run drive_connect.py again and paste the new line."
+        return False, f"Google refused the key for {who}. Make a new JSON key for it and paste the whole file again."
     except httpx.HTTPError as exc:
         return False, f"Could not reach Google: {exc.__class__.__name__}"
     if r.status_code == 404:
-        return False, (f"The folder {_folder_id()} was not found, or {robot} is not a member of its Shared Drive. "
+        if personal:
+            return False, f"The folder {_folder_id()} was not found in the Drive of the account that signed in. Check the folder link."
+        return False, (f"The folder {_folder_id()} was not found, or {who} is not a member of its Shared Drive. "
                        "In Drive: the Shared Drive > Manage members > add that address as Content manager.")
     if r.status_code != 200:
         return False, f"Google answered {r.status_code}: {r.text[:200]}"
     folder = r.json()
+    name = folder.get("name")
     if folder.get("mimeType") != "application/vnd.google-apps.folder":
         return False, "GOOGLE_DRIVE_FOLDER_ID points to a file, not a folder."
-    if not folder.get("driveId"):
-        return False, f"\"{folder.get('name')}\" is in a My Drive. It must be a folder inside a Shared Drive."
+    if not personal and not folder.get("driveId"):
+        return False, (f"\"{name}\" is in a My Drive, which a service account can't save to. Use a folder inside a Shared "
+                       "Drive, or connect your own Drive with drive_connect.py (see DEPLOY.md).")
     if not folder.get("capabilities", {}).get("canAddChildren"):
-        return False, f"{robot} can see \"{folder.get('name')}\" but may not add files. Make it Content manager of the Shared Drive."
-    return True, f"Connected. New uploads go to the folder \"{folder.get('name')}\" as {robot}."
+        return False, f"{who} can see \"{name}\" but may not add files to it. Give it edit access."
+    return True, f"Connected. New uploads go to the folder \"{name}\" as {who}."

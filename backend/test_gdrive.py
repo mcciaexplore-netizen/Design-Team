@@ -130,7 +130,7 @@ def test_check_google_drive_says_what_is_wrong(client, drive, monkeypatch):
     assert check() == {"ok": True, "detail": 'Connected. New uploads go to the folder "Uploads" as dd@proj.iam.gserviceaccount.com.'}
 
     folder["capabilities"]["canAddChildren"] = False
-    assert "Content manager" in check()["detail"]
+    assert "edit access" in check()["detail"]
     del folder["driveId"]
     assert "My Drive" in check()["detail"]
     folder = None
@@ -142,3 +142,30 @@ def test_check_google_drive_says_what_is_wrong(client, drive, monkeypatch):
     monkeypatch.delenv("GOOGLE_DRIVE_FOLDER_ID")
     assert "not set up" in check()["detail"]
     assert client.post("/api/integrations/drive/test", headers=auth(client, "des@x.com")).status_code == 403
+
+
+def test_your_own_drive_works_through_a_one_time_google_sign_in(client, drive, monkeypatch):
+    """GOOGLE_DRIVE_OAUTH: a refresh token instead of a service account, so a plain My Drive folder is fine."""
+    seen = []
+
+    def google(req):
+        if "oauth2" in str(req.url):
+            form = dict(httpx.QueryParams(req.content.decode()))
+            seen.append(form)
+            return httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
+        return httpx.Response(200, json={"name": "Uploads", "mimeType": "application/vnd.google-apps.folder",
+                                         "capabilities": {"canAddChildren": True}})   # no driveId: a My Drive folder
+
+    monkeypatch.delenv("GOOGLE_DRIVE_CREDENTIALS")
+    monkeypatch.setenv("GOOGLE_DRIVE_OAUTH", json.dumps({"client_id": "cid", "client_secret": "sec", "refresh_token": "rt"}))
+    monkeypatch.setattr(gdrive, "_client", lambda: httpx.Client(transport=httpx.MockTransport(google)))
+    r = client.post("/api/integrations/drive/test", headers=auth(client, "lead@x.com")).json()
+    assert r == {"ok": True, "detail": 'Connected. New uploads go to the folder "Uploads" as your Google account.'}
+    assert seen == [{"grant_type": "refresh_token", "refresh_token": "rt", "client_id": "cid", "client_secret": "sec"}]
+
+    monkeypatch.setattr(gdrive, "_token", {"value": None, "expires": 0.0})
+    monkeypatch.setattr(gdrive, "_client", lambda: httpx.Client(transport=httpx.MockTransport(drive)))
+    # Uploads go through the same token: store a file and read it back from the fake Drive.
+    monkeypatch.setattr(gdrive, "_access_token", lambda http: "tok")
+    fid = gdrive.upload(b"hello", "a.txt", "text/plain")
+    assert drive.names[fid] == "a.txt" and gdrive.download(fid)[0] == b"hello"

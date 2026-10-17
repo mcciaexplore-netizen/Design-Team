@@ -63,25 +63,45 @@ Each value is applied once, so a later restart does not undo the new password; s
 "Forgot your password?" on the sign-in page emails a reset link that works once, for 30 minutes. It needs email set
 up (Zoho Mail, below). Without it the page says to ask the Design Lead, who uses **Reset password** in Settings > Users.
 
-## Google Drive for files (Workspace Shared Drive)
+## Google Drive for files
 
-New uploads go to a folder in a Shared Drive when both variables below are set. Files uploaded before that stay where
-they were (the database) and keep working. Settings > Email & storage shows where new uploads go.
+New uploads go to one Drive folder once it is connected. Files uploaded before that stay where they were (the database)
+and keep working. In DesignDesk, **Settings > Email & storage > Check Google Drive** says whether it works, and what to
+fix if not. `GOOGLE_DRIVE_FOLDER_ID` is the folder's id from its URL (`https://drive.google.com/drive/folders/<this
+part>`); the whole link works too. There are two ways to connect; use one.
 
-1. In Google Drive (a Google Workspace account), create a **Shared drive**, e.g. "DesignDesk files", and a folder in it.
-   Copy the folder's id from its URL (`https://drive.google.com/drive/folders/<this part>`).
-2. In [Google Cloud Console](https://console.cloud.google.com): create a project, enable the **Google Drive API**, then
-   IAM & Admin > Service Accounts > **Create service account** (no roles needed) > Keys > Add key > **JSON**. A `.json`
-   key file downloads.
-3. Back in the Shared drive: Manage members > add the service account's email (`…@….iam.gserviceaccount.com`) as
-   **Content manager**.
+### A. Your own Drive (works with My Drive)
+
+Files are saved as the Google account that signs in, and count against its storage.
+
+1. In [Google Cloud Console](https://console.cloud.google.com), in a project: enable the **Google Drive API**. Then
+   APIs & Services > **OAuth consent screen**: user type **Internal** (only people in your Google Workspace), app name
+   "DesignDesk", your email; save.
+2. APIs & Services > Credentials > **Create credentials > OAuth client ID** > type **Desktop app** > Create >
+   **Download JSON**.
+3. On your computer, in `backend` (with the venv active): `python drive_connect.py path	o	hat-file.json`. A browser
+   opens; sign in with the account whose Drive should hold the files, and allow access. It prints one line.
 4. In Vercel > Settings > Environment Variables:
-   * `GOOGLE_DRIVE_CREDENTIALS` = the whole contents of the JSON key file (paste it as-is).
-   * `GOOGLE_DRIVE_FOLDER_ID` = the folder id from step 1.
-5. Redeploy. Files appear in the folder under their original names. Deleting a ticket moves its files to the Shared
-   drive's trash (recoverable for 30 days).
+   * `GOOGLE_DRIVE_OAUTH` = that whole line (keep it private: it gives access to that Drive).
+   * `GOOGLE_DRIVE_FOLDER_ID` = the folder's id.
+5. Redeploy, then click **Check Google Drive**. Deleted tickets' files go to that Drive's trash (30 days).
 
-A personal My Drive does not work: Google gives service accounts no storage space of their own.
+It keeps working until that account removes DesignDesk's access (Google Account > Security > Third-party
+connections), or the account is deleted. Then run step 3 again.
+
+### B. A Workspace Shared Drive (service account)
+
+Needs permission to create Shared Drives. A service account cannot use a My Drive folder: Google gives it no storage.
+
+1. In Google Drive: **Shared drives > New**, e.g. "DesignDesk files", and a folder in it.
+2. In Google Cloud Console: enable the **Google Drive API**, then IAM & Admin > Service Accounts > **Create service
+   account** (no roles needed) > Keys > Add key > **JSON**. A `.json` key file downloads; keep it out of this project
+   folder (and never commit it).
+3. In the Shared drive: Manage members > add the service account's email (`…@….iam.gserviceaccount.com`) as
+   **Content manager**.
+4. In Vercel: `GOOGLE_DRIVE_CREDENTIALS` = the whole contents of the JSON key file; `GOOGLE_DRIVE_FOLDER_ID` = the
+   folder's id.
+5. Redeploy, then click **Check Google Drive**.
 
 ## Zoho Mail for email
 
