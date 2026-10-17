@@ -84,6 +84,10 @@ export function mapTicket(b: ApiTicket, previous?: Ticket): Ticket {
 }
 
 /* ── Context ──────────────────────────────────── */
+export type TicketChange =
+  | { type: 'ticket_moved'; ticketNumber: string; to: string }
+  | { type: 'ticket_created'; ticketNumber: string; title: string };
+
 interface TicketsContextValue {
   tickets: Ticket[];
   staff: StaffUser[];            // people tickets can be assigned to
@@ -92,6 +96,8 @@ interface TicketsContextValue {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  /** Called with what other people changed, as the regular poll notices it. Returns an unsubscribe function. */
+  onChanges: (fn: (changes: TicketChange[]) => void) => () => void;
   getTicket: (id: string) => Ticket | undefined;
   createTicket: (input: NewTicketInput) => Promise<Ticket>;
   /** Optimistic update; rolls back and rethrows an ApiError if the server refuses. */
@@ -116,13 +122,26 @@ export function TicketsProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(0);         // optimistic mutations running; polling must not clobber them
+  const primed = useRef(false);       // the first list has loaded, so later polls can tell what changed
+  const listeners = useRef(new Set<(changes: TicketChange[]) => void>());
   const ticketsRef = useRef<Ticket[]>([]);
   ticketsRef.current = tickets;
 
-  const refresh = useCallback(async () => {
+  const load = useCallback(async (announce: boolean) => {
     try {
       const list = await apiJson<ApiTicket[]>('/api/tickets');
       if (inFlight.current > 0) return;
+      if (announce && primed.current) {
+        const before = new Map(ticketsRef.current.map(t => [t.id, t]));
+        const changes: TicketChange[] = [];
+        for (const b of list) {
+          const old = before.get(String(b.id));
+          if (!old) changes.push({ type: 'ticket_created', ticketNumber: b.ticket_number, title: b.title });
+          else if (old.status !== b.status) changes.push({ type: 'ticket_moved', ticketNumber: b.ticket_number, to: b.status });
+        }
+        if (changes.length) listeners.current.forEach(fn => fn(changes));
+      }
+      primed.current = true;
       setTickets(prev => {
         const byId = new Map(prev.map(t => [t.id, t]));
         return list.map(b => mapTicket(b, byId.get(String(b.id))));
@@ -132,6 +151,12 @@ export function TicketsProvider({ children }: { children: React.ReactNode }) {
       if (e instanceof ApiError && e.status === 401) return;
       setError(e instanceof Error ? e.message : 'Could not load tickets.');
     }
+  }, []);
+  const refresh = useCallback(() => load(false), [load]);
+
+  const onChanges = useCallback((fn: (changes: TicketChange[]) => void) => {
+    listeners.current.add(fn);
+    return () => { listeners.current.delete(fn); };
   }, []);
 
   /* Initial load + reference data once signed in */
@@ -156,11 +181,11 @@ export function TicketsProvider({ children }: { children: React.ReactNode }) {
   /* Keep the board fresh: poll while the tab is visible and refetch on focus */
   useEffect(() => {
     if (!isAuthenticated) return;
-    const tick = () => { if (document.visibilityState === 'visible') void refresh(); };
+    const tick = () => { if (document.visibilityState === 'visible') void load(true); };
     const id = setInterval(tick, POLL_MS);
     document.addEventListener('visibilitychange', tick);
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
-  }, [isAuthenticated, refresh]);
+  }, [isAuthenticated, load]);
 
   const staff = useMemo<StaffUser[]>(
     () => users.filter(u => u.role !== 'Requester').map(u => ({ id: u.id, name: u.full_name, role: u.role, email: u.email })),
@@ -275,9 +300,9 @@ export function TicketsProvider({ children }: { children: React.ReactNode }) {
   }, [mutateTicket]);
 
   const value = useMemo<TicketsContextValue>(() => ({
-    tickets, staff, clients, designTypes, loading, error, refresh, getTicket, createTicket, updateTicket,
+    tickets, staff, clients, designTypes, loading, error, refresh, onChanges, getTicket, createTicket, updateTicket,
     bulkUpdate, toggleSubtask, addSubtask, startTimer, stopTimer,
-  }), [tickets, staff, clients, designTypes, loading, error, refresh, getTicket, createTicket, updateTicket,
+  }), [tickets, staff, clients, designTypes, loading, error, refresh, onChanges, getTicket, createTicket, updateTicket,
     bulkUpdate, toggleSubtask, addSubtask, startTimer, stopTimer]);
 
   return <TicketsContext.Provider value={value}>{children}</TicketsContext.Provider>;

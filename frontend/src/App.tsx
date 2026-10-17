@@ -189,7 +189,7 @@ function AppShell() {
   const pageTitle = titleFor(location.pathname);
   const subtitle = PAGE_SUBTITLES[location.pathname];
   const { toasts, addToast, removeToast } = useToast();
-  const { refresh } = useTickets();
+  const { refresh, onChanges } = useTickets();
   const openNewRequest = useCallback((answers?: RequestPrefill) => { setPrefill(answers ?? null); setIsCreateModalOpen(true); }, []);
 
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -206,6 +206,17 @@ function AppShell() {
   }, [addToast, refresh, user?.name]);
 
   useTicketSocket({ userId: user?.id ?? 'guest', onMessage: handleSocketMessage });
+
+  // Without live updates (Vercel), the same messages come from the regular poll instead, minus who did it.
+  useEffect(() => {
+    if (import.meta.env.VITE_LIVE_UPDATES !== 'false') return;
+    return onChanges(changes => {
+      for (const c of changes.slice(0, 3)) {
+        addToast(c.type === 'ticket_moved' ? `${c.ticketNumber} moved → ${c.to}` : `New: ${c.ticketNumber} · ${c.title}`, 'info');
+      }
+      if (changes.length > 3) addToast(`…and ${changes.length - 3} more updates`, 'info');
+    });
+  }, [onChanges, addToast]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
