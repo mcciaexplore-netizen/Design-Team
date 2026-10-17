@@ -32,6 +32,14 @@ def enabled() -> bool:
     return bool(os.getenv("GOOGLE_DRIVE_CREDENTIALS") and os.getenv("GOOGLE_DRIVE_FOLDER_ID"))
 
 
+def _folder_id() -> str:
+    """The folder id, also when the whole folder link was pasted (…/folders/<id>?usp=sharing)."""
+    raw = os.environ["GOOGLE_DRIVE_FOLDER_ID"].strip()
+    if "/folders/" in raw:
+        raw = raw.split("/folders/", 1)[1]
+    return raw.split("?", 1)[0].strip("/")
+
+
 def _credentials() -> dict:
     raw = os.environ["GOOGLE_DRIVE_CREDENTIALS"].strip()
     if not raw.startswith("{"):
@@ -70,7 +78,7 @@ def upload(data: bytes, name: str, content_type: str = "application/octet-stream
     with _client() as http:
         start = http.post(f"{UPLOAD}?uploadType=resumable&supportsAllDrives=true&fields=id",
                           headers={**_auth(http), "X-Upload-Content-Type": content_type, "X-Upload-Content-Length": str(len(data))},
-                          json={"name": name, "parents": [os.environ["GOOGLE_DRIVE_FOLDER_ID"]]})
+                          json={"name": name, "parents": [_folder_id()]})
         if start.status_code != 200 or "location" not in start.headers:
             raise DriveError(f"Drive refused the upload ({start.status_code}): {start.text[:200]}")
         done = http.put(start.headers["location"], content=data, headers={"Content-Type": content_type})
@@ -102,3 +110,37 @@ def delete(file_id: str) -> None:
         r = http.patch(f"{API}/{file_id}?supportsAllDrives=true", headers=_auth(http), json={"trashed": True})
         if r.status_code not in (200, 404):
             raise DriveError(f"Drive delete failed ({r.status_code}): {r.text[:200]}")
+
+
+def check() -> tuple[bool, str]:
+    """Sign in and look at the folder, without storing anything: is Drive really ready for uploads? (Settings)"""
+    if not enabled():
+        return False, "Google Drive is not set up: add GOOGLE_DRIVE_CREDENTIALS and GOOGLE_DRIVE_FOLDER_ID in Vercel, then redeploy."
+    try:
+        creds = _credentials()
+        robot = creds["client_email"]
+        creds["private_key"]
+    except (ValueError, KeyError, TypeError):
+        return False, "GOOGLE_DRIVE_CREDENTIALS is not the service account's JSON key. Paste the whole .json file, from { to }."
+    try:
+        with _client() as http:
+            headers = _auth(http)
+            r = http.get(f"{API}/{_folder_id()}?supportsAllDrives=true&fields=name,mimeType,driveId,capabilities(canAddChildren)",
+                         headers=headers)
+    except DriveError:
+        return False, f"Google refused the key for {robot}. Make a new JSON key for it and paste the whole file again."
+    except httpx.HTTPError as exc:
+        return False, f"Could not reach Google: {exc.__class__.__name__}"
+    if r.status_code == 404:
+        return False, (f"The folder {_folder_id()} was not found, or {robot} is not a member of its Shared Drive. "
+                       "In Drive: the Shared Drive > Manage members > add that address as Content manager.")
+    if r.status_code != 200:
+        return False, f"Google answered {r.status_code}: {r.text[:200]}"
+    folder = r.json()
+    if folder.get("mimeType") != "application/vnd.google-apps.folder":
+        return False, "GOOGLE_DRIVE_FOLDER_ID points to a file, not a folder."
+    if not folder.get("driveId"):
+        return False, f"\"{folder.get('name')}\" is in a My Drive. It must be a folder inside a Shared Drive."
+    if not folder.get("capabilities", {}).get("canAddChildren"):
+        return False, f"{robot} can see \"{folder.get('name')}\" but may not add files. Make it Content manager of the Shared Drive."
+    return True, f"Connected. New uploads go to the folder \"{folder.get('name')}\" as {robot}."

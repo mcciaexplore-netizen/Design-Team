@@ -105,6 +105,14 @@ def test_email(user: models.User = Depends(require_lead)):
     return {"ok": ok, "detail": f"Sent to {user.email}. Check the inbox (and spam)." if ok else detail}
 
 
+@router.post("/api/integrations/drive/test")
+def test_drive(_lead: models.User = Depends(require_lead)):
+    """Check that Google Drive really accepts uploads (signs in and looks at the folder; stores nothing)."""
+    import gdrive
+    ok, detail = gdrive.check()
+    return {"ok": ok, "detail": detail}
+
+
 # ── Per-user preferences ─────────────────────────────────────────────────────
 
 class PreferencesUpdate(BaseModel):

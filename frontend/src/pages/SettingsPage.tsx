@@ -40,6 +40,8 @@ function IntegrationsTab() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [emailResult, setEmailResult] = useState<Result>(null);
+  const [checkingDrive, setCheckingDrive] = useState(false);
+  const [driveResult, setDriveResult] = useState<Result>(null);
 
   const load = useCallback(async () => {
     try { setCfg(await apiJson<IntegrationSettings>('/api/settings/integrations')); setLoadError(null); }
@@ -54,6 +56,15 @@ function IntegrationsTab() {
       setEmailResult({ ok: r.ok, text: r.detail });
     } catch (e) { setEmailResult({ ok: false, text: e instanceof Error ? e.message : 'Test failed.' }); }
     finally { setTesting(false); }
+  };
+
+  const testDrive = async () => {
+    setCheckingDrive(true); setDriveResult(null);
+    try {
+      const r = await apiJson<{ ok: boolean; detail: string }>('/api/integrations/drive/test', { method: 'POST' });
+      setDriveResult({ ok: r.ok, text: r.detail });
+    } catch (e) { setDriveResult({ ok: false, text: e instanceof Error ? e.message : 'Check failed.' }); }
+    finally { setCheckingDrive(false); }
   };
 
   if (loadError) return <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{loadError} <button type="button" className="chip" onClick={() => void load()}>Retry</button></p>;
@@ -82,6 +93,12 @@ function IntegrationsTab() {
           <h2 style={SECTION_LABEL}>File storage</h2>
           <p style={{ fontSize: '0.75rem', color: '#64748b' }}>New uploads are saved to: <strong>{cfg.file_storage}</strong>. Set Google Drive with GOOGLE_DRIVE_CREDENTIALS and GOOGLE_DRIVE_FOLDER_ID in Vercel.</p>
         </div>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <button type="button" className="btn-ghost" onClick={() => void testDrive()} disabled={checkingDrive}>
+          <HardDrive size={14} /> {checkingDrive ? 'Checking…' : 'Check Google Drive'}
+        </button>
+        <ResultLine r={driveResult} />
       </div>
     </section>
   );

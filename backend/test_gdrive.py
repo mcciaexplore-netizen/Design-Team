@@ -111,3 +111,34 @@ def test_a_drive_failure_is_a_clear_error_not_a_lost_file(client, drive, monkeyp
     db = TestingSessionLocal()
     assert db.query(models.Ticket).count() == 0
     db.close()
+
+
+def test_check_google_drive_says_what_is_wrong(client, drive, monkeypatch):
+    lead = auth(client, "lead@x.com")
+    folder = {"name": "Uploads", "mimeType": "application/vnd.google-apps.folder", "driveId": "SD1",
+              "capabilities": {"canAddChildren": True}}
+
+    def google(req):
+        if "oauth2" in str(req.url):
+            return drive(req)
+        assert "/files/1BRzHw?" in str(req.url)          # the id, also when the whole link was pasted
+        return httpx.Response(200, json=folder) if folder else httpx.Response(404)
+
+    monkeypatch.setattr(gdrive, "_client", lambda: httpx.Client(transport=httpx.MockTransport(google)))
+    monkeypatch.setenv("GOOGLE_DRIVE_FOLDER_ID", "https://drive.google.com/drive/folders/1BRzHw?usp=sharing")
+    check = lambda: client.post("/api/integrations/drive/test", headers=lead).json()
+    assert check() == {"ok": True, "detail": 'Connected. New uploads go to the folder "Uploads" as dd@proj.iam.gserviceaccount.com.'}
+
+    folder["capabilities"]["canAddChildren"] = False
+    assert "Content manager" in check()["detail"]
+    del folder["driveId"]
+    assert "My Drive" in check()["detail"]
+    folder = None
+    r = check()
+    assert r["ok"] is False and "not a member" in r["detail"]
+
+    monkeypatch.setenv("GOOGLE_DRIVE_CREDENTIALS", "not json")
+    assert "JSON key" in check()["detail"]
+    monkeypatch.delenv("GOOGLE_DRIVE_FOLDER_ID")
+    assert "not set up" in check()["detail"]
+    assert client.post("/api/integrations/drive/test", headers=auth(client, "des@x.com")).status_code == 403

@@ -18,3 +18,7 @@ _smoke*
 .dev_secret_key
 .pytest_tmp/
 .pytest_tmp_*/
+
+# Google service account keys: never commit
+*.iam.gserviceaccount.json
+designdesk-*.json
