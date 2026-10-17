@@ -942,3 +942,6 @@ select.input-field { cursor: pointer; }
 .glass-card.collapsible { max-height: 400px; overflow: hidden; transition: max-height 0.3s var(--ease), opacity 0.3s var(--ease), transform 0.3s var(--ease), padding 0.3s var(--ease), margin 0.3s var(--ease), border-color 0.3s var(--ease), box-shadow 0.3s var(--ease); }
 .glass-card.collapsible.removing { max-height: 0; opacity: 0; padding-top: 0 !important; padding-bottom: 0 !important; margin: 0; border-width: 0; transform: translateX(16px); }
 .btn-primary:disabled .app-spinner { border-color: rgba(255,255,255,0.35); border-top-color: #fff; }
+
+/* Library: folders above files on narrow screens */
+@media (max-width: 760px) { .library-layout { grid-template-columns: 1fr !important; } }

@@ -13,6 +13,7 @@ const ForcePasswordChangePage = lazy(() => import('./pages/ForcePasswordChangePa
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
 const WorkloadPage = lazy(() => import('./pages/WorkloadPage'));
+const LibraryPage = lazy(() => import('./pages/LibraryPage'));
 const ReviewPage = lazy(() => import('./pages/ReviewPage'));
 const RequestFormPage = lazy(() => import('./pages/RequestFormPage'));
 const TrackPage = lazy(() => import('./pages/TrackPage'));
@@ -32,7 +33,7 @@ import { NewRequestContext } from './contexts/NewRequestContext';
 import type { RequestPrefill } from './requestForm';
 import {
   LayoutDashboard, BarChart3, Plus, Users, Zap, LogOut, Search,
-  ChevronRight, Settings, Gauge, ListChecks, CalendarDays, Megaphone, type LucideIcon,
+  ChevronRight, Settings, Gauge, ListChecks, CalendarDays, Megaphone, Library, type LucideIcon,
 } from 'lucide-react';
 
 interface NavItem { to: string; label: string; icon: LucideIcon; roles: UserRole[] }
@@ -44,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
     { to: '/my-tasks', label: 'My Tasks',     icon: ListChecks,      roles: STAFF },
     { to: '/',         label: 'Visual Board', icon: LayoutDashboard, roles: STAFF },
     { to: '/workload', label: 'Workload',     icon: Gauge,           roles: STAFF },
+    { to: '/library',  label: 'Library',      icon: Library,         roles: STAFF },
     { to: '/calendar', label: 'Calendar',     icon: CalendarDays,    roles: ['Design Lead', 'Designer', 'Client'] },
   ] },
   { title: 'Insights', items: [
@@ -63,6 +65,7 @@ const PAGE_TITLES: [string, string][] = [
   ['/my-tasks',      'My tasks'],
   ['/dashboard',     'Performance'],
   ['/workload',      'Team workload'],
+  ['/library',       'Library'],
   ['/calendar',      'Calendar'],
   ['/campaigns',     'Campaigns'],
   ['/tickets',      'Ticket'],
@@ -74,6 +77,7 @@ const PAGE_SUBTITLES: Record<string, string> = {
   '/':              'Drag tickets between stages to keep work moving',
   '/dashboard':     'The last 30 days of delivery and this week’s load',
   '/workload':      'Who has capacity, and who is about to fall behind',
+  '/library':       'Logos, brand assets, templates and finished designs for the whole team',
   '/calendar':      'Deadlines and SLA windows at a glance',
   '/client-portal': 'Track requests and review designs',
   '/settings':      'Notifications, password and team',
@@ -298,6 +302,7 @@ function AppShell() {
               <Route path="/" element={<RequireRole roles={STAFF}><KanbanBoard /></RequireRole>} />
               <Route path="/my-tasks" element={<RequireRole roles={STAFF}><MyTasksPage /></RequireRole>} />
               <Route path="/workload" element={<RequireRole roles={STAFF}><WorkloadPage /></RequireRole>} />
+              <Route path="/library" element={<RequireRole roles={STAFF}><LibraryPage /></RequireRole>} />
               <Route path="/dashboard" element={<RequireRole roles={['Design Lead']}><Dashboard /></RequireRole>} />
               <Route path="/calendar" element={isClient ? <Navigate to="/client-portal" replace /> : <CalendarPage />} />
               <Route path="/client-portal" element={<ClientPortalPage onNewRequest={() => openNewRequest()} />} />

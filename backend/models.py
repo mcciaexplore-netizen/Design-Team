@@ -296,6 +296,10 @@ class LibraryItemVersion(Base):
     version_number = Column(Integer, nullable=False)
     file_url = Column(String, nullable=False)
     preview_url = Column(String, nullable=True)
+    file_name = Column(String, nullable=True)      # as uploaded, so a download keeps its real name
+    content_type = Column(String, nullable=True)
+    size_bytes = Column(Integer, nullable=True)
+    note = Column(Text, nullable=True)             # what changed in this version
     uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
 
