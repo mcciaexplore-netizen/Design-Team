@@ -169,7 +169,7 @@ def test_the_client_is_emailed_the_review_link_when_a_design_is_sent(client, mon
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
     t = make_ticket(client, "a@tata.com")
     out = upload_design(client, t["id"]).json()
-    to, subject, body = sent[0]
+    to, subject, body = next(m for m in sent if m[0] == "a@tata.com")   # the team is emailed too
     assert to == "a@tata.com" and t["ticket_number"] in subject
     assert out["approval"]["review_url"] in body and "/review/" in body
 

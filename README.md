@@ -9,14 +9,15 @@ Live on Vercel: every push to `main` deploys. Setup, email (Zoho) and Google Dri
 
 **Design Leads (admin)**
 - **Visual Board**: every ticket by stage or by person; drag to move, tick several to assign or move together.
-- **Performance**: delivery, SLA and workload numbers, with report exports.
+- **Performance**: a live feed of new requests and changes (updates every 15 seconds), plus delivery, SLA and
+  workload numbers with report exports.
 - **Ticket page**: assign a designer, set priority, note the client's changes, upload designs and send them for
   approval, files, source files, Figma, time.
 - **Settings**: add and remove people (**Users**), check email and file storage (**Email & storage**), and delete
   all past data (**Danger zone**).
 
 **Designers**
-- **My Tasks**: what is assigned to them, soonest deadline first.
+- **My Dashboard**: their queue (soonest deadline first), what changed on their work, and where their emails go.
 - **Library**: shared folders of logos, brand assets, templates and finished designs, with versions.
 - **Workload** and **Calendar**: who has capacity and what is due when.
 

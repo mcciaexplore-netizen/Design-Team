@@ -26,7 +26,7 @@ How it works on Vercel:
   finished edit windows, recurring tickets) run off normal traffic. After any request, if they last ran more than
   5 minutes ago, they run again. `AUTO_TICK=off` turns this off. The daily cron in `vercel.json` is a backup and needs
   `CRON_SECRET`.
-* **No live connection.** Pages refresh every 30 seconds and show a pop-up for what changed ("DES-12 moved → In Review").
+* **No live connection.** Pages refresh every 15 seconds and show a pop-up for what changed ("DES-12 moved → In Review").
 * **Emails** are sent before the request returns, so actions that send email take a moment longer.
 * **Public requests board.** `/requests` lists every request with its title, status and dates, without signing in.
   `PUBLIC_BOARD=off` hides it.

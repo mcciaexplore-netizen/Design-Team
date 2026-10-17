@@ -165,7 +165,7 @@ FLYER, INSTA, OTHER = "Flyer (Email / Print)", "Instagram post", "Other"
 def test_ticking_several_designs_creates_one_ticket_each(client, monkeypatch):
     sent = []
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
-    monkeypatch.setattr(request_form.delivery, "send_email", lambda to, subject, body: sent.append((subject, body)) or (True, "Sent"))
+    monkeypatch.setattr(request_form.delivery, "send_email", lambda to, subject, body: sent.append((to, subject, body)) or (True, "Sent"))
     details = {FLYER: {"size": "A4", "channel": "Print"}, INSTA: {"format": "Story (9:16)"}, OTHER: {}}
     data = form(details=json.dumps(details), other_details="A mascot")
     data["design_requirement"] = [FLYER, INSTA, OTHER, FLYER]   # a repeat is ignored
@@ -187,7 +187,8 @@ def test_ticking_several_designs_creates_one_ticket_each(client, monkeypatch):
     db.close()
     assert len(atts) == 3 and len({a.file_url for a in atts}) == 1   # one stored file, attached to each ticket
 
-    assert len(sent) == 1 and all(t["ticket_number"] in sent[0][1] for t in out)   # one confirmation listing all
+    to_client = [m for m in sent if m[0] == "meera@example.com"]   # the team is emailed separately
+    assert len(to_client) == 1 and all(t["ticket_number"] in to_client[0][2] for t in out)   # one confirmation listing all
 
 
 def test_each_design_must_answer_its_own_required_questions(client):

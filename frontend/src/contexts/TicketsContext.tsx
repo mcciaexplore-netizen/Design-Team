@@ -84,7 +84,8 @@ export function mapTicket(b: ApiTicket): Ticket {
 /* ── Context ──────────────────────────────────── */
 export type TicketChange =
   | { type: 'ticket_moved'; ticketNumber: string; to: string }
-  | { type: 'ticket_created'; ticketNumber: string; title: string };
+  | { type: 'ticket_created'; ticketNumber: string; title: string }
+  | { type: 'client_changes'; ticketNumber: string; text: string };
 
 interface TicketsContextValue {
   tickets: Ticket[];
@@ -108,7 +109,7 @@ interface TicketsContextValue {
 }
 
 const TicketsContext = createContext<TicketsContextValue | undefined>(undefined);
-const POLL_MS = 30_000;
+const POLL_MS = 15_000;
 
 export function TicketsProvider({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated } = useAuth();
@@ -136,6 +137,11 @@ export function TicketsProvider({ children }: { children: React.ReactNode }) {
           const old = before.get(String(b.id));
           if (!old) changes.push({ type: 'ticket_created', ticketNumber: b.ticket_number, title: b.title });
           else if (old.status !== b.status) changes.push({ type: 'ticket_moved', ticketNumber: b.ticket_number, to: b.status });
+          const notes = (f: Record<string, unknown> | undefined) => (Array.isArray(f?.client_changes) ? f.client_changes as { text: string }[] : []);
+          const now = notes(b.type_specific_fields);
+          if (old && now.length > notes(old.type_specific_fields).length) {
+            changes.push({ type: 'client_changes', ticketNumber: b.ticket_number, text: now[now.length - 1].text });
+          }
         }
         if (changes.length) listeners.current.forEach(fn => fn(changes));
       }

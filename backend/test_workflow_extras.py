@@ -72,7 +72,7 @@ def test_confirmation_email_has_the_ticket_number_and_tracking_link(client, monk
     assert sent == []   # SMTP not configured: nothing is sent
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
     out = submit(client)
-    to, subject, body = sent[0]
+    to, subject, body = next(m for m in sent if m[0] == "meera@example.com")   # the team is emailed too
     assert to == "meera@example.com" and out["ticket_number"] in subject
     assert out["tracking_url"] in body and "AI Workshop" in body
 

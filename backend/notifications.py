@@ -35,6 +35,10 @@ def notify_user(db, user, content, event_type, ticket_id=None):
     # Send through channels (a muted event is still logged below so it is not retried every cron tick)
     if in_app_enabled and not muted:
         CHANNELS[0].send(db, user, content, event_type, ticket_id)
+    if not muted and mute_key(event_type) == "sla_breach":   # due soon / overdue: the team is emailed too
+        import events
+        from models import Ticket
+        events.email_staff(db, user, content, db.query(Ticket).filter_by(id=ticket_id).first() if ticket_id else None, prefs)
 
     if ticket_id:
         log = NotificationLog(ticket_id=ticket_id, event_type=event_type)

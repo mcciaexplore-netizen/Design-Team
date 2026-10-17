@@ -27,13 +27,38 @@ def slack_escape(text: str) -> str:
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+# What the design team is also emailed about (clients get their own emails: confirmation, review links, reminders).
+STAFF_EMAIL_EVENTS = {"ticket_assigned", "client_changes", "approval_decision", "sla_breach", "ticket_created"}
+
+
+def email_staff(db: Session, user: models.User, content: str, ticket: Optional[models.Ticket] = None,
+                prefs: Optional[models.UserPreference] = None) -> None:
+    """Email a team member (designer or lead) at their account address, unless they turned email off or email
+    isn't set up. Clients are never emailed from here."""
+    from common import app_url
+    if user.role == models.RoleEnum.REQUESTER or not user.is_active or not delivery.email_configured():
+        return
+    if prefs is None:
+        prefs = db.query(models.UserPreference).filter(models.UserPreference.user_id == user.id).first()
+    if prefs is not None and not prefs.email_enabled:
+        return
+    link = f"{app_url()}/tickets/{ticket.id}" if ticket else app_url()
+    body = (f"Hi {user.full_name.split(' ')[0]},\n\n{content}\n\nOpen it in DesignDesk: {link}\n\n"
+            "You get these emails because you are on the design team. Turn them off on your My Dashboard page.\n")
+    subject = f"DesignDesk: {content}"[:150].replace("\n", " ")
+    delivery.run_in_background(delivery.send_email, user.email, subject, body)
+
+
 def notify(db: Session, user: models.User, content: str, event: str, ticket: Optional[models.Ticket] = None) -> None:
-    """Deliver one notification to one user according to their preferences. Caller commits."""
+    """Deliver one notification to one user according to their preferences: in the app, and by email for the
+    team's important events. Caller commits."""
     prefs = db.query(models.UserPreference).filter(models.UserPreference.user_id == user.id).first()
     if prefs and event in (prefs.muted_events or []):
         return
     if prefs is None or prefs.in_app_enabled:
         db.add(models.Notification(user_id=user.id, content=content, type=event, ticket_id=ticket.id if ticket else None))
+    if event in STAFF_EMAIL_EVENTS:
+        email_staff(db, user, content, ticket, prefs)
 
 
 def post_slack_event(db: Session, kind: str, text: str) -> None:

@@ -42,7 +42,7 @@ interface NavGroup { title: string; items: NavItem[] }
 const STAFF: UserRole[] = ['Design Lead', 'Designer'];
 const NAV_GROUPS: NavGroup[] = [
   { title: 'Workspace', items: [
-    { to: '/my-tasks', label: 'My Tasks',     icon: ListChecks,      roles: STAFF },
+    { to: '/my-tasks', label: 'My Dashboard', icon: ListChecks,      roles: STAFF },
     { to: '/',         label: 'Visual Board', icon: LayoutDashboard, roles: STAFF },
     { to: '/workload', label: 'Workload',     icon: Gauge,           roles: STAFF },
     { to: '/library',  label: 'Library',      icon: Library,         roles: STAFF },
@@ -62,7 +62,7 @@ const NAV_GROUPS: NavGroup[] = [
 
 const PAGE_TITLES: [string, string][] = [
   ['/client-portal', 'My requests'],
-  ['/my-tasks',      'My tasks'],
+  ['/my-tasks',      'My dashboard'],
   ['/dashboard',     'Performance'],
   ['/workload',      'Team workload'],
   ['/library',       'Library'],
@@ -215,7 +215,9 @@ function AppShell() {
     if (import.meta.env.VITE_LIVE_UPDATES !== 'false') return;
     return onChanges(changes => {
       for (const c of changes.slice(0, 3)) {
-        addToast(c.type === 'ticket_moved' ? `${c.ticketNumber} moved → ${c.to}` : `New: ${c.ticketNumber} · ${c.title}`, 'info');
+        addToast(c.type === 'ticket_moved' ? `${c.ticketNumber} moved → ${c.to}`
+          : c.type === 'client_changes' ? `${c.ticketNumber}: changes from the client · ${c.text.slice(0, 80)}`
+          : `New: ${c.ticketNumber} · ${c.title}`, 'info');
       }
       if (changes.length > 3) addToast(`…and ${changes.length - 3} more updates`, 'info');
     });

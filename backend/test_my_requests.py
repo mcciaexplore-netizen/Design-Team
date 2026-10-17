@@ -18,6 +18,11 @@ def outbox(monkeypatch):
     return sent
 
 
+def to(outbox, email):
+    """The emails sent to one address (the design team is emailed too)."""
+    return [m for m in outbox if m[0] == email]
+
+
 def link_token(body):
     return re.search(r"https://app\.example\.com/my-requests\?token=(\S+)", body).group(1)
 
@@ -35,7 +40,7 @@ def test_confirmation_email_links_to_all_requests_and_shows_only_that_persons(cl
     mine = submit(client, "meera@example.com", "Expo") + submit(client, "Meera@Example.com", "Open Day")
     clear_hits()
     theirs = submit(client, "someone.else@example.com", "Other event")
-    token = link_token(outbox[0][2])
+    token = link_token(to(outbox, "meera@example.com")[0][2])
 
     r = client.get("/api/public/my-requests", params={"token": token})
     assert r.status_code == 200, r.text
@@ -52,7 +57,7 @@ def test_asking_for_the_link_by_email_gives_the_same_answer_for_anyone(client, o
     unknown = client.post("/api/public/my-requests/link", json={"email": "nobody@example.com"})
     assert known.status_code == unknown.status_code == 200 and known.json() == unknown.json()
     assert [to for to, _, _ in outbox] == ["meera@example.com"]
-    assert client.get("/api/public/my-requests", params={"token": link_token(outbox[0][2])}).status_code == 200
+    assert client.get("/api/public/my-requests", params={"token": link_token(to(outbox, "meera@example.com")[0][2])}).status_code == 200
 
 
 def test_bad_or_wrong_purpose_tokens_are_refused(client, outbox):
@@ -60,7 +65,7 @@ def test_bad_or_wrong_purpose_tokens_are_refused(client, outbox):
     session = login(client, "a@tata.com").json()["access_token"]
     assert client.get("/api/public/my-requests", params={"token": session}).status_code == 404
     submit(client, "meera@example.com", "Expo")
-    token = link_token(outbox[0][2])
+    token = link_token(to(outbox, "meera@example.com")[0][2])
     assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401   # not a session
 
 

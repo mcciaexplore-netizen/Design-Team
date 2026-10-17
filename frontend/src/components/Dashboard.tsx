@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import { AlertTriangle, CheckCircle2, Clock, Inbox } from 'lucide-react';
 import { apiJson } from '../api';
+import ActivityFeed from './ActivityFeed';
 import { DONE_STATUSES, STATUSES } from '../types';
 import { useTickets } from '../contexts/TicketsContext';
 import ForecastingWidget from './ForecastingWidget';
@@ -56,7 +57,12 @@ const Dashboard = () => {
       .catch(e => setError(e instanceof Error ? e.message : 'Could not load the dashboard.'))
       .finally(() => setLoading(false));
   };
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+    // The numbers stay current while the page is open; the activity feed below refreshes faster on its own.
+    const id = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 60_000);
+    return () => clearInterval(id);
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const byStage = useMemo(
     () => STATUSES.map(s => ({ stage: s, tickets: tickets.filter(t => t.status === s).length })),
@@ -78,6 +84,8 @@ const Dashboard = () => {
         <h1>Performance at a glance</h1>
         <p>The last 30 days of delivery, plus what's on the team's plate this week.</p>
       </div>
+
+      <div style={{ marginBottom: 20 }}><ActivityFeed title="Latest requests and changes" /></div>
 
       {error && <p role="alert" style={{ color: '#b91c1c', marginBottom: 12 }}>{error} <button type="button" className="chip" onClick={load}>Retry</button></p>}
       {loading && !summary && <p role="status" style={{ color: '#64748B' }}>Loading…</p>}

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import models
 import delivery
 import events
-from auth import get_current_user, require_lead
+from auth import get_current_user, require_lead, require_staff
 from common import as_utc, storage_name
 from database import get_db
 
@@ -109,12 +109,17 @@ def test_email(user: models.User = Depends(require_lead)):
 
 class PreferencesUpdate(BaseModel):
     in_app_enabled: Optional[bool] = None
+    email_enabled: Optional[bool] = None
     muted_events: Optional[List[str]] = None
 
 
-def _prefs_payload(prefs: Optional[models.UserPreference]) -> dict:
+def _prefs_payload(prefs: Optional[models.UserPreference], user: models.User) -> dict:
     return {
         "in_app_enabled": prefs.in_app_enabled if prefs else True,
+        # The team is emailed about assignments, client changes and decisions, new requests and SLA alerts.
+        "email_enabled": prefs.email_enabled if prefs else True,
+        "email": user.email,
+        "email_available": delivery.email_configured(),
         "muted_events": [e for e in (prefs.muted_events or []) if e in events.EVENT_LABELS] if prefs else [],
         "available_events": events.EVENT_LABELS,
     }
@@ -123,7 +128,7 @@ def _prefs_payload(prefs: Optional[models.UserPreference]) -> dict:
 @router.get("/api/me/preferences")
 def get_preferences(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
     prefs = db.query(models.UserPreference).filter(models.UserPreference.user_id == user.id).first()
-    return _prefs_payload(prefs)
+    return _prefs_payload(prefs, user)
 
 
 @router.put("/api/me/preferences")
@@ -141,7 +146,56 @@ def update_preferences(body: PreferencesUpdate, db: Session = Depends(get_db), u
         setattr(prefs, key, value)
     db.commit()
     db.refresh(prefs)
-    return _prefs_payload(prefs)
+    return _prefs_payload(prefs, user)
+
+
+# ── Activity feed ────────────────────────────────────────────────────────────
+# What just happened across the studio (Design Lead dashboard) or on one designer's tickets (their dashboard), from
+# each ticket's history. The pages poll it, so new requests and changes show up within seconds.
+
+QUIET_ACTIONS = {"Logged time", "Deleted time entry"}
+
+
+def _activity_text(action: str, details: dict) -> tuple[str, str]:
+    """(kind, sentence) for one history entry. kind: new, status, client, design or other."""
+    details = details or {}
+    status = details.get("status")
+    if action == "Created":
+        return "new", "New request" + (" from the request form" if details.get("via") == "request form" else "")
+    if action in ("Client approved",):
+        return "client", "The client approved the design"
+    if action in ("Client requested changes", "Changes requested"):
+        reason = details.get("reason") or details.get("comment") or ""
+        return "client", "The client asked for changes" + (f": {reason}" if reason else "")
+    if action == "Client changes added":
+        return "client", f"Changes from the client: {details.get('text', '')}"
+    if action in ("Uploaded proof", "Sent for approval"):
+        version = details.get("version") or details.get("proof_version")
+        return "design", f"{action}{f' (version {version})' if version else ''}"
+    if action in ("Updated", "Bulk update") and isinstance(status, dict) and status.get("to"):
+        return "status", f"Moved to {status['to']}"
+    if action in ("Updated", "Bulk update") and "assignee_id" in details:
+        return "status", "Assigned to someone new"
+    if action == "Auto-closed":
+        return "status", f"Closed automatically ({details.get('reason', 'time ran out')})"
+    return "other", action
+
+
+@router.get("/api/activity")
+def activity(mine: bool = False, limit: int = 40, db: Session = Depends(get_db), user: models.User = Depends(require_staff)):
+    q = db.query(models.AuditLog, models.Ticket).join(models.Ticket, models.Ticket.id == models.AuditLog.ticket_id)         .filter(models.AuditLog.action.notin_(QUIET_ACTIONS))
+    if mine:
+        q = q.filter(models.Ticket.assignee_id == user.id)
+    rows = q.order_by(models.AuditLog.timestamp.desc(), models.AuditLog.id.desc()).limit(max(1, min(limit, 100))).all()
+    names = {u.id: u.full_name for u in db.query(models.User).filter(
+        models.User.id.in_({log.changed_by_id for log, _ in rows if log.changed_by_id} or {0}))}
+    out = []
+    for log, ticket in rows:
+        kind, text = _activity_text(log.action, log.details)
+        out.append({"id": log.id, "at": as_utc(log.timestamp).isoformat() if log.timestamp else None, "kind": kind, "text": text,
+                    "by": log.actor_label or names.get(log.changed_by_id) or "System",
+                    "ticket_id": ticket.id, "ticket_number": ticket.ticket_number, "title": ticket.title})
+    return out
 
 
 # ── In-app notifications ─────────────────────────────────────────────────────

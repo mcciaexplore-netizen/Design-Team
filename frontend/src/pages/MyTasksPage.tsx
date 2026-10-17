@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { apiJson } from '../api';
+import ActivityFeed from '../components/ActivityFeed';
 import { DONE_STATUSES } from '../types';
-import { AlertCircle, CheckCircle2, Clock, PauseCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Mail, PauseCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
 import { PRIORITY_STYLE, type Ticket } from '../types';
@@ -41,17 +44,35 @@ const MyTasksPage = () => {
     .filter(t => t.assignee_id === myId && !DONE.includes(t.status))
     .sort((a, b) => dueMs(a) - dueMs(b) || (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9));
   const blocked = mine.filter(t => t.status === 'Waiting on Requester').length;
+  const tiles: [string, number, string][] = [
+    ['Open tasks', mine.length, '#003F8A'],
+    ['Due in 24 hours', mine.filter(t => bucketOf(t, now) === 'today').length, '#B45309'],
+    ['Overdue', mine.filter(t => bucketOf(t, now) === 'overdue').length, '#B91C1C'],
+    ['With the client for review', mine.filter(t => t.status === 'In Review').length, '#047857'],
+  ];
 
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto', padding: '0.25rem 0 2rem' }}>
+    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0.25rem 0 2rem' }}>
       <h1 style={{ fontSize: 'clamp(1.4rem,3vw,2rem)', fontWeight: 800 }}>
-        Hi {user?.name.split(' ')[0] ?? 'there'}, here's your queue
+        Hi {user?.name.split(' ')[0] ?? 'there'}, here's your dashboard
       </h1>
       <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: 4, marginBottom: '1.25rem' }}>
         {mine.length} open task{mine.length === 1 ? '' : 's'}, soonest deadline first
         {blocked > 0 && ` · ${blocked} waiting on the requester`}.
       </p>
 
+      <section aria-label="Summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: '1.25rem' }}>
+        {tiles.map(([label, value, color]) => (
+          <div key={label} className="glass-card" style={{ padding: '0.85rem 1rem' }}>
+            <p style={{ fontSize: '1.6rem', fontWeight: 800, color, lineHeight: 1.1 }}>{value}</p>
+            <p style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>{label}</p>
+          </div>
+        ))}
+      </section>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '1.25rem', alignItems: 'start' }}>
+      <div style={{ minWidth: 0 }}>
+      <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#0F172A', marginBottom: 10 }}>My queue</h2>
       {error && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{error} <button type="button" className="chip" onClick={() => void refresh()}>Retry</button></p>}
       {loading && tickets.length === 0 && <p role="status" style={{ color: '#64748B' }}>Loading your tasks…</p>}
 
@@ -99,8 +120,51 @@ const MyTasksPage = () => {
           </section>
         );
       })}
+      </div>
+
+      <aside style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0 }}>
+        <EmailCard />
+        <ActivityFeed mine title="Latest on my work" limit={12} />
+      </aside>
+      </div>
     </div>
   );
 };
+
+interface EmailPrefs { email_enabled: boolean; email: string; email_available: boolean }
+
+/** Where this designer's emails go (their account address), with a switch to turn them off. */
+function EmailCard() {
+  const [prefs, setPrefs] = useState<EmailPrefs | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { apiJson<EmailPrefs>('/api/me/preferences').then(setPrefs).catch(() => setError('Could not load your email setting.')); }, []);
+  const toggle = (on: boolean) => {
+    setError(null);
+    apiJson<EmailPrefs>('/api/me/preferences', { method: 'PUT', json: { email_enabled: on } }).then(setPrefs)
+      .catch(e => setError(e instanceof Error ? e.message : 'Could not save.'));
+  };
+  if (!prefs) return error ? <p role="alert" style={{ fontSize: '0.8rem', color: '#B91C1C' }}>{error}</p> : null;
+  return (
+    <section className="glass-card" style={{ padding: '1rem 1.25rem' }} aria-labelledby="email-card-h">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <Mail size={15} aria-hidden="true" style={{ color: '#003F8A' }} />
+        <h2 id="email-card-h" style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A' }}>Email</h2>
+        <span className={prefs.email_available && prefs.email_enabled ? 'badge-green' : 'badge-red'} style={{ marginLeft: 'auto' }}>
+          {!prefs.email_available ? 'Not set up' : prefs.email_enabled ? 'On' : 'Off'}
+        </span>
+      </div>
+      <p style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.55 }}>
+        Emails go to <strong>{prefs.email}</strong> when work is assigned to you, the client sends changes, approves or asks for
+        changes, and when a ticket is about to be late.
+      </p>
+      {!prefs.email_available && <p style={{ fontSize: '0.76rem', color: '#92400E', marginTop: 6 }}>Email isn't connected yet: your Design Lead sets it up (Zoho Mail). You still get every update in the bell.</p>}
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', marginTop: 10, cursor: 'pointer' }}>
+        <input type="checkbox" checked={prefs.email_enabled} onChange={e => toggle(e.target.checked)} style={{ accentColor: '#003F8A' }} />
+        Email me about my work
+      </label>
+      {error && <p role="alert" style={{ fontSize: '0.78rem', color: '#B91C1C', marginTop: 6 }}>{error}</p>}
+    </section>
+  );
+}
 
 export default MyTasksPage;
