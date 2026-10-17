@@ -115,7 +115,7 @@ def seed_demo(db: Session, types: dict[str, models.DesignType]):
     staff_pw = os.getenv("SEED_STAFF_PASSWORD", "mccia123")
     client_pw = os.getenv("SEED_CLIENT_PASSWORD", "client123")
     users = [
-        models.User(email="lead@mccia.in", full_name="Priya Sharma", role=models.RoleEnum.DESIGN_LEAD, hashed_password=pwd_context.hash(staff_pw)),
+        models.User(email="lead@mccia.in", full_name="Demo Lead", role=models.RoleEnum.DESIGN_LEAD, hashed_password=pwd_context.hash(staff_pw)),
         models.User(email="alice@mccia.in", full_name="Alice Fernandez", role=models.RoleEnum.DESIGNER, hashed_password=pwd_context.hash(staff_pw)),
         models.User(email="bob@mccia.in", full_name="Bob Mehta", role=models.RoleEnum.DESIGNER, hashed_password=pwd_context.hash(staff_pw)),
         models.User(email="client@tata.com", full_name="Client (TATA)", role=models.RoleEnum.REQUESTER, client_org="TATA", hashed_password=pwd_context.hash(client_pw)),

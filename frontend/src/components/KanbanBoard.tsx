@@ -78,17 +78,20 @@ const KanbanBoard = () => {
   const visible = useMemo(() => tickets.filter(t => ticketMatches(t, filters, myId, now)), [tickets, filters, myId, Math.floor(now / 30_000)]); // eslint-disable-line react-hooks/exhaustive-deps
   // Person columns are keyed by account, not by display name: two people can share a name, and grouping by name
   // would merge them and assign work to the wrong account. Same-named accounts are told apart by their email.
-  const assigneeColumns = useMemo(() => {
+  // The same labels are used in the Assignee filter and the "Assign to…" menu.
+  const personLabel = useMemo(() => {
     const sameName = new Map<string, number>();
     for (const s of staff) sameName.set(s.name, (sameName.get(s.name) ?? 0) + 1);
-    const cols = [{ key: 'unassigned', label: 'Unassigned' },
-      ...staff.map(s => ({ key: `u:${s.id}`, label: (sameName.get(s.name) ?? 0) > 1 ? `${s.name} (${s.email})` : s.name }))];
+    return (s: { name: string; email: string }) => ((sameName.get(s.name) ?? 0) > 1 ? `${s.name} (${s.email})` : s.name);
+  }, [staff]);
+  const assigneeColumns = useMemo(() => {
+    const cols = [{ key: 'unassigned', label: 'Unassigned' }, ...staff.map(s => ({ key: `u:${s.id}`, label: personLabel(s) }))];
     // Someone no longer on the team list (e.g. deactivated) who still holds tickets keeps a column.
     for (const t of tickets) {
       if (t.assignee_id && !cols.some(c => c.key === `u:${t.assignee_id}`)) cols.push({ key: `u:${t.assignee_id}`, label: t.assignee || 'Former team member' });
     }
     return cols;
-  }, [staff, tickets]);
+  }, [staff, tickets, personLabel]);
 
   const getGroupKey = (t: Ticket) => (groupBy === 'assignee' ? (t.assignee_id ? `u:${t.assignee_id}` : 'unassigned') : t.status);
   const groupings = groupBy === 'assignee' ? assigneeColumns : STATUSES.map(st => ({ key: st, label: st }));
@@ -320,7 +323,7 @@ const KanbanBoard = () => {
           <option value="">Everyone</option>
           <option value="me">Me</option>
           <option value="unassigned">Unassigned</option>
-          {staff.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+          {staff.map(s => <option key={s.id} value={String(s.id)}>{personLabel(s)}</option>)}
         </select>
 
         <select className="input-field" aria-label="SLA" value={filters.sla} onChange={e => applyFilters({ sla: e.target.value as BoardFilters['sla'] })} style={ctl}>
@@ -366,7 +369,7 @@ const KanbanBoard = () => {
                 onChange={e => { const v = e.target.value; e.target.value = ''; if (!v) return; void runBulk({ assignee_id: v === 'none' ? null : Number(v) }, 'Reassigned'); }}>
                 <option value="" disabled>Assign to…</option>
                 <option value="none" style={{ background: '#0f172a' }}>Unassigned</option>
-                {staff.map(s => <option key={s.id} value={s.id} style={{ background: '#0f172a' }}>{s.name}</option>)}
+                {staff.map(s => <option key={s.id} value={s.id} style={{ background: '#0f172a' }}>{personLabel(s)}</option>)}
               </select>
               <select aria-label="Set priority of selected" className="input-field" defaultValue="" style={darkSelect}
                 onChange={e => { const v = e.target.value; e.target.value = ''; if (v) void runBulk({ priority: v }, `Priority ${v}`); }}>
