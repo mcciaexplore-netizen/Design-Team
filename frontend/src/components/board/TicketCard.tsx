@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDraggable } from '@dnd-kit/core';
-import { AlertTriangle, Copy, CheckSquare, MessageCircle } from 'lucide-react';
+import { AlertTriangle, Copy, CheckSquare } from 'lucide-react';
 import { type Ticket, DONE_STATUSES, PRIORITY_STYLE } from '../../types';
 import { colorFor } from '../../contexts/TicketsContext';
 
@@ -199,12 +199,6 @@ export function TicketCard({
             <span className="ticket-meta-chip">
               <CheckSquare size={10} />
               {ticket.subtasks.filter(s => s.is_completed).length}/{ticket.subtasks.length}
-            </span>
-          )}
-          {(ticket.comment_count ?? 0) > 0 && (
-            <span className="ticket-meta-chip">
-              <MessageCircle size={10} />
-              {ticket.comment_count}
             </span>
           )}
         </div>

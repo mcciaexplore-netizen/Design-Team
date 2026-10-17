@@ -101,7 +101,7 @@ def test_slack_event_toggle_is_respected(client, monkeypatch):
 def test_preferences_roundtrip_and_validation(client):
     h = auth(client, "des@x.com")
     r = client.get("/api/me/preferences", headers=h).json()
-    assert r["in_app_enabled"] is True and "mention" in r["available_events"]
+    assert r["in_app_enabled"] is True and "ticket_assigned" in r["available_events"]
     r = client.put("/api/me/preferences", json={"muted_events": ["ticket_assigned"]}, headers=h)
     assert r.status_code == 200 and r.json()["muted_events"] == ["ticket_assigned"]
     assert client.put("/api/me/preferences", json={"muted_events": ["nope"]}, headers=h).status_code == 422
@@ -134,39 +134,6 @@ def test_notifications_api_list_and_mark_read(client):
     assert client.post(f"/api/notifications/{nid}/read", headers=auth(client, "des@x.com")).status_code == 404  # not theirs
     client.post("/api/notifications/read-all", headers=lead)
     assert client.get("/api/notifications", params={"unread_only": True}, headers=lead).json()["unread"] == 0
-
-
-# ── Comments & mentions ──────────────────────────────────────────────────────
-
-def test_comment_with_mention_notifies_and_is_listed(client):
-    t = make_ticket(client, "a@tata.com")
-    des = auth(client, "des@x.com")
-    r = client.post(f"/api/tickets/{t['id']}/comments", json={"content": "Please look @Lead", "mentioned_user_ids": [1]}, headers=des)
-    assert r.status_code == 201 and r.json()["mentions"] == [{"id": 1, "full_name": "Lead"}]
-    assert any("mentioned you" in n for n in notes_for("lead@x.com"))
-    listing = client.get(f"/api/tickets/{t['id']}/comments", headers=auth(client, "a@tata.com")).json()
-    assert [c["content"] for c in listing] == ["Please look @Lead"]
-    assert any("commented" in n for n in notes_for("a@tata.com"))  # requester is told
-
-
-def test_cannot_mention_people_without_access_or_empty_comment(client):
-    t = make_ticket(client, "a@tata.com")
-    des = auth(client, "des@x.com")
-    # user 4 is an ACME client: no access to a TATA ticket, so mentioning would leak the ticket's title
-    assert client.post(f"/api/tickets/{t['id']}/comments", json={"content": "hi", "mentioned_user_ids": [4]}, headers=des).status_code == 422
-    assert client.post(f"/api/tickets/{t['id']}/comments", json={"content": "hi", "mentioned_user_ids": [5]}, headers=des).status_code == 422  # inactive
-    assert client.post(f"/api/tickets/{t['id']}/comments", json={"content": "   "}, headers=des).status_code == 422
-    assert notes_for("b@acme.com") == []
-
-
-def test_comments_are_scoped_to_client_org(client):
-    t = make_ticket(client, "a@tata.com")
-    other = auth(client, "b@acme.com")
-    assert client.get(f"/api/tickets/{t['id']}/comments", headers=other).status_code == 404
-    assert client.post(f"/api/tickets/{t['id']}/comments", json={"content": "x"}, headers=other).status_code == 404
-    assert client.get(f"/api/tickets/{t['id']}/mentionable", headers=other).status_code == 404
-    names = [p["full_name"] for p in client.get(f"/api/tickets/{t['id']}/mentionable", headers=auth(client, "a@tata.com")).json()]
-    assert "Acme B" not in names and "Lead" in names
 
 
 # ── Attachments ──────────────────────────────────────────────────────────────
@@ -221,15 +188,6 @@ def test_attachment_access_is_scoped_and_delete_rules(client):
     assert client.delete(f"/api/attachments/{att['id']}", headers=auth(client, "des@x.com")).status_code == 403
     assert client.delete(f"/api/attachments/{att['id']}", headers=auth(client, "a@tata.com")).status_code == 204
     assert client.get(f"/api/attachments/{att['id']}/download", headers=auth(client, "lead@x.com")).status_code == 404
-
-
-def test_attachment_can_hang_off_own_comment_only(client):
-    t = make_ticket(client, "a@tata.com")
-    c = client.post(f"/api/tickets/{t['id']}/comments", json={"content": "see file"}, headers=auth(client, "a@tata.com")).json()
-    assert upload(client, t["id"], "a@tata.com", comment_id=str(c["id"])).status_code == 201
-    assert upload(client, t["id"], "des@x.com", comment_id=str(c["id"])).status_code == 422  # someone else's comment
-    listing = client.get(f"/api/tickets/{t['id']}/comments", headers=auth(client, "a@tata.com")).json()
-    assert listing[0]["attachments"][0]["file_name"] == "mock.png"
 
 
 # ── Figma ────────────────────────────────────────────────────────────────────

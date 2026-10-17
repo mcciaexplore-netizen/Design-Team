@@ -99,7 +99,7 @@ class PreferencesUpdate(BaseModel):
 def _prefs_payload(prefs: Optional[models.UserPreference]) -> dict:
     return {
         "in_app_enabled": prefs.in_app_enabled if prefs else True,
-        "muted_events": (prefs.muted_events or []) if prefs else [],
+        "muted_events": [e for e in (prefs.muted_events or []) if e in events.EVENT_LABELS] if prefs else [],
         "available_events": events.EVENT_LABELS,
     }
 

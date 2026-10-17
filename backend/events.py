@@ -14,8 +14,6 @@ logger = logging.getLogger(__name__)
 EVENT_LABELS = {
     "ticket_assigned": "A ticket is assigned to me",
     "ticket_moved": "A ticket I raised changes stage",
-    "comment_added": "Someone comments on my ticket",
-    "mention": "I am @mentioned",
     "approval_requested": "A design is sent to me for review",
     "approval_decision": "A client approves or requests changes",
     "ticket_created": "A new ticket is created (leads)",
@@ -59,8 +57,6 @@ def _broadcast(event: str, ticket: models.Ticket, actor_name: str, extra: dict) 
         realtime.publish({"type": "ticket_created", **base}, ticket)
     elif event == "ticket_moved":
         realtime.publish({"type": "ticket_moved", "to": extra.get("to", ticket.status.value), **base}, ticket)
-    elif event in ("comment_added", "mention"):
-        realtime.publish({"type": "comment_added", **base}, ticket)
     elif event == "sla_breach":
         realtime.publish({"type": "sla_breach", **base}, ticket)
     elif event in ("ticket_assigned", "approval_decision", "approval_requested"):
@@ -90,16 +86,6 @@ def emit(db: Session, event: str, ticket: models.Ticket, actor: Optional[models.
             to = extra.get("to", ticket.status.value)
             if ticket.requester and ticket.requester.id != actor_id and to in ("In Review", "Delivered", "Closed"):
                 notify(db, ticket.requester, f"{ref} moved to {to}", event, ticket)
-
-        elif event == "comment_added":
-            for person in {ticket.assignee, ticket.requester}:
-                if person and person.id != actor_id:
-                    notify(db, person, f"{actor_name} commented on {ref}: {extra.get('excerpt', '')}", event, ticket)
-
-        elif event == "mention":
-            for user in extra.get("users", []):
-                if user.id != actor_id:
-                    notify(db, user, f"{actor_name} mentioned you on {ref}: {extra.get('excerpt', '')}", "mention", ticket)
 
         elif event == "approval_requested":
             if ticket.requester and ticket.requester.id != actor_id:

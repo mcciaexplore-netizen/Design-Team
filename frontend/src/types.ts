@@ -1,11 +1,4 @@
 /* Shared Ticket type — the UI shape of a ticket returned by the API (see contexts/TicketsContext) */
-export interface TicketComment {
-  id:        string;
-  author:    string;
-  text:      string;
-  createdAt: string;
-}
-
 export interface Subtask {
   id:           number;
   title:        string;
@@ -24,7 +17,6 @@ export interface Ticket {
   timer_started_at:   string | null;
   time_spent_seconds: number;
   subtasks:           Subtask[];
-  comments:           TicketComment[];
   tags:               string[];
   description:        string;
   figma_url?:         string;
@@ -42,7 +34,6 @@ export interface Ticket {
   is_overdue?:        boolean;
   is_locked?:         boolean;
   estimate_hours?:    number | null;
-  comment_count?:     number;
   design_type?:       string;
   type_specific_fields?: Record<string, unknown>;
 }

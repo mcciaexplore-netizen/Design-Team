@@ -100,7 +100,6 @@ class TicketResponse(TicketBase):
     is_locked: bool = False
     client_org: Optional[str] = None
     estimate_hours: Optional[float] = None
-    comment_count: int = 0
     external_key: Optional[str] = None
 
     requester: UserResponse
@@ -110,19 +109,7 @@ class TicketResponse(TicketBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-class TicketCommentBase(BaseModel):
-    content: str
 
-class TicketCommentCreate(TicketCommentBase):
-    pass
-
-class TicketCommentResponse(TicketCommentBase):
-    id: int
-    ticket_id: int
-    author_id: int
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
 
 # Pinpoint Comment Schemas
 class PinpointCommentBase(BaseModel):

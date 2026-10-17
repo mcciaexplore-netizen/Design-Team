@@ -5,7 +5,6 @@ export type SocketMessage =
   | { type: 'ticket_moved';   ticketNumber: string; to: string; by: string }
   | { type: 'ticket_created'; ticketNumber: string; title: string; by: string }
   | { type: 'sla_breach';     ticketNumber: string; title: string }
-  | { type: 'comment_added';  ticketNumber: string; by: string }
   | { type: 'ticket_updated'; ticketNumber: string; by: string };
 
 interface Options {

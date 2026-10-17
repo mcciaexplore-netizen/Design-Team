@@ -1,11 +1,8 @@
 """Tickets: listing, creation, updates, duplication, subtasks and pinpoint comments, plus the lookups the board needs."""
-import datetime
 import logging
 from typing import List
 
-import pytz
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 import auth
@@ -57,13 +54,7 @@ def get_tickets(db: Session = Depends(get_db), user: models.User = Depends(get_c
             query = query.filter(models.Ticket.client_org == user.client_org)
         else:
             query = query.filter(models.Ticket.requester_id == user.id)
-    tickets = query.order_by(models.Ticket.created_at.desc()).all()
-    counts = dict(db.query(models.TicketComment.ticket_id, func.count(models.TicketComment.id))
-                  .filter(models.TicketComment.ticket_id.in_([t.id for t in tickets] or [0]))
-                  .group_by(models.TicketComment.ticket_id).all())
-    for t in tickets:
-        t.comment_count = counts.get(t.id, 0)
-    return tickets
+    return query.order_by(models.Ticket.created_at.desc()).all()
 
 @router.post("/api/tickets", response_model=schemas.TicketResponse, status_code=status.HTTP_201_CREATED)
 def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), requester: models.User = Depends(get_current_user)):

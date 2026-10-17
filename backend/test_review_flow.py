@@ -76,42 +76,6 @@ def test_either_side_can_tick_a_marked_spot_off(client):
     assert r.json()["is_resolved"] is False
 
 
-# ── One conversation ─────────────────────────────────────────────────────────
-
-def test_the_thread_merges_comments_designs_marks_and_decisions_in_order(client):
-    tid, proof = sent_design(client)
-    cl, des = auth(client, "a@tata.com"), auth(client, "des@x.com")
-    time.sleep(1.1)   # SQLite keeps timestamps to the second; space the steps so their order is unambiguous
-    pin(client, tid, proof, content="Logo too small")
-    time.sleep(1.1)
-    client.post(f"/api/tickets/{tid}/comments", json={"content": "Also the date is wrong"}, headers=cl)
-    time.sleep(1.1)
-    client.post(f"/api/tickets/{tid}/comments", json={"content": "On it"}, headers=des)
-    time.sleep(1.1)
-    pending = [r for r in client.get(f"/api/tickets/{tid}/approval-requests", headers=cl).json() if r["status"] == "pending"][0]
-    client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "request_changes", "comment": "Please fix both"}, headers=cl)
-
-    thread = client.get(f"/api/tickets/{tid}/thread", headers=cl).json()
-    assert [(i["kind"], i.get("version")) for i in thread] == [
-        ("design_sent", 1), ("pin", 1), ("comment", None), ("comment", None), ("decision", 1)]
-    sent, mark, c1, c2, decision = thread
-    assert sent["by"] == "Designer" and mark["content"] == "Logo too small" and mark["by"] == "Tata A"
-    assert c1["author"]["full_name"] == "Tata A" and c2["content"] == "On it"
-    assert decision["decision"] == "changes_requested" and decision["comment"] == "Please fix both" and decision["by"] == "Tata A"
-    # the designer sees the very same conversation, and other organisations can't see it at all
-    assert [i["kind"] for i in client.get(f"/api/tickets/{tid}/thread", headers=des).json()] == [i["kind"] for i in thread]
-    assert client.get(f"/api/tickets/{tid}/thread", headers=auth(client, "b@acme.com")).status_code == 404
-
-
-def test_approval_shows_in_the_thread(client):
-    tid, _ = sent_design(client)
-    cl = auth(client, "a@tata.com")
-    pending = client.get(f"/api/tickets/{tid}/approval-requests", headers=cl).json()[0]
-    client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "approve"}, headers=cl)
-    last = client.get(f"/api/tickets/{tid}/thread", headers=cl).json()[-1]
-    assert last["kind"] == "decision" and last["decision"] == "approved" and last["by"] == "Tata A"
-
-
 # ── Reminders ────────────────────────────────────────────────────────────────
 
 def age_request(tid, days):

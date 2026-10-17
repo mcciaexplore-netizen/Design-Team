@@ -22,7 +22,7 @@ interface ApiTicket {
   type_specific_fields: Record<string, unknown>;
   created_at?: string; due_at: string | null; is_overdue: boolean; is_locked: boolean; parent_id: number | null; version_number: number;
   reason_for_change: string | null; revision_count: number; client_org: string | null; estimate_hours: number | null;
-  timer_started_at: string | null; time_spent_seconds: number; comment_count?: number;
+  timer_started_at: string | null; time_spent_seconds: number;
   subtasks: { id: number; title: string; is_completed: boolean }[];
 }
 
@@ -49,7 +49,7 @@ export interface BulkChange {
 }
 
 /* ── Mapping ──────────────────────────────────── */
-export function mapTicket(b: ApiTicket, previous?: Ticket): Ticket {
+export function mapTicket(b: ApiTicket): Ticket {
   return {
     id: String(b.id),
     number: b.ticket_number,
@@ -66,8 +66,6 @@ export function mapTicket(b: ApiTicket, previous?: Ticket): Ticket {
     timer_started_at: b.timer_started_at,
     time_spent_seconds: b.time_spent_seconds,
     subtasks: (b.subtasks ?? []) as Subtask[],
-    comments: [],
-    comment_count: b.comment_count ?? previous?.comment_count ?? 0,
     tags: b.tags ?? [],
     description: b.brief,
     figma_url: b.figma_url ?? undefined,
@@ -142,10 +140,7 @@ export function TicketsProvider({ children }: { children: React.ReactNode }) {
         if (changes.length) listeners.current.forEach(fn => fn(changes));
       }
       primed.current = true;
-      setTickets(prev => {
-        const byId = new Map(prev.map(t => [t.id, t]));
-        return list.map(b => mapTicket(b, byId.get(String(b.id))));
-      });
+      setTickets(list.map(b => mapTicket(b)));
       setError(null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) return;
@@ -198,7 +193,7 @@ export function TicketsProvider({ children }: { children: React.ReactNode }) {
 
   const replace = useCallback((b: ApiTicket) => {
     setTickets(prev => {
-      const t = mapTicket(b, prev.find(x => x.id === String(b.id)));
+      const t = mapTicket(b);
       return prev.some(x => x.id === t.id) ? prev.map(x => (x.id === t.id ? t : x)) : [t, ...prev];
     });
   }, []);

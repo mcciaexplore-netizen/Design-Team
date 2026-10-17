@@ -194,7 +194,7 @@ function AppShell() {
 
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSocketMessage = useCallback((msg: import('./hooks/useTicketSocket').SocketMessage) => {
-    // A burst of live events (a bulk update, several comments) reloads the list once, not once per event.
+    // A burst of live events (a bulk update, say) reloads the list once, not once per event.
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
     refreshTimer.current = setTimeout(() => void refresh(), 600);
     const mine = 'by' in msg && msg.by === user?.name;
@@ -202,7 +202,6 @@ function AppShell() {
     if (msg.type === 'ticket_moved') addToast(`${msg.by} moved ${msg.ticketNumber} → ${msg.to}`, 'info');
     else if (msg.type === 'ticket_created') addToast(`${msg.by} created ${msg.ticketNumber}: ${msg.title}`, 'info');
     else if (msg.type === 'sla_breach') addToast(`SLA breach: ${msg.ticketNumber} — ${msg.title}`, 'warning');
-    else if (msg.type === 'comment_added') addToast(`${msg.by} commented on ${msg.ticketNumber}`, 'info');
   }, [addToast, refresh, user?.name]);
 
   useTicketSocket({ userId: user?.id ?? 'guest', onMessage: handleSocketMessage });
