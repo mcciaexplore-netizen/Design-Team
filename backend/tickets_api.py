@@ -1,8 +1,10 @@
 """Tickets: listing, creation, updates, duplication, subtasks and pinpoint comments, plus the lookups the board needs."""
+import datetime
 import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 import auth
@@ -141,6 +143,9 @@ def update_ticket(ticket_id: int, ticket_update: schemas.TicketUpdate, db: Sessi
 
     old_assignee = db_ticket.assignee_id
     old_status = db_ticket.status
+    # Giving a New ticket to someone makes it Assigned, as automatic assignment does.
+    if update_data.get("assignee_id") and "status" not in update_data and db_ticket.status == models.TicketStatus.NEW:
+        update_data["status"] = models.TicketStatus.ASSIGNED
     changes = {}
     for key, value in update_data.items():
         old = getattr(db_ticket, key)
@@ -164,6 +169,35 @@ def update_ticket(ticket_id: int, ticket_update: schemas.TicketUpdate, db: Sessi
     if db_ticket.assignee_id and db_ticket.assignee_id != old_assignee:
         events.emit(db, "ticket_assigned", db_ticket, user)
     return db_ticket
+
+class ClientChange(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+@router.post("/api/tickets/{ticket_id}/client-changes", response_model=schemas.TicketResponse, status_code=status.HTTP_201_CREATED)
+def add_client_change(ticket_id: int, body: ClientChange, db: Session = Depends(get_db), user: models.User = Depends(require_staff)):
+    """Note down a change the client asked for (by phone, email, in person). Kept on the ticket in
+    type_specific_fields["client_changes"], shown to everyone on it, and sent to the assigned designer."""
+    ticket = db.query(models.Ticket).options(joinedload(models.Ticket.assignee)).filter(models.Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if ticket.is_locked:
+        raise HTTPException(status_code=409, detail="This request is closed. Raise a new request for further changes.")
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Write what the client wants changed.")
+    entry = {"text": text, "at": datetime.datetime.now(datetime.timezone.utc).isoformat(), "by": user.full_name}
+    fields = dict(ticket.type_specific_fields or {})
+    fields["client_changes"] = [*fields.get("client_changes", []), entry]
+    ticket.type_specific_fields = fields   # a new dict, so the JSON column is saved
+    log_audit(db, ticket.id, user, "Client changes added", {"text": text})
+    if ticket.assignee and ticket.assignee.id != user.id:
+        events.notify(db, ticket.assignee, f"{user.full_name} added changes from the client on {ticket.ticket_number}: "
+                      f"{text[:140]}{'…' if len(text) > 140 else ''}", "client_changes", ticket)
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+
 
 @router.post("/api/tickets/{ticket_id}/duplicate", response_model=schemas.TicketResponse, status_code=status.HTTP_201_CREATED)
 def duplicate_ticket(ticket_id: int, db: Session = Depends(get_db), user: models.User = Depends(require_staff)):

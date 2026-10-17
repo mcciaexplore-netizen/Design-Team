@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 EVENT_LABELS = {
     "ticket_assigned": "A ticket is assigned to me",
     "ticket_moved": "A ticket I raised changes stage",
+    "client_changes": "Changes from the client are added to my ticket",
     "approval_requested": "A design is sent to me for review",
     "approval_decision": "A client approves or requests changes",
     "ticket_created": "A new ticket is created (leads)",

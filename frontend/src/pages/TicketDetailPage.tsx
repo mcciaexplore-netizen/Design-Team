@@ -9,6 +9,8 @@ import { useNewRequest } from '../contexts/NewRequestContext';
 import { prefillFromTicket } from '../requestForm';
 import AnnotatePanel from '../components/AnnotatePanel';
 import AttachmentsPanel from '../components/AttachmentsPanel';
+import ClientChangesPanel from '../components/ClientChangesPanel';
+import { personLabeller } from '../people';
 import FigmaEmbed from '../components/FigmaEmbed';
 import ProofApprovalPanel from '../components/ProofApprovalPanel';
 import CdrPanel from '../components/CdrPanel';
@@ -20,11 +22,12 @@ const TicketDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { tickets, loading, updateTicket, toggleSubtask, refresh } = useTickets();
+  const { tickets, staff, loading, updateTicket, toggleSubtask, refresh } = useTickets();
   const { openNewRequest } = useNewRequest();
   const ticket = tickets.find(t => t.id === id);
   const isClient = user?.role === 'Client';
   const isLead = user?.role === 'Design Lead';
+  const label = useMemo(() => personLabeller(staff), [staff]);
 
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +165,7 @@ const TicketDetailPage: React.FC = () => {
                   </dl>
                 )}
               </div>
+              <ClientChangesPanel ticket={ticket} />
               <AttachmentsPanel ticketId={ticket.id} />
             </div>
           )}
@@ -221,6 +225,13 @@ const TicketDetailPage: React.FC = () => {
               </div>
               {isLead && (
                 <>
+                  <label htmlFor="d-assignee" className="section-label" style={{ marginBottom: 6, display: 'block' }}>Assign to</label>
+                  <select id="d-assignee" value={ticket.assignee_id ?? ''} className="input-field" style={{ width: '100%', fontSize: '0.82rem', marginBottom: 10 }}
+                    onChange={e => void run(() => updateTicket(ticket.id, { assignee_id: e.target.value ? Number(e.target.value) : null }), 'Could not change who it is assigned to.')}>
+                    <option value="">Unassigned</option>
+                    {staff.map(p => <option key={p.id} value={p.id}>{label(p)}{p.role === 'Designer' ? '' : ` · ${p.role}`}</option>)}
+                    {ticket.assignee_id && !staff.some(p => p.id === ticket.assignee_id) && <option value={ticket.assignee_id}>{ticket.assignee || 'Former team member'}</option>}
+                  </select>
                   <label htmlFor="d-prio" className="section-label" style={{ marginBottom: 6, display: 'block' }}>Priority</label>
                   <select id="d-prio" value={ticket.priority} onChange={e => void run(() => updateTicket(ticket.id, { priority: e.target.value }), 'Could not change priority.')} className="input-field" style={{ width: '100%', fontSize: '0.82rem' }}>
                     {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
@@ -343,7 +354,7 @@ const baseNumber = (n: string) => n.replace(/-V\d+$/, '');
 
 /** Fields worth listing under the brief, as readable text: no empty values, no "[object Object]", dates in words.
  *  The requester's name, email, notes and links are already in the brief itself. */
-const HIDDEN_FIELDS = new Set(['requester_name', 'requester_email', 'content', 'reference_links', 'details']);
+const HIDDEN_FIELDS = new Set(['requester_name', 'requester_email', 'content', 'reference_links', 'details', 'client_changes']);
 function detailRows(fields: Record<string, unknown>): [string, string][] {
   const show = (v: unknown): string => {
     if (v === null || v === undefined || v === '') return '';

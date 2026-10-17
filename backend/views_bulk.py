@@ -156,6 +156,10 @@ def bulk_update(body: BulkAction, db: Session = Depends(get_db), user: models.Us
             t.assignee_id = body.assignee_id
             if body.assignee_id:
                 assigned.append(t)
+                if not body.status and t.status == models.TicketStatus.NEW:   # as on the ticket page
+                    changes["status"] = {"from": t.status.value, "to": models.TicketStatus.ASSIGNED.value}
+                    t.status = models.TicketStatus.ASSIGNED
+                    moved.append(t)
         if add_tags or remove_tags:
             current = list(t.tags or [])
             new = [x for x in current if x not in remove_tags] + [x for x in add_tags if x not in current and x not in remove_tags]

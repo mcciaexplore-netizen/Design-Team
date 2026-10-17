@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { ToastContainer, useToast } from './Toast';
 import { useTickets } from '../contexts/TicketsContext';
+import { personLabeller } from '../people';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { apiJson } from '../api';
@@ -79,11 +80,7 @@ const KanbanBoard = () => {
   // Person columns are keyed by account, not by display name: two people can share a name, and grouping by name
   // would merge them and assign work to the wrong account. Same-named accounts are told apart by their email.
   // The same labels are used in the Assignee filter and the "Assign to…" menu.
-  const personLabel = useMemo(() => {
-    const sameName = new Map<string, number>();
-    for (const s of staff) sameName.set(s.name, (sameName.get(s.name) ?? 0) + 1);
-    return (s: { name: string; email: string }) => ((sameName.get(s.name) ?? 0) > 1 ? `${s.name} (${s.email})` : s.name);
-  }, [staff]);
+  const personLabel = useMemo(() => personLabeller(staff), [staff]);
   const assigneeColumns = useMemo(() => {
     const cols = [{ key: 'unassigned', label: 'Unassigned' }, ...staff.map(s => ({ key: `u:${s.id}`, label: personLabel(s) }))];
     // Someone no longer on the team list (e.g. deactivated) who still holds tickets keeps a column.
