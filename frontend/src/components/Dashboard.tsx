@@ -11,14 +11,16 @@ import ForecastingWidget from './ForecastingWidget';
 import ReportsExport from './ReportsExport';
 import CountUp from './CountUp';
 import GridBackground from './GridBackground';
-import BreakdownTable, { type BreakdownRow } from './BreakdownTable';
+import BreakdownChart, { type BreakdownRow } from './BreakdownChart';
 
 interface Summary {
   range: { from: string; to: string };
   kpis: { tickets_created: number; tickets_delivered: number; on_time_rate_pct: number | null; avg_turnaround_hours: number | null; avg_revisions_per_ticket: number | null; hours_logged: number };
   sla_trend: { week_start: string; on_time: number; late: number; overdue_open: number }[];
+  volume_trend: { week_start: string; tickets_created: number }[];
   by_design_type: BreakdownRow[];
   by_client: BreakdownRow[];
+  by_designer: { designer: string; tickets: number; delivered: number; on_time_rate_pct: number | null; avg_turnaround_hours: number | null; hours_logged: number }[];
 }
 interface Workload { designers: { designer_id: number; designer_name: string; capacity_hours: number; planned_hours: number }[] }
 
@@ -75,6 +77,8 @@ const Dashboard = () => {
 
   const k = summary?.kpis;
   const trend = (summary?.sla_trend ?? []).map(w => ({ week: shortDate(w.week_start), 'On time': w.on_time, Late: w.late, 'Overdue & open': w.overdue_open }));
+  const volume = (summary?.volume_trend ?? []).map(w => ({ week: shortDate(w.week_start), 'Tickets created': w.tickets_created }));
+  const byDesigner = (summary?.by_designer ?? []).map(d => ({ name: d.designer, Tickets: d.tickets, Delivered: d.delivered, 'On time %': d.on_time_rate_pct ?? 0 }));
   const load7 = (workload?.designers ?? []).map(d => ({ name: d.designer_name, Planned: d.planned_hours, Capacity: d.capacity_hours }));
 
   return (
@@ -138,6 +142,40 @@ const Dashboard = () => {
                   </ResponsiveContainer>
                 </div>
               </div>
+
+              <div className="glass-card dashboard-chart-card">
+                <h3>Requests over time</h3>
+                <div style={{ height: 240 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={volume}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Bar dataKey="Tickets created" fill="#0056B3" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="glass-card dashboard-chart-card">
+                <h3>Per-designer performance</h3>
+                {byDesigner.length === 0 ? <p style={{ color: '#64748B', fontSize: '0.82rem' }}>No tickets assigned in this period.</p> : (
+                  <div style={{ height: Math.max(180, byDesigner.length * 42) }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={byDesigner} layout="vertical" margin={{ left: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
+                        <Tooltip contentStyle={tooltipStyle} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="Tickets" fill="#cbd5e1" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="Delivered" fill="#059669" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -163,7 +201,7 @@ const Dashboard = () => {
             <ForecastingWidget />
           </div>
 
-          <BreakdownTable byDesignType={summary?.by_design_type ?? []} byClient={summary?.by_client ?? []} />
+          <BreakdownChart byDesignType={summary?.by_design_type ?? []} byClient={summary?.by_client ?? []} />
           <ReportsExport />
         </>
       )}

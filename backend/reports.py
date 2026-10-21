@@ -78,6 +78,9 @@ def build_report(db: Session, date_from=None, date_to=None, client_org: Optional
                                                     "turnaround_hours": [], "hours_logged": 0.0})
     types: Dict[str, dict] = defaultdict(lambda: {"tickets": 0, "revisions": 0, "delivered": 0, "on_time": 0,
                                                   "turnaround_hours": [], "hours_logged": 0.0})
+    designers: Dict[str, dict] = defaultdict(lambda: {"tickets": 0, "delivered": 0, "on_time": 0,
+                                                       "turnaround_hours": [], "hours_logged": 0.0})
+    volume_weeks: Dict[datetime.date, int] = defaultdict(int)
     categories: Dict[str, int] = defaultdict(int)
     delivered_total = on_time_total = 0
     turnarounds: List[float] = []
@@ -98,6 +101,11 @@ def build_report(db: Session, date_from=None, date_to=None, client_org: Optional
         ty["hours_logged"] += hours_by_ticket[t.id]
         if t.parent_id is None:
             ty["revisions"] += revisions_of(t)
+        des = designers[t.assignee.full_name] if t.assignee else None
+        if des is not None:
+            des["tickets"] += 1
+            des["hours_logged"] += hours_by_ticket[t.id]
+        volume_weeks[_week_start(as_utc(t.created_at))] += 1
 
         done_at, due = _completed_at(t), as_utc(t.due_at)
         if done_at:
@@ -108,6 +116,9 @@ def build_report(db: Session, date_from=None, date_to=None, client_org: Optional
             c["turnaround_hours"].append(hrs)
             ty["turnaround_hours"].append(hrs)
             turnarounds.append(hrs)
+            if des is not None:
+                des["delivered"] += 1
+                des["turnaround_hours"].append(hrs)
         if due:
             w = weeks[_week_start(due)]
             w["due"] += 1
@@ -117,6 +128,8 @@ def build_report(db: Session, date_from=None, date_to=None, client_org: Optional
                     c["on_time"] += 1
                     ty["on_time"] += 1
                     on_time_total += 1
+                    if des is not None:
+                        des["on_time"] += 1
                 else:
                     w["late"] += 1
             elif due < now:
@@ -141,6 +154,14 @@ def build_report(db: Session, date_from=None, date_to=None, client_org: Optional
             {"week_start": wk.isoformat(), **v, "on_time_rate_pct": pct(v["on_time"], v["on_time"] + v["late"])}
             for wk, v in sorted(weeks.items())
         ],
+        "volume_trend": [{"week_start": wk.isoformat(), "tickets_created": n} for wk, n in sorted(volume_weeks.items())],
+        "by_designer": sorted([
+            {"designer": name, "tickets": v["tickets"], "delivered": v["delivered"],
+             "on_time_rate_pct": pct(v["on_time"], v["delivered"]),
+             "avg_turnaround_hours": round(sum(v["turnaround_hours"]) / len(v["turnaround_hours"]), 1) if v["turnaround_hours"] else None,
+             "hours_logged": round(v["hours_logged"], 1)}
+            for name, v in designers.items()
+        ], key=lambda r: (-r["tickets"], r["designer"])),
         "by_client": sorted([
             {"client": org, "tickets": c["tickets"], "revisions": c["revisions"],
              "avg_revisions": round(c["revisions"] / max(1, c["tickets"]), 2), "tickets_with_3plus_revisions": c["with_3plus"],
