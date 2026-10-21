@@ -17,6 +17,7 @@ class TicketPriority(str, enum.Enum):
     URGENT = "Urgent"
 
 class TicketStatus(str, enum.Enum):
+    PENDING_REVIEW = "Pending Review" # A client's request, not yet accepted into the workflow by a Design Lead.
     NEW = "New"
     ASSIGNED = "Assigned"
     IN_PROGRESS = "In Progress"
@@ -26,6 +27,7 @@ class TicketStatus(str, enum.Enum):
     CLOSED = "Closed"
     CLOSED_WITHOUT_APPROVAL = "Closed without approval"
     REVISION_REQUESTED = "Revision Requested" # No longer assigned: changes now reopen the same ticket. Kept for older rows.
+    DECLINED = "Declined" # A Design Lead declined the request; it never entered the workflow.
 
 # Replaces hardcoded TicketStatus enum for custom pipelines
 class WorkflowStage(Base):
@@ -121,6 +123,7 @@ class Ticket(Base):
     version_number = Column(Integer, default=1, nullable=False)
     reason_for_change = Column(Text, nullable=True) # If this is a child ticket
     revision_category = Column(String, nullable=True) # "Missing Asset", "Scope Change", "Design Error"
+    decline_reason = Column(Text, nullable=True) # Set when a Design Lead declines a Pending Review request
     flagged_for_reassignment = Column(Boolean, default=False, nullable=False)
     external_key = Column(String, nullable=True, index=True) # Linked Jira issue key, e.g. DES-42
 

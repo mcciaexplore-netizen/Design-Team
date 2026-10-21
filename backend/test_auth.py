@@ -58,7 +58,12 @@ def make_ticket(client, email, title="T"):
         headers=auth(client, email),
     )
     assert r.status_code == 201, r.text
-    return r.json()
+    ticket = r.json()
+    if ticket["status"] == "Pending Review":   # a client's request: most tests want it already in the workflow
+        accepted = client.post(f"/api/tickets/{ticket['id']}/accept", headers=auth(client, "lead@x.com"))
+        assert accepted.status_code == 200, accepted.text
+        ticket = accepted.json()
+    return ticket
 
 
 def test_login_success_and_role_mapping(client):
@@ -124,8 +129,12 @@ def test_client_cannot_self_assign_on_create(client):
         headers=auth(client, "a@tata.com"),
     )
     assert r.status_code == 201
-    # The requested assignee (the lead, id 1) is ignored; the system picks a designer (id 2) instead.
-    assert r.json()["assignee_id"] == 2
+    # The requested assignee (the lead, id 1) is ignored outright: a client's request waits for review.
+    assert r.json()["assignee_id"] is None and r.json()["status"] == "Pending Review"
+    accepted = client.post(f"/api/tickets/{r.json()['id']}/accept", headers=auth(client, "lead@x.com"))
+    assert accepted.status_code == 200
+    # Once accepted, the system picks a designer (id 2), never the client's requested id (the lead, id 1).
+    assert accepted.json()["assignee_id"] == 2
 
 
 def test_ticket_requester_and_org_come_from_token(client):

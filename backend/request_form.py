@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Reques
 from sqlalchemy.orm import Session
 
 import auth
-import capacity_engine
 import delivery
 import events
 import models
@@ -226,6 +225,7 @@ class RequestFields:
         self,
         event_name: str = Form(..., min_length=1, max_length=200),
         event_date: datetime.date = Form(...),
+        department: str = Form(default="", max_length=120),
         design_requirement: list[str] = Form(...),                 # one or more; each becomes its own ticket
         delivery_date: datetime.date = Form(...),
         num_creatives: int = Form(default=1, ge=1, le=100),
@@ -237,6 +237,7 @@ class RequestFields:
         files: list[UploadFile] = File(default=[]),
     ):
         self.event_name, self.event_date = event_name.strip(), event_date
+        self.department = department.strip()
         self.requirements = list(dict.fromkeys(r.strip() for r in design_requirement if r.strip()))  # in order, no repeats
         self.delivery_date, self.num_creatives = delivery_date, num_creatives
         self.other_details, self.content = other_details.strip(), content.strip()
@@ -271,7 +272,7 @@ def _new_ticket(db: Session, requester: models.User, f: RequestFields, requireme
     details = f.details.get(requirement, {})
     fields = {
         "requester_name": requester.full_name, "requester_email": requester.email, "event_name": f.event_name,
-        "event_date": f.event_date.isoformat(), "design_requirement": requirement,
+        "event_date": f.event_date.isoformat(), "department": f.department or None, "design_requirement": requirement,
         "expected_delivery_date": f.delivery_date.isoformat(), "number_of_creatives": f.num_creatives,
         "other_details": (f.other_details or None) if requirement == OTHER else None, "content": f.content or None,
         "details": details, "reference_links": f.links,
@@ -280,6 +281,7 @@ def _new_ticket(db: Session, requester: models.User, f: RequestFields, requireme
     detail_lines = [f"{labels[k]}: {', '.join(v) if isinstance(v, list) else v}" for k, v in details.items()]
     brief = "\n".join(filter(None, [
         f"Event: {f.event_name} ({f.event_date:%d %b %Y})",
+        f"Department: {f.department}" if f.department else None,
         f"Requirement: {label}",
         *detail_lines,
         f"Creatives needed: {f.num_creatives}",
@@ -301,11 +303,9 @@ def _new_ticket(db: Session, requester: models.User, f: RequestFields, requireme
         client_org=requester.client_org if via == "portal form" else None,
         due_at=datetime.datetime.combine(f.delivery_date, datetime.time(12, 30), tzinfo=pytz.utc),  # 18:00 IST
         tags=["request-form"],
+        # A Design Lead must accept the request before it enters the workflow; see tickets_api.accept_ticket.
+        status=models.TicketStatus.PENDING_REVIEW,
     )
-    designer = capacity_engine.suggest_assignee(db, design_type.id)
-    if designer:
-        ticket.assignee_id = designer.id
-        ticket.status = models.TicketStatus.ASSIGNED
     db.add(ticket)
     db.flush()   # so the next ticket gets the next number and the next assignment sees this one's load
     log_audit(db, ticket.id, None, "Created", {"via": via, "event": f.event_name},

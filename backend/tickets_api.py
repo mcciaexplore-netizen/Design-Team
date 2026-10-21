@@ -56,6 +56,9 @@ def get_tickets(db: Session = Depends(get_db), user: models.User = Depends(get_c
             query = query.filter(models.Ticket.client_org == user.client_org)
         else:
             query = query.filter(models.Ticket.requester_id == user.id)
+    elif user.role == models.RoleEnum.DESIGNER:
+        # A request only a Design Lead can accept or decline; a Designer has nothing to do with it yet.
+        query = query.filter(models.Ticket.status.notin_([models.TicketStatus.PENDING_REVIEW, models.TicketStatus.DECLINED]))
     return query.order_by(models.Ticket.created_at.desc()).all()
 
 @router.post("/api/tickets", response_model=schemas.TicketResponse, status_code=status.HTTP_201_CREATED)
@@ -81,7 +84,10 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), r
         client_org=requester.client_org,
         due_at=compute_due_at(db, design_type, ticket.priority),
     )
-    if not db_ticket.assignee_id:
+    if is_client(requester):
+        # A Design Lead must accept the request before it enters the workflow; see accept_ticket below.
+        db_ticket.status = models.TicketStatus.PENDING_REVIEW
+    elif not db_ticket.assignee_id:
         designer = capacity_engine.suggest_assignee(db, design_type.id)
         if designer:
             db_ticket.assignee_id = designer.id
@@ -97,6 +103,64 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), r
         events.emit(db, "ticket_assigned", db_ticket, requester, {"auto": True})
 
     return db_ticket
+
+
+class DeclineBody(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
+@router.post("/api/tickets/{ticket_id}/accept", response_model=schemas.TicketResponse)
+def accept_ticket(ticket_id: int, db: Session = Depends(get_db), lead: models.User = Depends(require_lead)):
+    """A Design Lead accepts a Pending Review request: it becomes a real ticket, auto-assigned if capacity allows."""
+    ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if ticket.status != models.TicketStatus.PENDING_REVIEW:
+        raise HTTPException(status_code=409, detail="This request has already been reviewed.")
+
+    ticket.status = models.TicketStatus.NEW
+    designer = capacity_engine.suggest_assignee(db, ticket.design_type_id)
+    if designer:
+        ticket.assignee_id = designer.id
+        ticket.status = models.TicketStatus.ASSIGNED
+    log_audit(db, ticket.id, lead, "Accepted", {"status": ticket.status.value})
+    db.commit()
+    db.refresh(ticket)
+
+    events.emit(db, "ticket_moved", ticket, lead, {"to": ticket.status.value})
+    if ticket.assignee_id:
+        events.emit(db, "ticket_assigned", ticket, lead, {"auto": True})
+    if ticket.requester_id:
+        events.notify(db, ticket.requester, f"Your request {ticket.ticket_number} was accepted and is now in progress.",
+                      "ticket_accepted", ticket)
+        db.commit()
+    return ticket
+
+
+@router.post("/api/tickets/{ticket_id}/decline", response_model=schemas.TicketResponse)
+def decline_ticket(ticket_id: int, body: DeclineBody, db: Session = Depends(get_db), lead: models.User = Depends(require_lead)):
+    """A Design Lead declines a Pending Review request: it never enters the workflow."""
+    ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if ticket.status != models.TicketStatus.PENDING_REVIEW:
+        raise HTTPException(status_code=409, detail="This request has already been reviewed.")
+
+    ticket.status = models.TicketStatus.DECLINED
+    ticket.decline_reason = (body.reason or "").strip() or None
+    log_audit(db, ticket.id, lead, "Declined", {"reason": ticket.decline_reason})
+    db.commit()
+    db.refresh(ticket)
+
+    events.emit(db, "ticket_moved", ticket, lead, {"to": ticket.status.value})
+    if ticket.requester_id:
+        message = f"Your request {ticket.ticket_number} was declined."
+        if ticket.decline_reason:
+            message += f" {ticket.decline_reason}"
+        events.notify(db, ticket.requester, message, "ticket_declined", ticket)
+        db.commit()
+    return ticket
+
 
 NOT_BLANK = {"title", "brief", "type_specific_fields", "priority", "status", "tags"}
 

@@ -47,7 +47,7 @@ def test_confirmation_email_links_to_all_requests_and_shows_only_that_persons(cl
     numbers = [x["ticket_number"] for x in r.json()["requests"]]
     assert sorted(numbers) == sorted(mine) and not set(numbers) & set(theirs)
     first = r.json()["requests"][0]
-    assert first["tracking_url"].startswith("https://app.example.com/track/") and first["status"] in ("New", "Assigned")
+    assert first["tracking_url"].startswith("https://app.example.com/track/") and first["status"] in ("Pending Review", "New", "Assigned")
 
 
 def test_asking_for_the_link_by_email_gives_the_same_answer_for_anyone(client, outbox):

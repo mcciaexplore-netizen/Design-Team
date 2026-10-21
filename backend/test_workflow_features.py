@@ -162,11 +162,17 @@ def test_request_form_creates_an_assigned_ticket_with_the_attachment(client):
         t = db.query(models.Ticket).filter_by(ticket_number=number).first()
         assert t.title == "AI Workshop - Flyer (Email / Print)" and "blue theme" in t.brief
         assert t.type_specific_fields["number_of_creatives"] == 2
-        assert t.assignee.email == "des@x.com" and t.status == models.TicketStatus.ASSIGNED   # inactive designer is skipped
+        assert t.status == models.TicketStatus.PENDING_REVIEW and t.assignee is None   # waits for a Design Lead to accept it
         assert t.requester.email == "meera@example.com" and t.requester.role == models.RoleEnum.REQUESTER
         assert db.query(models.Attachment).filter_by(ticket_id=t.id).count() == 1
+        ticket_id = t.id
     finally:
         db.close()
+
+    accepted = client.post(f"/api/tickets/{ticket_id}/accept", headers=auth(client, "lead@x.com"))
+    assert accepted.status_code == 200
+    assert accepted.json()["assignee"]["email"] == "des@x.com" and accepted.json()["status"] == "Assigned"   # inactive designer is skipped
+
     # the same person submitting again reuses their account
     assert client.post("/api/public/requests", data=form()).status_code == 201
     db = TestingSessionLocal()
@@ -257,7 +263,9 @@ def test_portal_request_uses_the_signed_in_user(client):
                     files={"file": ("brief.png", PNG, "image/png")}, headers=auth(client, "a@tata.com"))
     assert r.status_code == 201, r.text
     t = client.get("/api/tickets", headers=auth(client, "a@tata.com")).json()
-    assert t[0]["id"] == r.json()["id"] and t[0]["client_org"] == "TATA" and t[0]["assignee"]["email"] == "des@x.com"
+    assert t[0]["id"] == r.json()["id"] and t[0]["client_org"] == "TATA" and t[0]["status"] == "Pending Review"
+    accepted = client.post(f"/api/tickets/{r.json()['id']}/accept", headers=auth(client, "lead@x.com"))
+    assert accepted.status_code == 200 and accepted.json()["assignee"]["email"] == "des@x.com"
     assert client.post("/api/requests", data={"event_name": "x", "event_date": "2030-02-01", "design_requirement": "Flyer (Email / Print)", "delivery_date": d}).status_code == 401
 
 

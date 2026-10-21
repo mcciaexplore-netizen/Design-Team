@@ -211,10 +211,10 @@ def test_audit_trail_is_ordered_scoped_and_hides_internals_from_clients(client):
     client.patch(f"/api/tickets/{t['id']}", json={"status": "In Progress", "assignee_id": 2}, headers=lead)
     client.post(f"/api/tickets/{t['id']}/time", json={"seconds": 600}, headers=des)
     staff_view = client.get(f"/api/tickets/{t['id']}/audit", headers=lead).json()
-    assert [a["action"] for a in staff_view] == ["Created", "Updated", "Logged time"]
-    assert staff_view[1]["details"]["status"] == {"from": "Assigned", "to": "In Progress"}
+    assert [a["action"] for a in staff_view] == ["Created", "Accepted", "Updated", "Logged time"]
+    assert staff_view[2]["details"]["status"] == {"from": "Assigned", "to": "In Progress"}
     client_view = client.get(f"/api/tickets/{t['id']}/audit", headers=cl).json()
-    assert [a["action"] for a in client_view] == ["Created", "Updated", "Logged time"]
+    assert [a["action"] for a in client_view] == ["Created", "Accepted", "Updated", "Logged time"]
     assert all(a["details"] == {} for a in client_view)
     assert client.get(f"/api/tickets/{t['id']}/audit", headers=auth(client, "b@acme.com")).status_code == 404
     assert client.get(f"/api/tickets/{t['id']}/audit").status_code == 401

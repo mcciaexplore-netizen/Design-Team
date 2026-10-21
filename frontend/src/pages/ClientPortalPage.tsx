@@ -34,6 +34,8 @@ const niceDate = (d: Date) => d.toLocaleDateString('en-IN', { weekday: 'short', 
 function nowLine(t: Ticket): string {
   const who = t.assignee || 'A designer';
   switch (t.status) {
+    case 'Pending Review': return 'Received. The design team is reviewing your request.';
+    case 'Declined': return t.decline_reason ? `This request was declined: ${t.decline_reason}` : 'This request was declined.';
     case 'New': return 'Received. A designer will pick it up soon.';
     case 'Assigned': return `${who} will start on it soon.`;
     case 'In Progress': return `${who} is working on it.`;

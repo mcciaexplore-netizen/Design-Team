@@ -36,6 +36,7 @@ export interface Ticket {
   estimate_hours?:    number | null;
   design_type?:       string;
   type_specific_fields?: Record<string, unknown>;
+  decline_reason?:    string | null;
 }
 
 export const STATUSES = [
@@ -44,7 +45,7 @@ export const STATUSES = [
 ];
 
 /** Statuses that mean the work is finished (hidden from open-work lists). */
-export const DONE_STATUSES = ['Delivered', 'Closed', 'Closed without approval', 'Revision Requested'];
+export const DONE_STATUSES = ['Delivered', 'Closed', 'Closed without approval', 'Revision Requested', 'Declined'];
 
 export const PRIORITIES = ['Urgent', 'High', 'Normal', 'Low'];
 

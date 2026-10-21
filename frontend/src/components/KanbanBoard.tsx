@@ -19,6 +19,7 @@ import { apiJson } from '../api';
 /* ── helpers ─────────────────────────────────── */
 import { DraggableTicket, TicketCard } from './board/TicketCard';
 import { DroppableColumn } from './board/BoardColumn';
+import PendingReviewPanel from './board/PendingReviewPanel';
 import { EMPTY_FILTERS, QUICK_VIEWS, sameFilters, ticketMatches, type BoardFilters, type GroupBy, type SavedView } from './board/boardFilters';
 
 /* ── Main KanbanBoard ─────────────────────── */
@@ -76,7 +77,10 @@ const KanbanBoard = () => {
   );
 
   /* ── Computed ── */
-  const visible = useMemo(() => tickets.filter(t => ticketMatches(t, filters, myId, now)), [tickets, filters, myId, Math.floor(now / 30_000)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Pending Review and Declined requests live in the panel above, not as board columns or cards.
+  const pendingReview = useMemo(() => tickets.filter(t => t.status === 'Pending Review'), [tickets]);
+  const boardTickets = useMemo(() => tickets.filter(t => t.status !== 'Pending Review' && t.status !== 'Declined'), [tickets]);
+  const visible = useMemo(() => boardTickets.filter(t => ticketMatches(t, filters, myId, now)), [boardTickets, filters, myId, Math.floor(now / 30_000)]); // eslint-disable-line react-hooks/exhaustive-deps
   // Person columns are keyed by account, not by display name: two people can share a name, and grouping by name
   // would merge them and assign work to the wrong account. Same-named accounts are told apart by their email.
   // The same labels are used in the Assignee filter and the "Assign to…" menu.
@@ -152,6 +156,24 @@ const KanbanBoard = () => {
       await refresh();
       addToast(`Duplicated as ${copy.ticket_number}`, 'success');
     } catch (e) { fail(e, 'Could not duplicate the ticket.'); }
+  };
+
+  const handleAcceptRequest = async (ticket: Ticket) => {
+    try {
+      await apiJson(`/api/tickets/${ticket.id}/accept`, { method: 'POST' });
+      await refresh();
+      addToast(`${ticket.number} accepted`, 'success');
+    } catch (e) { fail(e, 'Could not accept this request.'); }
+  };
+
+  const handleDeclineRequest = async (ticket: Ticket) => {
+    if (!window.confirm(`Decline ${ticket.number}: "${ticket.title}"?`)) return;
+    const reason = window.prompt('Reason for the client (optional)') ?? '';
+    try {
+      await apiJson(`/api/tickets/${ticket.id}/decline`, { method: 'POST', json: { reason: reason.trim() || null } });
+      await refresh();
+      addToast(`${ticket.number} declined`, 'success');
+    } catch (e) { fail(e, 'Could not decline this request.'); }
   };
 
   /* ── Click logic ── */
@@ -243,6 +265,10 @@ const KanbanBoard = () => {
           {error}
           <button type="button" className="btn-ghost" style={{ padding: '0.25rem 0.7rem', fontSize: '0.75rem', marginLeft: 'auto' }} onClick={() => void refresh()}>Retry</button>
         </div>
+      )}
+
+      {isLead && (
+        <PendingReviewPanel tickets={pendingReview} onAccept={t => void handleAcceptRequest(t)} onDecline={t => void handleDeclineRequest(t)} />
       )}
 
       {/* ── Views + filters ── */}

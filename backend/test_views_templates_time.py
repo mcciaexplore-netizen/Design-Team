@@ -112,7 +112,7 @@ def test_bulk_writes_audit_entries(client):
     lead = auth(client, "lead@x.com")
     client.post("/api/tickets/bulk", json={"ticket_ids": [t], "status": "In Progress"}, headers=lead)
     trail = client.get(f"/api/tickets/{t}/audit", headers=lead).json()
-    assert [a["action"] for a in trail] == ["Created", "Bulk update"] and trail[1]["actor"] == "Lead"
+    assert [a["action"] for a in trail] == ["Created", "Accepted", "Bulk update"] and trail[2]["actor"] == "Lead"
 
 
 def test_duplicate_keeps_client_and_resets_state(client):

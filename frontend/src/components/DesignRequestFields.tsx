@@ -151,6 +151,12 @@ export default function DesignRequestFields({ options, form, idPrefix }: Props) 
         <input {...a11y(form, p, 'event_date')} type="date" className="input-field" value={values.event_date} onChange={e => form.set('event_date', e.target.value)} />
         <FieldError form={form} prefix={p} name="event_date" />
       </div>
+      <div>
+        <label htmlFor={fieldId(p, 'department')} style={requestLabel}>Department</label>
+        <input {...a11y(form, p, 'department')} className="input-field" maxLength={120} placeholder="e.g. Marketing, HR, Events"
+          value={values.department} onChange={e => form.set('department', e.target.value)} />
+        <FieldError form={form} prefix={p} name="department" />
+      </div>
 
       <fieldset style={noBorder}>
         <legend style={requestLabel}>Design requirement *</legend>

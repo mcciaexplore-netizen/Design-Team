@@ -101,6 +101,7 @@ class TicketResponse(TicketBase):
     client_org: Optional[str] = None
     estimate_hours: Optional[float] = None
     external_key: Optional[str] = None
+    decline_reason: Optional[str] = None
 
     requester: UserResponse
     assignee: Optional[UserResponse]

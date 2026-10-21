@@ -17,7 +17,7 @@ export interface RequestFormOptions {
 
 export interface RequestValues {
   name: string; email: string;
-  event_name: string; event_date: string;
+  event_name: string; event_date: string; department: string;
   design_requirements: string[]; other_details: string;   // every ticked design becomes its own ticket
   delivery_date: string; num_creatives: string; content: string;
   details: Record<string, Answers>;   // answers to each design's questions: details[design][question id]
@@ -38,7 +38,7 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'psd', 'ai', 'fig', 'cdr', 'eps', 'indd'];
 
 export const emptyValues = (): RequestValues => ({
-  name: '', email: '', event_name: '', event_date: '', design_requirements: [], other_details: '',
+  name: '', email: '', event_name: '', event_date: '', department: '', design_requirements: [], other_details: '',
   delivery_date: '', num_creatives: '1', content: '', details: {}, links: [],
 });
 
@@ -117,6 +117,7 @@ export function buildBody(v: RequestValues, files: File[], needsIdentity: boolea
   if (needsIdentity) { body.set('name', v.name.trim()); body.set('email', v.email.trim()); }
   body.set('event_name', v.event_name.trim());
   body.set('event_date', v.event_date);
+  body.set('department', v.department.trim());
   for (const design of v.design_requirements) body.append('design_requirement', design);
   body.set('other_details', v.other_details.trim());
   body.set('delivery_date', v.delivery_date);
@@ -177,7 +178,7 @@ export function loadDraft(form: string): RequestPrefill | null {
   if (!d || typeof d !== 'object') return null;
   const base = emptyValues();
   const out: RequestPrefill = {};
-  for (const key of ['event_name', 'event_date', 'other_details', 'delivery_date', 'num_creatives', 'content'] as const) {
+  for (const key of ['event_name', 'event_date', 'department', 'other_details', 'delivery_date', 'num_creatives', 'content'] as const) {
     const value = (d as Record<string, unknown>)[key];
     if (typeof value === 'string') out[key] = value;
   }
@@ -204,7 +205,7 @@ export const clearDraft = (form: string) => remove(draftKey(form));
 /** True when the person has not typed anything (the defaults do not count). */
 function isBlank(v: RequestValues): boolean {
   const base = emptyValues();
-  return v.event_name === '' && v.event_date === '' && v.design_requirements.length === 0 && v.other_details === '' && v.delivery_date === ''
+  return v.event_name === '' && v.event_date === '' && v.department === '' && v.design_requirements.length === 0 && v.other_details === '' && v.delivery_date === ''
     && v.content === '' && v.num_creatives === base.num_creatives
     && Object.values(v.details).every(answers => Object.values(answers ?? {}).every(a => (Array.isArray(a) ? a.length === 0 : !a)))
     && v.links.every(l => !l);
@@ -235,7 +236,7 @@ export function prefillFromTicket(t: Ticket): RequestPrefill {
   }
   const now = currentRequirement(text(f.design_requirement), details);
   return {
-    event_name: text(f.event_name), design_requirements: now.requirement ? [now.requirement] : [], other_details: text(f.other_details),
+    event_name: text(f.event_name), department: text(f.department), design_requirements: now.requirement ? [now.requirement] : [], other_details: text(f.other_details),
     num_creatives: String(f.number_of_creatives ?? 1), content: notes, details: now.requirement ? { [now.requirement]: now.details } : {},
     links: Array.isArray(f.reference_links) ? f.reference_links.map(String) : [],
   };
