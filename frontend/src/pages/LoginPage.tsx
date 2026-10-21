@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import GridBackground from '../components/GridBackground';
-import { Eye, EyeOff, Zap, LogIn, RotateCw } from 'lucide-react';
+import { Eye, EyeOff, LogIn, RotateCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const FEATURES = ['Visual Board', 'SLA Tracking', 'CDR Approval', 'Design Proofing', 'Capacity Forecast', 'Client Portal'];
@@ -50,8 +50,8 @@ const LoginPage: React.FC = () => {
 
         <div style={{ position: 'relative', textAlign: 'center', maxWidth: 400 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: '2rem' }}>
-            <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Zap size={24} color="white" aria-hidden="true" />
+            <div style={{ padding: '0.6rem 0.9rem', borderRadius: 14, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="/mccia_logo.png" alt="MCCIA" style={{ height: 32, width: 'auto', objectFit: 'contain', display: 'block' }} />
             </div>
             <div style={{ textAlign: 'left' }}>
               <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 1 }}>MCCIA</p>

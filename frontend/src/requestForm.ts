@@ -4,6 +4,11 @@ import type { Ticket } from './types';
 
 export interface Question { id: string; label: string; type: 'text' | 'select' | 'multiselect' | 'number'; options: string[]; required: boolean }
 
+export const DEPARTMENTS = [
+  'Admin', 'CBP', 'AI Studio', 'ERU (Economic Research Unit)', 'HR', 'Accounts', 'Membership',
+  'Foreign Trade', 'RAMP', 'Sampark', 'MSME Helpline',
+];
+
 export interface RequestFormOptions {
   design_requirements: string[];
   other_label: string;

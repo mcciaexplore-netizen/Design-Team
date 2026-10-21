@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useEstimate, type RequestForm } from '../hooks/useRequestForm';
-import { fieldId, questionKey, requestLabel, shortDate, todayISO, type Question, type RequestFormOptions } from '../requestForm';
+import { DEPARTMENTS, fieldId, questionKey, requestLabel, shortDate, todayISO, type Question, type RequestFormOptions } from '../requestForm';
 import FileDropzone from './FileDropzone';
 
 const errorStyle = { fontSize: '0.78rem', color: '#b91c1c', marginTop: 4 } as const;
@@ -153,8 +153,10 @@ export default function DesignRequestFields({ options, form, idPrefix }: Props) 
       </div>
       <div>
         <label htmlFor={fieldId(p, 'department')} style={requestLabel}>Department</label>
-        <input {...a11y(form, p, 'department')} className="input-field" maxLength={120} placeholder="e.g. Marketing, HR, Events"
-          value={values.department} onChange={e => form.set('department', e.target.value)} />
+        <select {...a11y(form, p, 'department')} className="input-field" value={values.department} onChange={e => form.set('department', e.target.value)}>
+          <option value="">Select department</option>
+          {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
         <FieldError form={form} prefix={p} name="department" />
       </div>
 
