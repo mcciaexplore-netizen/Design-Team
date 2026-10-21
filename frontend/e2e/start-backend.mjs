@@ -14,13 +14,12 @@ const env = {
   DATABASE_URL: `sqlite:///${dbFile}`,
   SECRET_KEY: 'e2e-only-secret-key-not-for-production-use',
   BCRYPT_ROUNDS: '4',
-  SEED_DEMO_DATA: 'true',
   ALLOWED_ORIGINS: 'http://127.0.0.1:5199',
   PUBLIC_APP_URL: 'http://127.0.0.1:5199',
   UPLOAD_DIR: join(tmpdir(), 'dd-e2e-uploads'),
 };
 
-for (const args of [['-m', 'alembic', 'upgrade', 'head'], ['seed.py']]) {
+for (const args of [['-m', 'alembic', 'upgrade', 'head'], ['e2e_fixtures.py']]) {
   const r = spawnSync(python, args, { cwd: backend, env, stdio: 'inherit' });
   if (r.status !== 0) process.exit(r.status ?? 1);
 }

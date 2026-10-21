@@ -31,18 +31,11 @@ How it works on Vercel:
 * **Public requests board.** `/requests` lists every request with its title, status and dates, without signing in.
   `PUBLIC_BOARD=off` hides it.
 
-## Demo accounts
-
-The demo accounts (`lead@mccia.in`, `alice@mccia.in`, `bob@mccia.in`, `client@tata.com`, `client@acme.com`) are only
-created on a local SQLite database, or when `SEED_DEMO_DATA=true`. Never set that on the live site. If they exist on
-the live site, remove them in **Settings > Users**.
-
 ## What `python seed.py` does on every deploy
 
 1. Runs migrations.
 2. Creates the default design types if there are none (ticket creation needs at least one).
 3. Creates / promotes `ADMIN_EMAIL` as a Design Lead (idempotent).
-4. Only on SQLite, or with `SEED_DEMO_DATA=true`: adds the demo accounts and sample tickets.
 
 ## Accounts and passwords
 

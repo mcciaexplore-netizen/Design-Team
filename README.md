@@ -40,8 +40,10 @@ cd backend
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
+$env:ADMIN_EMAIL = "you@example.com"      # becomes your Design Lead account
+$env:ADMIN_PASSWORD = "pick-a-password"
 alembic upgrade head
-python seed.py            # design types, plus demo accounts (only on SQLite)
+python seed.py             # design types, plus your admin account
 uvicorn main:app --reload
 
 # Website (second terminal)
@@ -50,8 +52,8 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. Demo sign-ins: `lead@mccia.in` / `mccia123` (Design Lead), `alice@mccia.in` /
-`mccia123` (Designer), `client@tata.com` / `client123` (Client).
+Open http://localhost:5173 and sign in with the `ADMIN_EMAIL` / `ADMIN_PASSWORD` you set above. Add designers and
+clients from **Settings > Users** once signed in.
 
 ## Tests
 

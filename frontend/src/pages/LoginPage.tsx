@@ -1,16 +1,7 @@
 import React, { useState } from 'react';
 import GridBackground from '../components/GridBackground';
-import { Eye, EyeOff, Zap, LogIn, ArrowRight, RotateCw } from 'lucide-react';
+import { Eye, EyeOff, Zap, LogIn, RotateCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-
-const DEMO_ACCOUNTS = [
-  { label: 'Design Lead',  email: 'lead@mccia.in',    password: 'mccia123', color: '#003F8A', desc: 'Full admin + analytics access'  },
-  { label: 'Designer',     email: 'alice@mccia.in',   password: 'mccia123', color: '#003F8A', desc: 'Ticket management + timers'      },
-  { label: 'Client View',  email: 'client@tata.com',  password: 'client123',color: '#C2410C', desc: 'View-only + approval workflow'   },
-];
-
-/** Demo shortcuts only exist in local dev builds; the deployed seed passwords are generated. */
-const SHOW_DEMO = import.meta.env.DEV;
 
 const FEATURES = ['Visual Board', 'SLA Tracking', 'CDR Approval', 'Design Proofing', 'Capacity Forecast', 'Client Portal'];
 
@@ -44,12 +35,6 @@ const LoginPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void submit();
-  };
-
-  const fillDemo = (acc: typeof DEMO_ACCOUNTS[0]) => {
-    setEmail(acc.email);
-    setPassword(acc.password);
-    setErrorMsg('');
   };
 
   const field = { width: '100%' } as const;
@@ -110,42 +95,6 @@ const LoginPage: React.FC = () => {
             </p>
           </div>
 
-          {SHOW_DEMO && !signup && (
-            <>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-hint)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>Try a demo account (dev only)</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {DEMO_ACCOUNTS.map(acc => (
-                    <button
-                      key={acc.label}
-                      type="button"
-                      className="login-demo-btn"
-                      onClick={() => fillDemo(acc)}
-                      style={{
-                        '--demo-bg': `${acc.color}06`, '--demo-border': `${acc.color}18`,
-                        '--demo-bg-hover': `${acc.color}12`, '--demo-border-hover': `${acc.color}35`,
-                      } as React.CSSProperties}
-                    >
-                      <div aria-hidden="true" style={{ width: 32, height: 32, borderRadius: 9, background: acc.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, color: 'white', flexShrink: 0 }}>
-                        {acc.label[0]}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1.2 }}>{acc.label}</p>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-hint)', marginTop: 2 }}>{acc.desc}</p>
-                      </div>
-                      <ArrowRight size={14} aria-hidden="true" style={{ color: 'var(--text-hint)', flexShrink: 0 }} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1.25rem' }}>
-                <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-hint)', fontWeight: 600 }}>or sign in with email</span>
-                <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
-              </div>
-            </>
-          )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} noValidate={false}>
             {signup && (
@@ -265,15 +214,6 @@ const LoginPage: React.FC = () => {
           <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-hint)', marginTop: '1.5rem', lineHeight: 1.6 }}>
             Protected by MCCIA Applied AI Studio.
           </p>
-
-          {SHOW_DEMO && (
-            <div style={{ background: '#F8FAFC', border: '1px solid var(--border-soft)', borderRadius: 10, padding: '0.75rem 1rem', marginTop: '1.25rem' }}>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-soft)', lineHeight: 1.6 }}>
-                <strong style={{ color: 'var(--text-strong)' }}>Dev demo credentials:</strong>{' '}
-                <code>lead@mccia.in</code> / <code>mccia123</code>
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>
