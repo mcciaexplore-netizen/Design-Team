@@ -163,7 +163,7 @@ export default function DesignRequestFields({ options, form, idPrefix }: Props) 
       <fieldset style={noBorder}>
         <legend style={requestLabel}>Design requirement *</legend>
         <p id={`${p}-requirement-hint`} style={{ fontSize: '0.78rem', color: 'var(--text-soft)', margin: '-2px 0 8px' }}>
-          Tick everything you need. Each design becomes its own request, with its own designer and approval.
+          Tick everything you need. They all go on one request, with one designer and one approval.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {options.design_requirements.map((o, i) => (

@@ -64,33 +64,14 @@ function RequestFormBody({ options }: { options: RequestFormOptions }) {
       <div className="glass-card" role="status" style={{ padding: '2rem', textAlign: 'center' }}>
         <CheckCircle2 size={36} color="#059669" style={{ margin: '0 auto 10px' }} />
         <h2 style={{ fontWeight: 800, marginBottom: 6 }}>Request received</h2>
-        {done.tickets.length > 1 ? (
-          <>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)' }}>
-              Your request was split into {done.tickets.length} tickets, one per design. The design team has been notified and will be in touch.
-            </p>
-            <ul style={{ listStyle: 'none', padding: 0, margin: '12px auto 0', maxWidth: 420, textAlign: 'left', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {done.tickets.map(t => (
-                <li key={t.ticket_number} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderBottom: '1px solid rgba(226,232,240,0.9)', paddingBottom: 6 }}>
-                  <span><strong>{t.ticket_number}</strong> · {t.design}</span>
-                  <a href={t.tracking_url} style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Track</a>
-                </li>
-              ))}
-            </ul>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-soft)', marginTop: 8 }}>Bookmark the links to follow each one, no sign-in needed.</p>
-          </>
-        ) : (
-          <>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)' }}>
-              {done.tickets[0] && <>Your ticket number is <strong>{done.tickets[0].ticket_number}</strong>. </>}The design team has been notified and will be in touch.
-            </p>
-            {done.tickets[0] && (
-              <p style={{ fontSize: '0.85rem', marginTop: 10 }}>
-                <a href={done.tickets[0].tracking_url} style={{ fontWeight: 700 }}>Track this request</a> any time. Bookmark the link, no sign-in needed.
-                {' '}Or <a href="/requests" style={{ fontWeight: 700 }}>see all requests</a> and where each one stands.
-              </p>
-            )}
-          </>
+        <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)' }}>
+          {done.tickets[0] && <>Your ticket number is <strong>{done.tickets[0].ticket_number}</strong>. </>}The design team has been notified and will be in touch.
+        </p>
+        {done.tickets[0] && (
+          <p style={{ fontSize: '0.85rem', marginTop: 10 }}>
+            <a href={done.tickets[0].tracking_url} style={{ fontWeight: 700 }}>Track this request</a> any time. Bookmark the link, no sign-in needed.
+            {' '}Or <a href="/requests" style={{ fontWeight: 700 }}>see all requests</a> and where each one stands.
+          </p>
         )}
         <button type="button" className="btn-primary" style={{ marginTop: 16 }} onClick={() => { setDone(null); form.reset(); }}>Submit another request</button>
       </div>

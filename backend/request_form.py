@@ -265,25 +265,34 @@ def _label(f: RequestFields, requirement: str) -> str:
     return f.other_details if requirement == OTHER else requirement
 
 
-def _new_ticket(db: Session, requester: models.User, f: RequestFields, requirement: str, via: str) -> models.Ticket:
-    """One ticket for one of the chosen designs, auto-assigned and flushed (not committed)."""
-    design_type = _design_type(db, requirement)
-    label = _label(f, requirement)
-    details = f.details.get(requirement, {})
+def _new_ticket(db: Session, requester: models.User, f: RequestFields, via: str) -> models.Ticket:
+    """One ticket covering every chosen design, auto-assigned by the first design's type, flushed (not committed)."""
+    primary = f.requirements[0]
+    design_type = _design_type(db, primary)
+    several = len(f.requirements) > 1
+    labels = [_label(f, r) for r in f.requirements]
+    title_label = labels[0] if not several else f"{labels[0]} +{len(labels) - 1} more"
     fields = {
         "requester_name": requester.full_name, "requester_email": requester.email, "event_name": f.event_name,
-        "event_date": f.event_date.isoformat(), "department": f.department or None, "design_requirement": requirement,
+        "event_date": f.event_date.isoformat(), "department": f.department or None,
+        "design_requirement": primary,
+        **({"design_requirements": f.requirements} if several else {}),
         "expected_delivery_date": f.delivery_date.isoformat(), "number_of_creatives": f.num_creatives,
-        "other_details": (f.other_details or None) if requirement == OTHER else None, "content": f.content or None,
-        "details": details, "reference_links": f.links,
+        "other_details": (f.other_details or None) if OTHER in f.requirements else None, "content": f.content or None,
+        # One design: the same flat {question: answer} shape every older ticket has. Several: grouped by design.
+        "details": f.details if several else f.details.get(primary, {}),
+        "reference_links": f.links,
     }
-    labels = {q["id"]: q["label"] for q in QUESTIONS[requirement]}
-    detail_lines = [f"{labels[k]}: {', '.join(v) if isinstance(v, list) else v}" for k, v in details.items()]
+    sections = []
+    for r in f.requirements:
+        q_labels = {q["id"]: q["label"] for q in QUESTIONS[r]}
+        detail_lines = [f"{q_labels[k]}: {', '.join(v) if isinstance(v, list) else v}" for k, v in f.details.get(r, {}).items()]
+        heading = f"{_label(f, r)}:" if several else f"Requirement: {_label(f, r)}"
+        sections.append("\n".join(filter(None, [heading, *detail_lines])))
     brief = "\n".join(filter(None, [
         f"Event: {f.event_name} ({f.event_date:%d %b %Y})",
         f"Department: {f.department}" if f.department else None,
-        f"Requirement: {label}",
-        *detail_lines,
+        *sections,
         f"Creatives needed: {f.num_creatives}",
         f"Expected delivery: {f.delivery_date:%d %b %Y}",
         f"Requested by: {requester.full_name} <{requester.email}>",
@@ -293,7 +302,7 @@ def _new_ticket(db: Session, requester: models.User, f: RequestFields, requireme
 
     ticket = models.Ticket(
         ticket_number=next_ticket_number(db),
-        title=f"{f.event_name} - {label}"[:200],
+        title=f"{f.event_name} - {title_label}"[:200],
         brief=brief,
         design_type_id=design_type.id,
         type_specific_fields=fields,
@@ -307,58 +316,50 @@ def _new_ticket(db: Session, requester: models.User, f: RequestFields, requireme
         status=models.TicketStatus.PENDING_REVIEW,
     )
     db.add(ticket)
-    db.flush()   # so the next ticket gets the next number and the next assignment sees this one's load
+    db.flush()
     log_audit(db, ticket.id, None, "Created", {"via": via, "event": f.event_name},
               actor_label=f"{requester.full_name} ({via})")
     return ticket
 
 
 def create_tickets_from_form(db: Session, requester: models.User, f: RequestFields, uploads: list, via: str) -> list:
-    """One ticket per chosen design, created together, then assigned and announced. Files are stored once and
-    attached to every ticket."""
-    stored = [(store_bytes(data, fname.rsplit(".", 1)[-1].lower(), fname), fname, ctype, len(data)) for data, fname, ctype in uploads]
-    tickets = [_new_ticket(db, requester, f, r, via) for r in f.requirements]
-    for ticket in tickets:
-        for key, fname, ctype, size in stored:
-            db.add(models.Attachment(ticket_id=ticket.id, file_name=fname, file_url=key, content_type=ctype,
-                                     size_bytes=size, uploaded_by_id=requester.id))
-        others = [t for t in tickets if t is not ticket]
-        if others:   # tell the team which tickets came in together
-            ticket.brief += "\n\nSame request also asked for:\n" + "\n".join(
-                f"- {t.ticket_number}: {_label(f, t.type_specific_fields['design_requirement'])}" for t in others)
+    """One ticket for the whole request, covering every chosen design, with any files attached to it."""
+    ticket = _new_ticket(db, requester, f, via)
+    for data, fname, ctype in uploads:
+        key = store_bytes(data, fname.rsplit(".", 1)[-1].lower(), fname)
+        db.add(models.Attachment(ticket_id=ticket.id, file_name=fname, file_url=key, content_type=ctype,
+                                 size_bytes=len(data), uploaded_by_id=requester.id))
     db.commit()
 
-    for ticket in tickets:
-        db.refresh(ticket)
-        events.emit(db, "ticket_created", ticket, requester if via == "portal form" else None)
-        if ticket.assignee_id:
-            events.emit(db, "ticket_assigned", ticket, None, {"auto": True})
-    _send_confirmation(requester, tickets, f)
-    return tickets
+    db.refresh(ticket)
+    events.emit(db, "ticket_created", ticket, requester if via == "portal form" else None)
+    if ticket.assignee_id:
+        events.emit(db, "ticket_assigned", ticket, None, {"auto": True})
+    _send_confirmation(requester, [ticket], f)
+    return [ticket]
 
 
 def _send_confirmation(requester: models.User, tickets: list, f: "RequestFields") -> None:
-    """Email the requester their ticket numbers and links to follow progress (only if SMTP is configured)."""
+    """Email the requester their ticket number and a link to follow progress (only if SMTP is configured)."""
     if not delivery.email_configured():
         return
-    lines = [f"{t.ticket_number} ({_label(f, t.type_specific_fields['design_requirement'])}): {tracking_url(t.ticket_number)}"
-             for t in tickets]
+    ticket = tickets[0]
+    designs = ", ".join(_label(f, r) for r in ticket.type_specific_fields.get("design_requirements", f.requirements))
     body = "\n".join([
         f"Hi {requester.full_name},",
         "",
-        f'We have received your design request for "{f.event_name}".',
+        f'We have received your design request for "{f.event_name}" ({designs}).',
         f"Expected delivery: {f.delivery_date:%d %b %Y}",
         "",
-        "Follow progress any time, no login needed:" if len(tickets) == 1 else
-        f"It has been split into {len(tickets)} tickets, one per design. Follow each one any time, no login needed:",
-        *lines,
+        "Follow progress any time, no login needed:",
+        f"{ticket.ticket_number}: {tracking_url(ticket.ticket_number)}",
         "",
         "See all your requests in one place (this link works for 30 days):",
         my_requests_url(requester),
         "",
         "MCCIA Applied AI Studio",
     ])
-    subject = f"Design request received: {', '.join(t.ticket_number for t in tickets)}"
+    subject = f"Design request received: {ticket.ticket_number}"
     delivery.run_in_background(delivery.send_email, requester.email, subject[:150], body)
 
 

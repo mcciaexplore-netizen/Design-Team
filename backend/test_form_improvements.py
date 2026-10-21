@@ -162,7 +162,7 @@ def test_a_choice_must_match_its_own_questions_and_old_bundled_names_are_rejecte
 FLYER, INSTA, OTHER = "Flyer (Email / Print)", "Instagram post", "Other"
 
 
-def test_ticking_several_designs_creates_one_ticket_each(client, monkeypatch):
+def test_ticking_several_designs_creates_one_ticket(client, monkeypatch):
     sent = []
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
     monkeypatch.setattr(request_form.delivery, "send_email", lambda to, subject, body: sent.append((to, subject, body)) or (True, "Sent"))
@@ -172,23 +172,26 @@ def test_ticking_several_designs_creates_one_ticket_each(client, monkeypatch):
     r = client.post("/api/public/requests", data=data, files=[("files", ("brief.png", PNG, "image/png"))])
     assert r.status_code == 201, r.text
     out = r.json()["tickets"]
-    assert [t["design"] for t in out] == [FLYER, INSTA, "A mascot"]
-    assert r.json()["ticket_number"] == out[0]["ticket_number"]
+    assert len(out) == 1
+    assert r.json()["ticket_number"] == out[0]["ticket_number"] == r.json()["tickets"][0]["ticket_number"]
 
-    flyer, insta, other = (ticket(t["ticket_number"]) for t in out)
-    assert flyer.type_specific_fields["details"] == {"size": "A4", "channel": "Print"}
-    assert insta.type_specific_fields["details"] == {"format": "Story (9:16)"} and insta.title == "AI Workshop - Instagram post"
-    assert other.type_specific_fields["other_details"] == "A mascot" and flyer.type_specific_fields["other_details"] is None
-    assert flyer.design_type_id != insta.design_type_id
-    assert f"- {insta.ticket_number}: Instagram post" in flyer.brief and flyer.ticket_number not in flyer.brief.split("also asked for")[1]
+    t = ticket(out[0]["ticket_number"])
+    assert t.type_specific_fields["design_requirements"] == [FLYER, INSTA, OTHER]   # the repeat was dropped
+    assert t.type_specific_fields["details"] == {FLYER: {"size": "A4", "channel": "Print"}, INSTA: {"format": "Story (9:16)"}, OTHER: {}}
+    assert t.type_specific_fields["other_details"] == "A mascot"
+    db = TestingSessionLocal()
+    flyer_type = db.query(models.DesignType).filter_by(name="Flyer").one()
+    db.close()
+    assert t.design_type_id == flyer_type.id   # the first chosen design decides the ticket's type
+    assert "Flyer (Email / Print):" in t.brief and "Instagram post:" in t.brief and "A mascot:" in t.brief
 
     db = TestingSessionLocal()
-    atts = db.query(models.Attachment).filter(models.Attachment.ticket_id.in_([flyer.id, insta.id, other.id])).all()
+    atts = db.query(models.Attachment).filter(models.Attachment.ticket_id == t.id).all()
     db.close()
-    assert len(atts) == 3 and len({a.file_url for a in atts}) == 1   # one stored file, attached to each ticket
+    assert len(atts) == 1   # one ticket, one stored file
 
     to_client = [m for m in sent if m[0] == "meera@example.com"]   # the team is emailed separately
-    assert len(to_client) == 1 and all(t["ticket_number"] in to_client[0][2] for t in out)   # one confirmation listing all
+    assert len(to_client) == 1 and t.ticket_number in to_client[0][2]
 
 
 def test_each_design_must_answer_its_own_required_questions(client):
@@ -210,7 +213,7 @@ def test_portal_request_with_several_designs(client):
     del data["name"], data["email"]
     r = client.post("/api/requests", data=data, headers=auth(client, "a@tata.com"))
     assert r.status_code == 201, r.text
-    assert len(r.json()["tickets"]) == 2 and r.json()["id"] == r.json()["tickets"][0]["id"]
+    assert len(r.json()["tickets"]) == 1 and r.json()["id"] == r.json()["tickets"][0]["id"]
 
 
 def test_estimate_for_several_designs_uses_the_slowest(client):

@@ -32,17 +32,21 @@ def test_only_a_lead_can_delete_a_ticket_and_everything_it_owns_goes(client):
 
 
 def test_a_file_shared_with_another_ticket_is_kept(client):
-    data = form(details=json.dumps({"Flyer (Email / Print)": {"size": "A4", "channel": "Print"}, "Instagram post": {"format": "Carousel"}}))
-    data["design_requirement"] = ["Flyer (Email / Print)", "Instagram post"]
-    r = client.post("/api/public/requests", data=data, files=[("files", ("brief.png", PNG, "image/png"))])
-    first, second = r.json()["tickets"]
+    import common
+    first = make_ticket(client, "a@tata.com", "First")
+    second = make_ticket(client, "a@tata.com", "Second")
+    key = common.store_bytes(PNG, "png", "brief.png")
     db = TestingSessionLocal()
-    ids = {t.ticket_number: t.id for t in db.query(models.Ticket).all()}
+    db.add_all([
+        models.Attachment(ticket_id=first["id"], file_name="brief.png", file_url=key, content_type="image/png", size_bytes=len(PNG), uploaded_by_id=first["requester_id"]),
+        models.Attachment(ticket_id=second["id"], file_name="brief.png", file_url=key, content_type="image/png", size_bytes=len(PNG), uploaded_by_id=second["requester_id"]),
+    ])
+    db.commit()
     db.close()
 
-    assert client.delete(f"/api/tickets/{ids[first['ticket_number']]}", headers=auth(client, "lead@x.com")).status_code == 204
+    assert client.delete(f"/api/tickets/{first['id']}", headers=auth(client, "lead@x.com")).status_code == 204
     assert len(os.listdir(os.environ["UPLOAD_DIR"])) == 1                 # still attached to the other ticket
-    att = TestingSessionLocal().query(models.Attachment).filter_by(ticket_id=ids[second["ticket_number"]]).one()
+    att = TestingSessionLocal().query(models.Attachment).filter_by(ticket_id=second["id"]).one()
     assert client.get(f"/api/attachments/{att.id}/download", headers=auth(client, "lead@x.com")).status_code == 200
 
 
