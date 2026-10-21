@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiJson } from '../api';
 import ActivityFeed from '../components/ActivityFeed';
+import PendingReviewPanel from '../components/board/PendingReviewPanel';
+import { ToastContainer, useToast } from '../components/Toast';
 import { DONE_STATUSES } from '../types';
 import { AlertCircle, CheckCircle2, Clock, Mail, PauseCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -39,6 +41,27 @@ const MyTasksPage = () => {
   const { tickets, loading, error, refresh } = useTickets();
   const myId = user ? Number(user.id) : null;
   const now = Date.now();
+  const isLead = user?.role === 'Design Lead';
+  const { toasts, addToast, removeToast } = useToast();
+  const pendingReview = tickets.filter(t => t.status === 'Pending Review');
+
+  const handleAcceptRequest = async (ticket: Ticket) => {
+    try {
+      await apiJson(`/api/tickets/${ticket.id}/accept`, { method: 'POST' });
+      await refresh();
+      addToast(`${ticket.number} accepted`, 'success');
+    } catch (e) { addToast(e instanceof Error ? e.message : 'Could not accept this request.', 'error'); }
+  };
+
+  const handleDeclineRequest = async (ticket: Ticket) => {
+    if (!window.confirm(`Decline ${ticket.number}: "${ticket.title}"?`)) return;
+    const reason = window.prompt('Reason for the client (optional)') ?? '';
+    try {
+      await apiJson(`/api/tickets/${ticket.id}/decline`, { method: 'POST', json: { reason: reason.trim() || null } });
+      await refresh();
+      addToast(`${ticket.number} declined`, 'success');
+    } catch (e) { addToast(e instanceof Error ? e.message : 'Could not decline this request.', 'error'); }
+  };
 
   const mine = tickets
     .filter(t => t.assignee_id === myId && !DONE.includes(t.status))
@@ -69,6 +92,10 @@ const MyTasksPage = () => {
           </div>
         ))}
       </section>
+
+      {isLead && (
+        <PendingReviewPanel tickets={pendingReview} onAccept={t => void handleAcceptRequest(t)} onDecline={t => void handleDeclineRequest(t)} />
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '1.25rem', alignItems: 'start' }}>
       <div style={{ minWidth: 0 }}>
@@ -127,6 +154,7 @@ const MyTasksPage = () => {
         <ActivityFeed mine title="Latest on my work" limit={12} />
       </aside>
       </div>
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 };

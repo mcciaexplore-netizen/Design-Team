@@ -4,9 +4,7 @@ import NotificationBell from './components/NotificationBell';
 import TicketCreateModal from './components/TicketCreateModal';
 import CommandPalette from './components/CommandPalette';
 import LoginPage from './pages/LoginPage';
-// Pages other than the first screen load on demand, so nobody downloads the charts library or the calendar
-// until they open them.
-const Dashboard = lazy(() => import('./components/Dashboard'));
+// Pages other than the first screen load on demand, so nobody downloads the calendar library until it opens.
 const TicketDetailPage = lazy(() => import('./pages/TicketDetailPage'));
 const ForcePasswordChangePage = lazy(() => import('./pages/ForcePasswordChangePage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -30,7 +28,7 @@ import { useTicketSocket } from './hooks/useTicketSocket';
 import { NewRequestContext } from './contexts/NewRequestContext';
 import type { RequestPrefill } from './requestForm';
 import {
-  LayoutDashboard, BarChart3, Plus, Zap, LogOut, Search,
+  LayoutDashboard, Plus, Zap, LogOut, Search,
   ChevronRight, Settings, ListChecks, CalendarDays, Library, type LucideIcon,
 } from 'lucide-react';
 
@@ -52,9 +50,6 @@ const NAV_GROUPS: NavGroup[] = [
     { to: '/library',  label: 'Library',      icon: Library,         roles: STAFF },
     { to: '/calendar', label: 'Calendar',     icon: CalendarDays,    roles: STAFF },
   ] },
-  { title: 'Insights', items: [
-    { to: '/dashboard', label: 'Performance', icon: BarChart3, roles: ['Design Lead'] },
-  ] },
   { title: 'Account', items: [
     { to: '/settings', label: 'Settings', icon: Settings, roles: STAFF },
   ] },
@@ -62,7 +57,6 @@ const NAV_GROUPS: NavGroup[] = [
 
 const PAGE_TITLES: [string, string][] = [
   ['/my-tasks',      'My dashboard'],
-  ['/dashboard',     'Performance'],
   ['/workload',      'Team workload'],
   ['/library',       'Library'],
   ['/calendar',      'Calendar'],
@@ -73,7 +67,6 @@ const PAGE_TITLES: [string, string][] = [
 
 const PAGE_SUBTITLES: Record<string, string> = {
   '/':              'Drag tickets between stages to keep work moving',
-  '/dashboard':     'The last 30 days of delivery and this week’s load',
   '/workload':      'Who has capacity, and who is about to fall behind',
   '/library':       'Logos, brand assets, templates and finished designs for the whole team',
   '/calendar':      'Deadlines and SLA windows at a glance',
@@ -283,7 +276,6 @@ function AppShell() {
               <Route path="/my-tasks" element={<RequireRole roles={STAFF}><MyTasksPage /></RequireRole>} />
               <Route path="/workload" element={<RequireRole roles={STAFF}><WorkloadPage /></RequireRole>} />
               <Route path="/library" element={<RequireRole roles={STAFF}><LibraryPage /></RequireRole>} />
-              <Route path="/dashboard" element={<RequireRole roles={['Design Lead']}><Dashboard /></RequireRole>} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/client-portal" element={<RedirectToPortal to="/portal/client-portal" />} />
               <Route path="/campaigns" element={<RedirectToPortal to="/portal/campaigns" />} />
