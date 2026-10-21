@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Ticket as TicketIcon, LayoutDashboard, ArrowRight, BarChart3, Gauge, Settings, Users, type LucideIcon } from 'lucide-react';
+import { Search, Ticket as TicketIcon, LayoutDashboard, ArrowRight, BarChart3, ListChecks, Settings, type LucideIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
 
@@ -8,11 +8,10 @@ interface CommandPaletteProps { isOpen: boolean; onClose: () => void }
 interface Entry { key: string; icon: LucideIcon; label: string; sub?: string; to: string; color?: string; group: 'Pages' | 'Tickets' }
 
 const PAGES: (Omit<Entry, 'key' | 'group'> & { roles: string[] })[] = [
+  { icon: ListChecks,      label: 'My Dashboard',          sub: 'Your own open tasks',              to: '/my-tasks',      roles: ['Design Lead', 'Designer'] },
   { icon: LayoutDashboard, label: 'Visual board',          sub: 'Move work between stages',        to: '/',              roles: ['Design Lead', 'Designer'] },
-  { icon: Gauge,           label: 'Team workload',         sub: 'Capacity versus planned effort',  to: '/workload',      roles: ['Design Lead', 'Designer'] },
   { icon: BarChart3,       label: 'Performance dashboard', sub: 'Last 30 days',                    to: '/dashboard',     roles: ['Design Lead'] },
-  { icon: Users,           label: 'Client portal',         sub: 'Requests and reviews',            to: '/client-portal', roles: ['Design Lead', 'Designer', 'Client'] },
-  { icon: Settings,        label: 'Settings',              sub: 'Notifications and integrations',  to: '/settings',      roles: ['Design Lead', 'Designer', 'Client'] },
+  { icon: Settings,        label: 'Settings',              sub: 'Notifications and integrations',  to: '/settings',      roles: ['Design Lead', 'Designer'] },
 ];
 
 const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose }) => {

@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import KanbanBoard from './components/KanbanBoard';
 import NotificationBell from './components/NotificationBell';
-import ClientPortalPage from './pages/ClientPortalPage';
 import TicketCreateModal from './components/TicketCreateModal';
 import CommandPalette from './components/CommandPalette';
 import LoginPage from './pages/LoginPage';
@@ -21,7 +20,6 @@ const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
 const MyRequestsPage = lazy(() => import('./pages/MyRequestsPage'));
 const RequestsBoardPage = lazy(() => import('./pages/RequestsBoardPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
-const CampaignsPage = lazy(() => import('./pages/CampaignsPage'));
 
 const PageLoading = () => <p role="status" style={{ color: 'var(--text-hint)', padding: '1rem' }}>Loading…</p>;
 import { AuthProvider, useAuth, type UserRole } from './contexts/AuthContext';
@@ -32,9 +30,16 @@ import { useTicketSocket } from './hooks/useTicketSocket';
 import { NewRequestContext } from './contexts/NewRequestContext';
 import type { RequestPrefill } from './requestForm';
 import {
-  LayoutDashboard, BarChart3, Plus, Users, Zap, LogOut, Search,
-  ChevronRight, Settings, Gauge, ListChecks, CalendarDays, Megaphone, Library, type LucideIcon,
+  LayoutDashboard, BarChart3, Plus, Zap, LogOut, Search,
+  ChevronRight, Settings, ListChecks, CalendarDays, Library, type LucideIcon,
 } from 'lucide-react';
+
+/** The client experience now lives entirely in the separate /portal app (see PortalApp.tsx); these
+ *  URLs only exist so old bookmarks, emails and notifications keep working. */
+function RedirectToPortal({ to }: { to: string }) {
+  useEffect(() => { window.location.replace(to); }, [to]);
+  return <FullScreenLoading text="Taking you to your portal…" />;
+}
 
 interface NavItem { to: string; label: string; icon: LucideIcon; roles: UserRole[] }
 interface NavGroup { title: string; items: NavItem[] }
@@ -44,30 +49,23 @@ const NAV_GROUPS: NavGroup[] = [
   { title: 'Workspace', items: [
     { to: '/my-tasks', label: 'My Dashboard', icon: ListChecks,      roles: STAFF },
     { to: '/',         label: 'Visual Board', icon: LayoutDashboard, roles: STAFF },
-    { to: '/workload', label: 'Workload',     icon: Gauge,           roles: STAFF },
     { to: '/library',  label: 'Library',      icon: Library,         roles: STAFF },
-    { to: '/calendar', label: 'Calendar',     icon: CalendarDays,    roles: ['Design Lead', 'Designer', 'Client'] },
+    { to: '/calendar', label: 'Calendar',     icon: CalendarDays,    roles: STAFF },
   ] },
   { title: 'Insights', items: [
     { to: '/dashboard', label: 'Performance', icon: BarChart3, roles: ['Design Lead'] },
   ] },
-  { title: 'Portals', items: [
-    { to: '/client-portal', label: 'Client Portal', icon: Users, roles: ['Design Lead', 'Designer', 'Client'] },
-    { to: '/campaigns', label: 'Campaigns', icon: Megaphone, roles: ['Design Lead', 'Designer', 'Client'] },
-  ] },
   { title: 'Account', items: [
-    { to: '/settings', label: 'Settings', icon: Settings, roles: ['Design Lead', 'Designer', 'Client'] },
+    { to: '/settings', label: 'Settings', icon: Settings, roles: STAFF },
   ] },
 ];
 
 const PAGE_TITLES: [string, string][] = [
-  ['/client-portal', 'My requests'],
   ['/my-tasks',      'My dashboard'],
   ['/dashboard',     'Performance'],
   ['/workload',      'Team workload'],
   ['/library',       'Library'],
   ['/calendar',      'Calendar'],
-  ['/campaigns',     'Campaigns'],
   ['/tickets',      'Ticket'],
   ['/settings',      'Settings'],
   ['/',              'Visual Board'],
@@ -79,7 +77,6 @@ const PAGE_SUBTITLES: Record<string, string> = {
   '/workload':      'Who has capacity, and who is about to fall behind',
   '/library':       'Logos, brand assets, templates and finished designs for the whole team',
   '/calendar':      'Deadlines and SLA windows at a glance',
-  '/client-portal': 'Track requests and review designs',
   '/settings':      'Notifications, password and team',
 };
 
@@ -106,7 +103,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
 
       <button type="button" onClick={onNewTicket} className="app-create-ticket btn-primary w-full mb-5 justify-center" style={{ borderRadius: 'var(--radius-btn)', gap: '0.5rem' }}>
         <Plus size={14} strokeWidth={2.5} />
-        {role === 'Client' ? 'New Request' : 'New Ticket'}
+        New Ticket
       </button>
 
       <nav className="app-side-nav space-y-0.5 flex-1" aria-label="Main navigation">
@@ -118,9 +115,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
               {gi > 0 && <div className="app-nav-divider" style={{ margin: '0.875rem 0 0.5rem' }} />}
               <p className="sidebar-section-title mb-2">{group.title}</p>
               {items.map(({ to, label, icon: Icon }) => {
-                const active = location.pathname === to
-                  || (to === '/client-portal' && location.pathname.startsWith('/tickets/') && role === 'Client')
-                  || (to === '/' && location.pathname.startsWith('/tickets/') && role !== 'Client');
+                const active = location.pathname === to || (to === '/' && location.pathname.startsWith('/tickets/'));
                 return (
                   <Link
                     key={to} to={to}
@@ -179,7 +174,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
 function RequireRole({ roles, children }: { roles: UserRole[]; children: ReactNode }) {
   const { user } = useAuth();
   if (!user) return null;
-  if (!roles.includes(user.role)) return <Navigate to={user.role === 'Client' ? '/client-portal' : '/'} replace />;
+  if (!roles.includes(user.role)) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -188,8 +183,7 @@ function AppShell() {
   const [prefill, setPrefill] = useState<RequestPrefill | null>(null);   // set by "Request again"
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const location = useLocation();
-  const { user, logout } = useAuth();
-  const isClient = user?.role === 'Client';
+  const { user } = useAuth();
   const pageTitle = titleFor(location.pathname);
   const subtitle = PAGE_SUBTITLES[location.pathname];
   const { toasts, addToast, removeToast } = useToast();
@@ -241,31 +235,22 @@ function AppShell() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [openNewRequest]);
 
-  const home = user?.role === 'Client' ? '/client-portal' : user?.role === 'Designer' ? '/my-tasks' : '/';
+  const home = user?.role === 'Designer' ? '/my-tasks' : '/';
 
   return (
     <NewRequestContext.Provider value={{ openNewRequest }}>
     <div className="app-shell flex h-screen font-body">
       <a href="#main-content" className="skip-link">Skip to content</a>
-      {/* Clients get a focused page: their requests and notifications, nothing else. */}
-      {!isClient && <Sidebar onNewTicket={() => openNewRequest()} />}
+      <Sidebar onNewTicket={() => openNewRequest()} />
 
       <main className="flex-1 flex flex-col relative z-0 min-w-0">
-        <header className={`app-header h-16 flex items-center px-8 justify-between sticky top-0 z-20 ${isClient ? 'client-header' : ''}`}>
-          {isClient ? (
-            /* The page has its own heading, so the client's top bar is just the brand. */
-            <Link to="/client-portal" aria-label="MCCIA Applied AI Studio, my requests" style={{ display: 'inline-flex', alignItems: 'center' }}>
-              <img src="/mccia_logo.png" alt="" style={{ height: 34, width: 'auto', maxWidth: 160, objectFit: 'contain', display: 'block' }} />
-            </Link>
-          ) : (
-            <div className="app-header-title">
-              <h2 className="font-heading font-bold" style={{ fontSize: 'clamp(1.1rem, 2vw, 1.35rem)', letterSpacing: '-0.02em', color: 'var(--text-strong)' }}>{pageTitle}</h2>
-              {subtitle && <p className="app-header-subtitle">{subtitle}</p>}
-            </div>
-          )}
+        <header className="app-header h-16 flex items-center px-8 justify-between sticky top-0 z-20">
+          <div className="app-header-title">
+            <h2 className="font-heading font-bold" style={{ fontSize: 'clamp(1.1rem, 2vw, 1.35rem)', letterSpacing: '-0.02em', color: 'var(--text-strong)' }}>{pageTitle}</h2>
+            {subtitle && <p className="app-header-subtitle">{subtitle}</p>}
+          </div>
 
           <div className="flex items-center gap-3">
-            {!isClient && (<>
             <button type="button" className="app-header-search" onClick={() => setIsCommandPaletteOpen(true)} aria-label="Search the workspace" title="Search (Ctrl+K)">
               <Search size={15} />
               <span>Search anything…</span>
@@ -273,12 +258,11 @@ function AppShell() {
             </button>
 
             <div style={{ width: 1, height: 24, background: 'var(--border-soft)' }} />
-            </>)}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><NotificationBell /></div>
 
-            <button type="button" className="app-header-create btn-primary" onClick={() => openNewRequest()} aria-label={user?.role === 'Client' ? 'New request' : 'New ticket'} style={{ gap: '0.4rem' }}>
+            <button type="button" className="app-header-create btn-primary" onClick={() => openNewRequest()} aria-label="New ticket" style={{ gap: '0.4rem' }}>
               <Plus size={14} strokeWidth={2.5} />
-              <span>{user?.role === 'Client' ? 'New request' : 'New ticket'}</span>
+              <span>New ticket</span>
             </button>
 
             {user && (
@@ -288,17 +272,11 @@ function AppShell() {
                 </div>
               </div>
             )}
-            {isClient && (
-              <>
-                <Link to="/settings" aria-label="Settings" title="Settings" className="app-header-search" style={{ padding: '0.45rem', minWidth: 0 }}><Settings size={16} /></Link>
-                <button type="button" className="btn-ghost" onClick={logout} style={{ gap: '0.4rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}><LogOut size={14} /> <span className="client-signout-label">Sign out</span></button>
-              </>
-            )}
           </div>
         </header>
 
         <div id="main-content" tabIndex={-1} className="app-content flex-1 overflow-auto px-8 py-7 relative">
-          <div className="h-full animate-fade-in-up" style={isClient ? { maxWidth: 980, margin: '0 auto', width: '100%' } : undefined}>
+          <div className="h-full animate-fade-in-up">
             <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<RequireRole roles={STAFF}><KanbanBoard /></RequireRole>} />
@@ -306,9 +284,9 @@ function AppShell() {
               <Route path="/workload" element={<RequireRole roles={STAFF}><WorkloadPage /></RequireRole>} />
               <Route path="/library" element={<RequireRole roles={STAFF}><LibraryPage /></RequireRole>} />
               <Route path="/dashboard" element={<RequireRole roles={['Design Lead']}><Dashboard /></RequireRole>} />
-              <Route path="/calendar" element={isClient ? <Navigate to="/client-portal" replace /> : <CalendarPage />} />
-              <Route path="/client-portal" element={<ClientPortalPage onNewRequest={() => openNewRequest()} />} />
-              <Route path="/campaigns" element={<CampaignsPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/client-portal" element={<RedirectToPortal to="/portal/client-portal" />} />
+              <Route path="/campaigns" element={<RedirectToPortal to="/portal/campaigns" />} />
               <Route path="/tickets/:id"element={<TicketDetailPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={home} replace />} />
@@ -318,7 +296,7 @@ function AppShell() {
         </div>
 
         <TicketCreateModal isOpen={isCreateModalOpen} prefill={prefill} onClose={() => setIsCreateModalOpen(false)} />
-        <CommandPalette    isOpen={isCommandPaletteOpen && !isClient} onClose={() => setIsCommandPaletteOpen(false)} />
+        <CommandPalette    isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
         <ToastContainer    toasts={toasts} onRemove={removeToast} />
       </main>
     </div>
@@ -362,24 +340,36 @@ function AppContent() {
     return <Suspense fallback={<PageLoading />}><Routes><Route path="/track/:token" element={<TrackPage />} /></Routes></Suspense>;
   }
 
-  if (isLoading) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#003F8A' }}>
-        <div style={{ textAlign: 'center', color: 'white' }}>
-          <div className="app-spinner" role="status" aria-label="Loading" />
-          <p style={{ fontSize: '0.9rem', fontFamily: 'var(--font-body)', opacity: 0.7, marginTop: 14 }}>Loading MCCIA Studio…</p>
-        </div>
-      </div>
-    );
+  if (isLoading) return <FullScreenLoading text="Loading MCCIA Studio…" />;
+  if (!isAuthenticated) return <LoginPage />;
+
+  /* The client experience now lives entirely at /portal (see PortalApp.tsx); send a signed-in Client there,
+   * keeping any deep link (an emailed ticket link, say) instead of always landing on the main requests page. */
+  if (user?.role === 'Client') {
+    const target = location.pathname.startsWith('/tickets/') ? `/portal${location.pathname}`
+      : location.pathname === '/campaigns' ? '/portal/campaigns'
+      : location.pathname === '/settings' ? '/portal/settings'
+      : '/portal/client-portal';
+    return <RedirectToPortal to={target} />;
   }
 
-  if (!isAuthenticated) return <LoginPage />;
   if (user?.mustChangePassword) return <Suspense fallback={<PageLoading />}><ForcePasswordChangePage /></Suspense>;
 
   return (
     <TicketsProvider>
       <AppShell />
     </TicketsProvider>
+  );
+}
+
+function FullScreenLoading({ text }: { text: string }) {
+  return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#003F8A' }}>
+      <div style={{ textAlign: 'center', color: 'white' }}>
+        <div className="app-spinner" role="status" aria-label="Loading" />
+        <p style={{ fontSize: '0.9rem', fontFamily: 'var(--font-body)', opacity: 0.7, marginTop: 14 }}>{text}</p>
+      </div>
+    </div>
   );
 }
 
