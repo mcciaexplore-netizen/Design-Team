@@ -10,6 +10,7 @@ import pytest
 
 import common
 import cron_jobs
+import delivery
 import gdrive
 import models
 from test_auth import TestingSessionLocal, auth, client  # noqa: F401  (shared fixture)
@@ -99,17 +100,24 @@ def test_connect_from_settings_then_uploads_go_to_that_drive(client, google):
     assert check == {"ok": True, "detail": 'Connected. New uploads go to the folder "DesignDesk files" as studio@gmail.com.'}
 
 
-def test_reminder_a_day_ahead_then_uploads_fall_back_to_the_database_until_reconnected(client, google):
+def test_reminder_a_day_ahead_then_uploads_fall_back_to_the_database_until_reconnected(client, google, monkeypatch):
     lead = auth(client, "lead@x.com")
     connect(client, lead)
+    sent = []
+    monkeypatch.setattr(delivery, "run_in_background", lambda fn, *a: fn(*a))
+    monkeypatch.setenv("SMTP_HOST", "smtp.zoho.in")
+    monkeypatch.setattr(delivery, "send_email", lambda to, subject, body: sent.append((to, subject, body)) or (True, "Sent"))
     db = TestingSessionLocal()
     start = datetime.datetime.now(datetime.timezone.utc)
     cron_jobs.drive_sign_in(db, start + datetime.timedelta(days=3))
-    assert db.query(models.Notification).count() == 0
+    assert db.query(models.Notification).count() == 0 and sent == []
     for _ in range(2):   # once only
         cron_jobs.drive_sign_in(db, start + datetime.timedelta(days=6, hours=2))
     texts = [n.content for n in db.query(models.Notification).all()]
     assert len(texts) == 1 and "Google Drive disconnects on" in texts[0]   # only the lead in the fixture
+    assert len(sent) == 1
+    to, subject, body = sent[0]
+    assert to == "lead@x.com" and subject == "Google Drive connection" and "Google Drive disconnects on" in body
 
     # Google ends the sign-in early: the upload that finds out is kept in the database, and so are the next ones.
     google.refresh_ok = False

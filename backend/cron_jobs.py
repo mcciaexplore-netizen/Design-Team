@@ -164,7 +164,9 @@ def drive_sign_in(db: Session, now: datetime.datetime) -> None:
     leads = db.query(models.User).filter(models.User.role.in_([models.RoleEnum.DESIGN_LEAD, models.RoleEnum.ADMIN]),
                                          models.User.is_active.is_(True)).all()
     for lead in leads:
-        notify_user(db, lead, text, "DRIVE_SIGN_IN")
+        if notify_user(db, lead, text, "DRIVE_SIGN_IN") is not False and delivery.email_configured():
+            delivery.run_in_background(delivery.send_email, lead.email, "Google Drive connection",
+                                       f"Hi {lead.full_name},\n\n{text}\n\nMCCIA Applied AI Studio")
 
 
 # ── Running the jobs without a frequent cron ─────────────────────────────────
