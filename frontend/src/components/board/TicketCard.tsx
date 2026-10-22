@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDraggable } from '@dnd-kit/core';
 import { AlertTriangle, Copy, CheckSquare } from 'lucide-react';
-import { type Ticket, DONE_STATUSES, PRIORITY_STYLE } from '../../types';
+import { type Ticket, DONE_STATUSES } from '../../types';
 import { colorFor } from '../../contexts/TicketsContext';
 
 /* ── helpers ─────────────────────────────────── */
@@ -61,7 +61,6 @@ export function TicketCard({
   onSaveTitle:    () => void;
   onDuplicate:    () => void;
 }) {
-  const ps  = PRIORITY_STYLE[ticket.priority] ?? {};
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editingTitle !== null) ref.current?.select(); }, [editingTitle]);
@@ -129,7 +128,6 @@ export function TicketCard({
           </button>
           {ticket.status === 'Waiting on Requester' && <span className="badge-red" title="Waiting on the requester">Blocked</span>}
           {!finished && <SLABadge dueAt={ticket.due_at} />}
-          {!replaced && <span className="badge-blue" style={ps}>{ticket.priority}</span>}
         </div>
       </div>
 

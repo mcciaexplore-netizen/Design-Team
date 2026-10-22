@@ -109,9 +109,17 @@ class DeclineBody(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
 
+class AcceptBody(BaseModel):
+    assignee_id: int | None = Field(default=None)
+
+
+class ClarificationBody(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+
+
 @router.post("/api/tickets/{ticket_id}/accept", response_model=schemas.TicketResponse)
-def accept_ticket(ticket_id: int, db: Session = Depends(get_db), lead: models.User = Depends(require_lead)):
-    """A Design Lead accepts a Pending Review request: it becomes a real ticket, auto-assigned if capacity allows."""
+def accept_ticket(ticket_id: int, body: AcceptBody | None = None, db: Session = Depends(get_db), lead: models.User = Depends(require_lead)):
+    """A Design Lead accepts a Pending Review request: it becomes a real ticket, optionally assigned to a specific staff member or auto-assigned."""
     ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -119,20 +127,56 @@ def accept_ticket(ticket_id: int, db: Session = Depends(get_db), lead: models.Us
         raise HTTPException(status_code=409, detail="This request has already been reviewed.")
 
     ticket.status = models.TicketStatus.NEW
-    designer = capacity_engine.suggest_assignee(db, ticket.design_type_id)
-    if designer:
-        ticket.assignee_id = designer.id
+    chosen_assignee_id = body.assignee_id if body else None
+
+    if chosen_assignee_id:
+        assignee = db.query(models.User).filter(
+            models.User.id == chosen_assignee_id,
+            models.User.is_active == True,
+            models.User.role != models.RoleEnum.REQUESTER
+        ).first()
+        if not assignee:
+            raise HTTPException(status_code=422, detail="Assignee must be an active staff member")
+        ticket.assignee_id = assignee.id
         ticket.status = models.TicketStatus.ASSIGNED
-    log_audit(db, ticket.id, lead, "Accepted", {"status": ticket.status.value})
+    else:
+        designer = capacity_engine.suggest_assignee(db, ticket.design_type_id)
+        if designer:
+            ticket.assignee_id = designer.id
+            ticket.status = models.TicketStatus.ASSIGNED
+
+    log_audit(db, ticket.id, lead, "Accepted", {"status": ticket.status.value, "assignee_id": ticket.assignee_id})
     db.commit()
     db.refresh(ticket)
 
     events.emit(db, "ticket_moved", ticket, lead, {"to": ticket.status.value})
     if ticket.assignee_id:
-        events.emit(db, "ticket_assigned", ticket, lead, {"auto": True})
+        events.emit(db, "ticket_assigned", ticket, lead, {"auto": chosen_assignee_id is None})
     if ticket.requester_id:
         events.notify(db, ticket.requester, f"Your request {ticket.ticket_number} was accepted and is now in progress.",
                       "ticket_accepted", ticket)
+        db.commit()
+    return ticket
+
+
+@router.post("/api/tickets/{ticket_id}/clarify", response_model=schemas.TicketResponse)
+def request_clarification(ticket_id: int, body: ClarificationBody, db: Session = Depends(get_db), lead: models.User = Depends(require_lead)):
+    """A Design Lead asks the requester for clarification on a request, moving it to Waiting on Requester without declining."""
+    ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    old_status = ticket.status
+    ticket.status = models.TicketStatus.WAITING_ON_REQUESTER
+    question_text = body.question.strip()
+    log_audit(db, ticket.id, lead, "Clarification Requested", {"from": old_status.value, "question": question_text})
+    db.commit()
+    db.refresh(ticket)
+
+    events.emit(db, "ticket_moved", ticket, lead, {"from": old_status.value, "to": ticket.status.value})
+    if ticket.requester_id:
+        msg = f"The design team has a question about {ticket.ticket_number}: {question_text}"
+        events.notify(db, ticket.requester, msg, "ticket_clarification", ticket)
         db.commit()
     return ticket
 

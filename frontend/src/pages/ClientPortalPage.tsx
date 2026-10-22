@@ -362,11 +362,16 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
                         <p style={{ fontSize: '0.74rem', color: '#475569', marginTop: 2 }}>{t.number}{delivered ? ` · Delivered ${delivered}` : ''}</p>
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 'auto', flexWrap: 'wrap' }}>
+                        <button type="button" className="btn-primary" style={{ gap: 5, fontSize: '0.78rem', padding: '0.4rem 0.7rem' }}
+                          aria-label={`Download all assets for ${t.title}`}
+                          onClick={() => void downloadFile(`/api/tickets/${t.id}/download-bundle`, `${t.number}_all_assets.zip`).catch(() => {})}>
+                          <Download size={13} aria-hidden="true" /> Download All (.zip)
+                        </button>
                         {o?.latest_proof && (
-                          <button type="button" className="btn-primary" style={{ gap: 5, fontSize: '0.78rem', padding: '0.4rem 0.7rem' }}
-                            aria-label={`Download ${t.title}`}
+                          <button type="button" className="btn-ghost" style={{ gap: 5, fontSize: '0.78rem', padding: '0.4rem 0.7rem' }}
+                            aria-label={`Download ${t.title} preview only`}
                             onClick={() => void downloadFile(`/api/proofs/${o.latest_proof!.id}/file`, o.latest_proof!.file_name).catch(() => {})}>
-                            <Download size={13} aria-hidden="true" /> Download
+                            Preview
                           </button>
                         )}
                         <button type="button" className="btn-ghost" aria-label={`Request again: ${t.title}`} onClick={() => openNewRequest(prefillFromTicket(t))}

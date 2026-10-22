@@ -9,10 +9,7 @@ import ClientRequestForm from './ClientRequestForm';
 import type { RequestPrefill } from '../requestForm';
 import { useUploadLimits } from '../uploadLimits';
 
-const PRIORITIES: { value: string; color: string }[] = [
-  { value: 'Low', color: '#059669' }, { value: 'Normal', color: '#0056B3' },
-  { value: 'High', color: '#C2410C' }, { value: 'Urgent', color: '#B91C1C' },
-];
+
 const PRESET_TAGS = ['Needs Copy', 'Marketing', 'Social', 'Internal', 'Urgent Fix'];
 const MAX_FILES = 5;
 const ALLOWED = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'psd', 'ai', 'fig'];
@@ -258,18 +255,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem' }}>
-                <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
-                  <legend style={sectionTitle}>Priority</legend>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {PRIORITIES.map(p => (
-                      <button key={p.value} type="button" aria-pressed={priority === p.value} onClick={() => setPriority(p.value)}
-                        style={{ padding: '0.35rem 0.8rem', borderRadius: 99, fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', border: `1.5px solid ${priority === p.value ? p.color : 'rgba(226,232,240,0.9)'}`, background: priority === p.value ? `${p.color}14` : 'white', color: priority === p.value ? p.color : '#475569' }}>
-                        {p.value}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.85rem' }}>
                 <div>
                   <label htmlFor="nt-deadline" style={sectionTitle}>Needed by (optional)</label>
                   <input id="nt-deadline" type="date" className="input-field" min={new Date().toISOString().slice(0, 10)} value={deadline} onChange={e => setDeadline(e.target.value)} />

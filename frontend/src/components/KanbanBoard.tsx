@@ -370,11 +370,6 @@ const KanbanBoard = () => {
                 <option value="none" style={{ background: '#0f172a' }}>Unassigned</option>
                 {staff.map(s => <option key={s.id} value={s.id} style={{ background: '#0f172a' }}>{personLabel(s)}</option>)}
               </select>
-              <select aria-label="Set priority of selected" className="input-field" defaultValue="" style={darkSelect}
-                onChange={e => { const v = e.target.value; e.target.value = ''; if (v) void runBulk({ priority: v }, `Priority ${v}`); }}>
-                <option value="" disabled>Priority…</option>
-                {PRIORITIES.map(p => <option key={p} value={p} style={{ background: '#0f172a' }}>{p}</option>)}
-              </select>
             </>
           )}
 

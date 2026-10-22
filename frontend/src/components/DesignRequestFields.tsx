@@ -116,7 +116,7 @@ function EstimateNote({ requirements, deliveryDate }: { requirements: string[]; 
   if (!estimate?.rush) return null;
   return (
     <p role="status" style={{ fontSize: '0.82rem', color: '#92400e', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '0.45rem 0.7rem' }}>
-      You asked for {shortDate(deliveryDate)}, earlier than usual. This will be marked {estimate.priority} and may not be possible.
+      You asked for {shortDate(deliveryDate)}, which is earlier than the standard turnaround.
     </p>
   );
 }

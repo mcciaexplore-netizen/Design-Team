@@ -1,12 +1,13 @@
-"""Versioned proofs, shareable approve / request-changes links, and the ticket audit trail."""
 import datetime
 import hashlib
+import io
 import secrets
 import time
+import zipfile
 from typing import Literal, Optional
 
 import pytz
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -15,7 +16,7 @@ import events
 import revision_engine
 import models
 from auth import get_current_user, get_ticket_for_user, is_client, require_staff
-from common import app_url, as_utc, ensure_changes_allowed, mark_delivered, stored_file_response, log_audit, read_upload, store_bytes
+from common import app_url, as_utc, ensure_changes_allowed, load_bytes, mark_delivered, stored_file_response, log_audit, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["approvals"])
@@ -131,6 +132,62 @@ def proof_file(proof_id: int, request: Request, db: Session = Depends(get_db), u
     get_ticket_for_user(db, proof.ticket_id, user)
     ct = proof.content_type or "application/octet-stream"
     return stored_file_response(request, proof.storage_key, proof.file_name, ct)
+
+
+@router.get("/api/tickets/{ticket_id}/download-bundle")
+def download_ticket_bundle(ticket_id: int, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+    """Downloads all proofs, source files, and attachments for a ticket bundled into a single ZIP archive."""
+    ticket = get_ticket_for_user(db, ticket_id, user)
+    proofs = db.query(models.ProofVersion).filter(models.ProofVersion.ticket_id == ticket_id).order_by(models.ProofVersion.version.asc()).all()
+    attachments = db.query(models.Attachment).filter(models.Attachment.ticket_id == ticket_id).all()
+    cdrs = db.query(models.CdrAsset).filter(models.CdrAsset.ticket_id == ticket_id).all()
+
+    if not proofs and not attachments and not cdrs:
+        raise HTTPException(status_code=404, detail="No files found to bundle for this ticket.")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        seen = set()
+        for p in proofs:
+            try:
+                data = load_bytes(p.storage_key)
+                fname = f"proofs/v{p.version}_{p.file_name}"
+                while fname in seen:
+                    fname = f"proofs/v{p.version}_{secrets.token_hex(2)}_{p.file_name}"
+                seen.add(fname)
+                zf.writestr(fname, data)
+            except Exception:
+                pass
+        for a in attachments:
+            try:
+                data = load_bytes(a.storage_key)
+                fname = f"attachments/{a.file_name}"
+                while fname in seen:
+                    fname = f"attachments/{secrets.token_hex(2)}_{a.file_name}"
+                seen.add(fname)
+                zf.writestr(fname, data)
+            except Exception:
+                pass
+        for c in cdrs:
+            try:
+                data = load_bytes(c.storage_key)
+                fname = f"source_files/{c.file_name}"
+                while fname in seen:
+                    fname = f"source_files/{secrets.token_hex(2)}_{c.file_name}"
+                seen.add(fname)
+                zf.writestr(fname, data)
+            except Exception:
+                pass
+
+    buf.seek(0)
+    zip_bytes = buf.getvalue()
+    safe_title = "".join(ch if ch.isalnum() or ch in "._- " else "_" for ch in ticket.title)[:40].strip() or "assets"
+    filename = f"{ticket.ticket_number}_{safe_title}.zip"
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 # ── Approval requests (staff) ────────────────────────────────────────────────

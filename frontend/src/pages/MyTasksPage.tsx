@@ -5,10 +5,10 @@ import ActivityFeed from '../components/ActivityFeed';
 import PendingReviewPanel from '../components/board/PendingReviewPanel';
 import { ToastContainer, useToast } from '../components/Toast';
 import { DONE_STATUSES } from '../types';
-import { AlertCircle, CheckCircle2, Clock, Mail, PauseCircle } from 'lucide-react';
+import { CheckCircle2, Mail, PauseCircle, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
-import { PRIORITY_STYLE, type Ticket } from '../types';
+import { type Ticket } from '../types';
 
 const DONE = DONE_STATUSES;
 const DAY = 86_400_000;
@@ -33,8 +33,36 @@ function bucketOf(t: Ticket, now: number): Bucket {
 }
 
 const dueMs = (t: Ticket) => (t.due_at ? new Date(t.due_at).getTime() : Infinity);
-const fmtDue = (iso: string) =>
-  iso ? new Date(iso).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'No due date';
+
+function DeadlineBadge({ dueAt }: { dueAt: string | null }) {
+  if (!dueAt) return <span style={{ fontSize: '0.74rem', color: '#64748B' }}>No deadline</span>;
+  const ms = new Date(dueAt).getTime() - Date.now();
+  const d = new Date(dueAt);
+  const timeStr = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+  const dateStr = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  if (ms < 0) {
+    const hoursOver = Math.max(1, Math.round(Math.abs(ms) / 3_600_000));
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.2rem 0.55rem', borderRadius: 99, background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#B91C1C', fontSize: '0.72rem', fontWeight: 700 }}>
+        🔴 Overdue (by {hoursOver >= 24 ? `${Math.round(hoursOver / 24)}d` : `${hoursOver}h`})
+      </span>
+    );
+  }
+  if (ms <= DAY) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.2rem 0.55rem', borderRadius: 99, background: '#FFFBEB', border: '1px solid #FDE68A', color: '#B45309', fontSize: '0.72rem', fontWeight: 700 }}>
+        🟡 Due today at {timeStr}
+      </span>
+    );
+  }
+  const daysLeft = Math.ceil(ms / DAY);
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.2rem 0.55rem', borderRadius: 99, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#15803D', fontSize: '0.72rem', fontWeight: 700 }}>
+      🟢 On track (due in {daysLeft}d · {dateStr})
+    </span>
+  );
+}
 
 const MyTasksPage = () => {
   const { user } = useAuth();
@@ -45,12 +73,26 @@ const MyTasksPage = () => {
   const { toasts, addToast, removeToast } = useToast();
   const pendingReview = tickets.filter(t => t.status === 'Pending Review');
 
-  const handleAcceptRequest = async (ticket: Ticket) => {
+  const handleAcceptRequest = async (ticket: Ticket, assigneeId?: number) => {
     try {
-      await apiJson(`/api/tickets/${ticket.id}/accept`, { method: 'POST' });
+      await apiJson(`/api/tickets/${ticket.id}/accept`, {
+        method: 'POST',
+        json: assigneeId ? { assignee_id: assigneeId } : {}
+      });
       await refresh();
       addToast(`${ticket.number} accepted`, 'success');
     } catch (e) { addToast(e instanceof Error ? e.message : 'Could not accept this request.', 'error'); }
+  };
+
+  const handleClarification = async (ticket: Ticket, question: string) => {
+    try {
+      await apiJson(`/api/tickets/${ticket.id}/clarify`, {
+        method: 'POST',
+        json: { question }
+      });
+      await refresh();
+      addToast(`Clarification requested for ${ticket.number}`, 'success');
+    } catch (e) { addToast(e instanceof Error ? e.message : 'Could not send clarification request.', 'error'); }
   };
 
   const handleDeclineRequest = async (ticket: Ticket) => {
@@ -112,10 +154,41 @@ const MyTasksPage = () => {
       {isLead && (
         <PendingReviewPanel
           tickets={pendingReview}
-          onAccept={t => void handleAcceptRequest(t)}
+          onAccept={(t, assigneeId) => void handleAcceptRequest(t, assigneeId)}
           onDecline={t => void handleDeclineRequest(t)}
           onBulkAccept={ts => void handleBulkAcceptRequest(ts)}
+          onClarify={(t, q) => handleClarification(t, q)}
         />
+      )}
+
+      {/* Focus Mode / Next Up Hero Banner */}
+      {mine.length > 0 && (
+        <section aria-label="Focus Mode" className="glass-card" style={{ marginBottom: '1.25rem', padding: '1.25rem', border: '1px solid rgba(0,63,138,0.25)', background: 'linear-gradient(135deg, rgba(0,63,138,0.06), rgba(0,63,138,0.01))', borderRadius: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--brand)' }}>
+              <Sparkles size={14} /> Focus Mode · Next Up
+            </span>
+            <DeadlineBadge dueAt={mine[0].due_at} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <p style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: '#64748B', fontWeight: 700 }}>
+                {mine[0].number}{mine[0].client_org ? ` · ${mine[0].client_org}` : ''}
+              </p>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0F172A', marginTop: 2, marginBottom: 4 }}>
+                {mine[0].title}
+              </h2>
+              <p style={{ fontSize: '0.84rem', color: '#475569', maxWidth: 640 }}>
+                {mine[0].description ? `${mine[0].description.slice(0, 140)}...` : 'Ready to work. Click below to open ticket or drag proofs.'}
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Link to={`/tickets/${mine[0].id}`} className="btn-primary" style={{ textDecoration: 'none', gap: 6, padding: '0.5rem 1rem' }}>
+                Open Ticket Details →
+              </Link>
+            </div>
+          </div>
+        </section>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '1.25rem', alignItems: 'start' }}>
@@ -146,22 +219,25 @@ const MyTasksPage = () => {
               {rows.map(t => {
                 const isBlocked = t.status === 'Waiting on Requester';
                 return (
-                  <Link key={t.id} to={`/tickets/${t.id}`} className="glass-card"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0.85rem 1.1rem', textDecoration: 'none', flexWrap: 'wrap' }}>
+                  <div key={t.id} className="glass-card"
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0.85rem 1.1rem', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: 200 }}>
                       <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em' }}>{t.number}{t.client_org ? ` · ${t.client_org}` : ''}</div>
-                      <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#0F172A', overflowWrap: 'anywhere' }}>{t.title}</div>
-                      <div style={{ fontSize: '0.75rem', color: key === 'overdue' ? '#EF4444' : '#64748B', marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <Clock size={12} /> {fmtDue(t.due_at)}
+                      <Link to={`/tickets/${t.id}`} style={{ textDecoration: 'none', color: '#0F172A' }}>
+                        <div style={{ fontSize: '0.92rem', fontWeight: 600, overflowWrap: 'anywhere' }}>{t.title}</div>
+                      </Link>
+                      <div style={{ marginTop: 4 }}>
+                        <DeadlineBadge dueAt={t.due_at} />
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                       {isBlocked && <span className="badge-red" style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><PauseCircle size={11} /> Blocked</span>}
-                      {key === 'overdue' && <span className="badge-red" style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><AlertCircle size={11} /> Overdue</span>}
-                      <span className="badge-blue" style={PRIORITY_STYLE[t.priority] ?? {}}>{t.priority}</span>
                       <span className="badge-blue">{t.status}</span>
+                      <Link to={`/tickets/${t.id}`} className="btn-ghost" style={{ padding: '0.35rem 0.65rem', fontSize: '0.76rem', textDecoration: 'none' }}>
+                        Open →
+                      </Link>
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>

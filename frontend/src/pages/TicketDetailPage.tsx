@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, GitBranch, Tag, CheckSquare, Square, Trash2 } from 'lucide-react';
-import { STATUSES, PRIORITIES, PRIORITY_STYLE, DONE_STATUSES } from '../types';
+import { STATUSES, DONE_STATUSES } from '../types';
 import { apiJson } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
@@ -67,7 +67,6 @@ const TicketDetailPage: React.FC = () => {
     try { await op(); } catch (e) { setError(e instanceof Error ? e.message : fallback); }
   };
 
-  const ps = PRIORITY_STYLE[ticket.priority] ?? {};
   const statusOptions = STATUSES.includes(ticket.status) ? STATUSES : [...STATUSES, ticket.status];
   const cutoff = changeCutoff(ticket);
   const revisionsLocked = cutoff !== null && Date.now() >= cutoff;
@@ -123,7 +122,6 @@ const TicketDetailPage: React.FC = () => {
             <h1 style={{ fontSize: 'clamp(1.3rem,3vw,1.8rem)', fontFamily: 'var(--font-body)', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{ticket.title}</h1>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <span className="badge-blue" style={ps}>{ticket.priority}</span>
             <span className="badge-blue">{ticket.status}</span>
             {isClient && DONE_STATUSES.includes(ticket.status) && (
               <button type="button" className="btn-ghost" onClick={() => openNewRequest(prefillFromTicket(ticket))}>Request again</button>
@@ -231,10 +229,6 @@ const TicketDetailPage: React.FC = () => {
                     <option value="">Unassigned</option>
                     {staff.map(p => <option key={p.id} value={p.id}>{label(p)}{p.role === 'Designer' ? '' : ` · ${p.role}`}</option>)}
                     {ticket.assignee_id && !staff.some(p => p.id === ticket.assignee_id) && <option value={ticket.assignee_id}>{ticket.assignee || 'Former team member'}</option>}
-                  </select>
-                  <label htmlFor="d-prio" className="section-label" style={{ marginBottom: 6, display: 'block' }}>Priority</label>
-                  <select id="d-prio" value={ticket.priority} onChange={e => void run(() => updateTicket(ticket.id, { priority: e.target.value }), 'Could not change priority.')} className="input-field" style={{ width: '100%', fontSize: '0.82rem' }}>
-                    {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                   <button type="button" className="btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: 14, color: '#B91C1C', gap: 6 }}
                     onClick={() => {
