@@ -169,3 +169,37 @@ def test_your_own_drive_works_through_a_one_time_google_sign_in(client, drive, m
     monkeypatch.setattr(gdrive, "_access_token", lambda http: "tok")
     fid = gdrive.upload(b"hello", "a.txt", "text/plain")
     assert drive.names[fid] == "a.txt" and gdrive.download(fid)[0] == b"hello"
+
+
+def test_a_drive_setting_that_cant_be_read_does_not_stop_uploads(client, drive, monkeypatch):
+    """A bad GOOGLE_DRIVE_OAUTH used to make every upload fail with 502; now files go to the next storage and Check
+    Google Drive says what to fix."""
+    monkeypatch.delenv("GOOGLE_DRIVE_CREDENTIALS")
+    monkeypatch.setenv("GOOGLE_DRIVE_OAUTH", "1//0g-just-the-refresh-token")
+    assert not gdrive.enabled() and common.storage_name() != "Google Drive"
+    r = client.post("/api/public/requests", data=form(), files={"files": ("brief.png", PNG, "image/png")})
+    assert r.status_code < 300, r.text
+    assert drive.files == {}
+
+    check = lambda: client.post("/api/integrations/drive/test", headers=auth(client, "lead@x.com")).json()
+    r = check()
+    assert r["ok"] is False and "not what drive_connect.py printed" in r["detail"] and "Until then" in r["detail"]
+    # The OAuth client file from Google Cloud pasted instead of the line drive_connect.py prints.
+    monkeypatch.setenv("GOOGLE_DRIVE_OAUTH", json.dumps({"installed": {"client_id": "cid", "client_secret": "sec"}}))
+    assert "OAuth client file" in check()["detail"]
+
+
+def test_drive_settings_forgive_the_usual_paste_slips():
+    line = json.dumps({"client_id": "cid", "client_secret": "sec", "refresh_token": "rt"})
+    pastes = [line, f"  {line}\n", f"'{line}'", f'"{line}"', f"GOOGLE_DRIVE_OAUTH = {line}", f"GOOGLE_DRIVE_OAUTH =\n{line}",
+              json.dumps(line), __import__("base64").b64encode(line.encode()).decode()]
+    mp = pytest.MonkeyPatch()
+    try:
+        for pasted in pastes:
+            mp.setenv("GOOGLE_DRIVE_OAUTH", pasted)
+            assert gdrive._env_oauth() == json.loads(line), pasted
+        for pasted in ["", "not json", "{broken", json.dumps({"client_id": "cid"}), "[1, 2]"]:
+            mp.setenv("GOOGLE_DRIVE_OAUTH", pasted)
+            assert gdrive._env_oauth() is None, pasted
+    finally:
+        mp.undo()
