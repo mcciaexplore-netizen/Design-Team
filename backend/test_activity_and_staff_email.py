@@ -54,7 +54,43 @@ def test_designers_are_emailed_about_their_work_and_can_turn_it_off(client, outb
     assert client.get("/api/notifications", headers=des).json()["unread"] >= 3   # still told in the app
 
 
-def test_a_new_request_emails_the_leads_and_the_designer_it_went_to_but_not_the_client(client, outbox):
+def test_a_new_request_emails_the_leads_the_designer_it_went_to_and_confirms_to_the_client(client, outbox):
     t = make_ticket(client, "a@tata.com", "Expo")
     assert t["assignee_id"] == 2   # assigned automatically
-    assert sorted(to for to, _, _ in outbox) == ["des@x.com", "lead@x.com"]
+    assert sorted(to for to, _, _ in outbox) == ["a@tata.com", "des@x.com", "lead@x.com"]
+    [(subject, body)] = [(s, b) for to, s, b in outbox if to == "a@tata.com"]   # one confirmation, no team emails
+    assert subject == f"Design request received: {t['ticket_number']}" and f"Your ticket number is {t['ticket_number']}" in body
+
+
+def test_a_form_request_tells_the_client_their_number_and_the_leads_who_asked_then_the_assignee(client, outbox):
+    from test_workflow_features import clear_hits, form
+    clear_hits()
+    lead = auth(client, "lead@x.com")
+    r = client.post("/api/public/requests", data=form())
+    assert r.status_code == 201, r.text
+    number = r.json()["ticket_number"]
+
+    [(subject, body)] = [(s, b) for to, s, b in outbox if to == "meera@example.com"]
+    assert number in subject and f"Your ticket number is {number}" in body
+    [(subject, body)] = [(s, b) for to, s, b in outbox if to == "lead@x.com"]
+    assert subject.startswith(f"DesignDesk: New request {number}") and "from Meera Joshi" in subject and "Someone" not in subject
+    assert f"Ticket: {number}" in body and "Requested by: Meera Joshi <meera@example.com>" in body
+    assert "Event: AI Workshop" in body and "Assigned to: Not assigned yet" in body
+    assert "des@x.com" not in [to for to, _, _ in outbox]   # waits for a lead to accept it
+
+    tid = next(t["id"] for t in client.get("/api/tickets", headers=lead).json() if t["ticket_number"] == number)
+    outbox.clear()
+    assert client.post(f"/api/tickets/{tid}/accept", json={"assignee_id": 2}, headers=lead).status_code == 200
+    [(subject, body)] = [(s, b) for to, s, b in outbox if to == "des@x.com"]
+    assert "assigned you" in subject and "A ticket was raised and you are assigned to it." in body
+    assert "Requested by: Meera Joshi <meera@example.com>" in body and "Assigned to: Designer" in body
+
+
+def test_a_designer_preset_on_a_template_is_emailed_about_each_ticket(client, outbox):
+    from test_views_templates_time import PACK
+    lead = auth(client, "lead@x.com")
+    tid = client.post("/api/templates", json=PACK, headers=lead).json()["id"]
+    outbox.clear()
+    assert client.post(f"/api/templates/{tid}/instantiate", json={"requester_id": 3, "assignee_id": 2}, headers=lead).status_code == 201
+    to_designer = [s for to, s, _ in outbox if to == "des@x.com"]
+    assert len(to_designer) == 2 and all("assigned you" in s for s in to_designer)

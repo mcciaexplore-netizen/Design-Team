@@ -348,7 +348,8 @@ def _send_confirmation(requester: models.User, tickets: list, f: "RequestFields"
     body = "\n".join([
         f"Hi {requester.full_name},",
         "",
-        f'We have received your design request for "{f.event_name}" ({designs}).',
+        f'Thank you, we have received your design request for "{f.event_name}" ({designs}).',
+        f"Your ticket number is {ticket.ticket_number}. Please mention it if you contact us about this request.",
         f"Expected delivery: {f.delivery_date:%d %b %Y}",
         "",
         "Follow progress any time, no login needed:",

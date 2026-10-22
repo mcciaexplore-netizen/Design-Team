@@ -34,4 +34,5 @@ def test_uploading_a_design_emails_the_client_the_review_link_and_says_so(client
     out = upload_proof(client, t["id"]).json()
     assert out["approval"]["emailed_to"] == "a@tata.com"
     to, subject, body = sent[0]
-    assert to == "a@tata.com" and "ready for your review" in subject and out["approval"]["review_url"] in body
+    assert to == "a@tata.com" and "ready for your approval" in subject and out["approval"]["review_url"] in body
+    assert "is complete and needs your approval" in body

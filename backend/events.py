@@ -31,10 +31,34 @@ def slack_escape(text: str) -> str:
 STAFF_EMAIL_EVENTS = {"ticket_assigned", "client_changes", "approval_decision", "sla_breach", "ticket_created"}
 
 
+def ticket_details(ticket: models.Ticket) -> str:
+    """The ticket at a glance for the team's emails: number, who asked, priority, due date, assignee, and the brief
+    (which, for form requests, already lists the event, the designs and the requested delivery date)."""
+    import pytz
+    from common import as_utc
+    requester = ticket.requester
+    who = f"{requester.full_name} <{requester.email}>" if requester else "Unknown"
+    org = ticket.client_org or (requester.client_org if requester else None)
+    due = as_utc(ticket.due_at).astimezone(pytz.timezone("Asia/Kolkata")).strftime("%d %b %Y, %I:%M %p IST") if ticket.due_at else None
+    lines = [
+        f"Ticket: {ticket.ticket_number}",
+        f"Title: {ticket.title}",
+        f"Requested by: {who}" + (f" ({org})" if org else ""),
+        f"Priority: {ticket.priority.value}",
+        f"Status: {ticket.status.value}",
+        f"Due: {due}" if due else None,
+        f"Assigned to: {ticket.assignee.full_name if ticket.assignee else 'Not assigned yet'}",
+        "",
+        "Brief:",
+        (ticket.brief or "").strip()[:3000] or "(none)",
+    ]
+    return "\n".join(line for line in lines if line is not None)
+
+
 def email_staff(db: Session, user: models.User, content: str, ticket: Optional[models.Ticket] = None,
-                prefs: Optional[models.UserPreference] = None) -> None:
+                prefs: Optional[models.UserPreference] = None, details: Optional[str] = None) -> None:
     """Email a team member (designer or lead) at their account address, unless they turned email off or email
-    isn't set up. Clients are never emailed from here."""
+    isn't set up. Clients are never emailed from here. `details` (e.g. ticket_details) goes under the message."""
     from common import app_url
     if user.role == models.RoleEnum.REQUESTER or not user.is_active or not delivery.email_configured():
         return
@@ -43,22 +67,41 @@ def email_staff(db: Session, user: models.User, content: str, ticket: Optional[m
     if prefs is not None and not prefs.email_enabled:
         return
     link = f"{app_url()}/tickets/{ticket.id}" if ticket else app_url()
-    body = (f"Hi {user.full_name.split(' ')[0]},\n\n{content}\n\nOpen it in DesignDesk: {link}\n\n"
+    extra = f"\n\n{details}" if details else ""
+    body = (f"Hi {user.full_name.split(' ')[0]},\n\n{content}{extra}\n\nOpen it in DesignDesk: {link}\n\n"
             "You get these emails because you are on the design team. Turn them off on your My Dashboard page.\n")
     subject = f"DesignDesk: {content}"[:150].replace("\n", " ")
     delivery.run_in_background(delivery.send_email, user.email, subject, body)
 
 
-def notify(db: Session, user: models.User, content: str, event: str, ticket: Optional[models.Ticket] = None) -> None:
+def notify(db: Session, user: models.User, content: str, event: str, ticket: Optional[models.Ticket] = None,
+           details: Optional[str] = None) -> None:
     """Deliver one notification to one user according to their preferences: in the app, and by email for the
-    team's important events. Caller commits."""
+    team's important events (with `details` added to the email only). Caller commits."""
     prefs = db.query(models.UserPreference).filter(models.UserPreference.user_id == user.id).first()
     if prefs and event in (prefs.muted_events or []):
         return
     if prefs is None or prefs.in_app_enabled:
         db.add(models.Notification(user_id=user.id, content=content, type=event, ticket_id=ticket.id if ticket else None))
     if event in STAFF_EMAIL_EVENTS:
-        email_staff(db, user, content, ticket, prefs)
+        email_staff(db, user, content, ticket, prefs, details)
+
+
+def email_request_received(ticket: models.Ticket) -> None:
+    """Confirm a client's request by email: their ticket number and where to follow it. The request forms send their
+    own, fuller confirmation (request_form._send_confirmation); this covers a client raising a ticket any other way."""
+    from common import app_url
+    requester = ticket.requester
+    if not requester or not delivery.email_configured():
+        return
+    body = "\n".join([
+        f"Hi {requester.full_name},", "",
+        f'Thank you, we have received your design request "{ticket.title}".',
+        f"Your ticket number is {ticket.ticket_number}. Please mention it if you contact us about this request.", "",
+        f"Follow it in your DesignDesk portal: {app_url()}/portal", "",
+        "MCCIA Applied AI Studio",
+    ])
+    delivery.run_in_background(delivery.send_email, requester.email, f"Design request received: {ticket.ticket_number}", body)
 
 
 def post_slack_event(db: Session, kind: str, text: str) -> None:
@@ -98,15 +141,21 @@ def emit(db: Session, event: str, ticket: models.Ticket, actor: Optional[models.
     _broadcast(event, ticket, actor_name, extra)
     try:
         if event == "ticket_created":
+            # Name who asked for it: a public form request has no signed-in actor, which used to read "Someone created".
+            asked_by = ticket.requester.full_name if ticket.requester else actor_name
+            msg = f"New request {ref} from {asked_by}" if not actor or actor_id == ticket.requester_id \
+                else f"{actor_name} created {ref} for {asked_by}"
+            details = ticket_details(ticket)
             for lead in _leads(db):
                 if lead.id != actor_id:
-                    notify(db, lead, f"{actor_name} created {ref}", event, ticket)
-            post_slack_event(db, "new", f":inbox_tray: *New ticket* {slack_escape(ref)} ({ticket.priority.value}) from {slack_escape(actor_name)}")
+                    notify(db, lead, msg, event, ticket, details)
+            post_slack_event(db, "new", f":inbox_tray: *New ticket* {slack_escape(ref)} ({ticket.priority.value}) from {slack_escape(asked_by)}")
 
         elif event == "ticket_assigned":
             if ticket.assignee and ticket.assignee.id != actor_id:
                 who = f"{ref} was assigned to you" if extra.get("auto") else f"{actor_name} assigned you {ref}"
-                notify(db, ticket.assignee, who, event, ticket)
+                details = f"A ticket was raised and you are assigned to it.\n\n{ticket_details(ticket)}"
+                notify(db, ticket.assignee, who, event, ticket, details)
 
         elif event == "ticket_moved":
             to = extra.get("to", ticket.status.value)

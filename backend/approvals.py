@@ -56,13 +56,18 @@ def _email_review(ticket: models.Ticket, version: int, link: str) -> Optional[st
     the review page: it asks for a name and a confirming click, so a mail scanner opening the link can't approve anything."""
     if not delivery.email_configured() or not ticket.requester:
         return None
+    done = (f"The changes you asked for are done: version {version} of your design \"{ticket.title}\" ({ticket.ticket_number}) "
+            "is complete and needs your approval." if version > 1 else
+            f"Your design \"{ticket.title}\" ({ticket.ticket_number}) is complete and needs your approval.")
     body = "\n".join([
         f"Hi {ticket.requester.full_name},", "",
-        f"The design team has sent version {version} of \"{ticket.title}\" ({ticket.ticket_number}) for your review.", "",
-        "Review it, then approve or tell us what to change:", link, "",
-        "You can also review it any time from your DesignDesk portal.", "", "MCCIA Applied AI Studio",
+        done, "",
+        "Open it, then approve it or tell us what to change:", link, "",
+        "You can also review it any time from your DesignDesk portal.", "",
+        "MCCIA Applied AI Studio",
     ])
-    delivery.run_in_background(delivery.send_email, ticket.requester.email, f"Design ready for your review: {ticket.ticket_number}", body)
+    delivery.run_in_background(delivery.send_email, ticket.requester.email,
+                               f"Design ready for your approval: {ticket.ticket_number}", body)
     return ticket.requester.email
 
 

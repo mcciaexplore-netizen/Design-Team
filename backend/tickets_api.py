@@ -101,6 +101,8 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), r
     events.emit(db, "ticket_created", db_ticket, requester)
     if db_ticket.assignee_id:
         events.emit(db, "ticket_assigned", db_ticket, requester, {"auto": True})
+    if is_client(requester):
+        events.email_request_received(db_ticket)
 
     return db_ticket
 

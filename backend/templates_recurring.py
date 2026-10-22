@@ -110,6 +110,8 @@ def run_due_rules(db: Session, now: Optional[datetime.datetime] = None) -> int:
         db.commit()
         for t in tickets:
             events.emit(db, "ticket_created", t, requester)
+            if t.assignee_id:
+                events.emit(db, "ticket_assigned", t, None, {"auto": True})
         total += len(tickets)
     return total
 
@@ -219,6 +221,8 @@ def instantiate(template_id: int, body: InstantiateBody = InstantiateBody(), db:
     db.commit()
     for t in tickets:
         events.emit(db, "ticket_created", t, user)
+        if t.assignee_id:
+            events.emit(db, "ticket_assigned", t, user)
     return {"created": [{"id": t.id, "ticket_number": t.ticket_number, "title": t.title} for t in tickets]}
 
 
@@ -305,4 +309,6 @@ def run_rule_now(rule_id: int, db: Session = Depends(get_db), user: models.User 
     db.commit()
     for t in tickets:
         events.emit(db, "ticket_created", t, user)
+        if t.assignee_id:
+            events.emit(db, "ticket_assigned", t, user)
     return {"created": [{"id": t.id, "ticket_number": t.ticket_number} for t in tickets]}
