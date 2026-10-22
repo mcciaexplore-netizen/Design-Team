@@ -118,18 +118,75 @@ def _usable_connection() -> Optional[dict]:
     return c if c and c.get("refresh_token") and c.get("folder_id") and not c.get("lapsed") else None
 
 
+def _env_json(name: str) -> Optional[dict]:
+    """The JSON object in a setting, forgiving the usual paste slips: surrounding quotes, the whole `NAME = {...}` line,
+    or base64. None when it is unset or still unreadable."""
+    raw = os.getenv(name, "").strip()
+    if raw.startswith(name):
+        raw = raw[len(name):].strip().lstrip("=").strip()
+    if raw.startswith('"'):   # the JSON pasted as a quoted, escaped string: "{\"client_id\": …}"
+        try:
+            inner = json.loads(raw)
+            raw = inner.strip() if isinstance(inner, str) else raw
+        except ValueError:
+            pass
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "'\"":
+        raw = raw[1:-1].strip()
+    if not raw:
+        return None
+    try:
+        if not raw.startswith("{"):
+            raw = base64.b64decode(raw, validate=True).decode()
+        value = json.loads(raw)
+    except ValueError:   # also covers bad base64 and UnicodeDecodeError
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _env_oauth() -> Optional[dict]:
+    """GOOGLE_DRIVE_OAUTH, when it is the line drive_connect.py printed."""
+    value = _env_json("GOOGLE_DRIVE_OAUTH")
+    return value if value and all(value.get(k) for k in ("client_id", "client_secret", "refresh_token")) else None
+
+
+def _env_credentials() -> Optional[dict]:
+    """GOOGLE_DRIVE_CREDENTIALS, when it is a service account's JSON key."""
+    value = _env_json("GOOGLE_DRIVE_CREDENTIALS")
+    return value if value and value.get("client_email") and value.get("private_key") else None
+
+
 def enabled() -> bool:
-    if os.getenv("GOOGLE_DRIVE_FOLDER_ID") and (os.getenv("GOOGLE_DRIVE_OAUTH") or os.getenv("GOOGLE_DRIVE_CREDENTIALS")):
+    # A setting that can't be read doesn't count: uploads then go to the next storage instead of all failing, and
+    # Check Google Drive in Settings says what is wrong with it (_env_problem).
+    if os.getenv("GOOGLE_DRIVE_FOLDER_ID", "").strip() and (_env_oauth() or _env_credentials()):
         return True
     return _usable_connection() is not None
 
 
+def _env_problem() -> Optional[str]:
+    """What is wrong with GOOGLE_DRIVE_OAUTH / GOOGLE_DRIVE_CREDENTIALS, when GOOGLE_DRIVE_FOLDER_ID says they are meant
+    to be used and neither can be."""
+    if not os.getenv("GOOGLE_DRIVE_FOLDER_ID", "").strip() or _env_oauth() or _env_credentials():
+        return None
+    from common import storage_name
+    meanwhile = f" Until then new uploads go to: {storage_name()}."
+    if os.getenv("GOOGLE_DRIVE_OAUTH", "").strip():
+        pasted = _env_json("GOOGLE_DRIVE_OAUTH") or {}
+        if "installed" in pasted or "web" in pasted:
+            return ("GOOGLE_DRIVE_OAUTH holds the OAuth client file downloaded from Google, not the line drive_connect.py "
+                    "printed. Run python drive_connect.py with that file and paste the line it prints, from { to }." + meanwhile)
+        return "GOOGLE_DRIVE_OAUTH is not what drive_connect.py printed. Paste that whole line again, from { to }." + meanwhile
+    if os.getenv("GOOGLE_DRIVE_CREDENTIALS", "").strip():
+        return "GOOGLE_DRIVE_CREDENTIALS is not the service account's JSON key. Paste the whole .json file, from { to }." + meanwhile
+    return None
+
+
 def _personal() -> Optional[dict]:
     """client_id, client_secret and refresh_token for a person's own Drive, when that way is set up."""
-    raw = os.getenv("GOOGLE_DRIVE_OAUTH", "").strip()
-    if raw:
-        return json.loads(raw)
-    c = _usable_connection() if not os.getenv("GOOGLE_DRIVE_CREDENTIALS") else None
+    env = _env_oauth()
+    if env:
+        return env
+    c = _usable_connection() if not _env_credentials() else None
     if c:
         cid, secret = oauth_client()
         return {"client_id": cid, "client_secret": secret, "refresh_token": c["refresh_token"], "saved": True}
@@ -147,10 +204,10 @@ def _folder_id() -> str:
 
 
 def _credentials() -> dict:
-    raw = os.environ["GOOGLE_DRIVE_CREDENTIALS"].strip()
-    if not raw.startswith("{"):
-        raw = base64.b64decode(raw).decode()
-    return json.loads(raw)
+    creds = _env_credentials()
+    if not creds:
+        raise ValueError("GOOGLE_DRIVE_CREDENTIALS is not a service account's JSON key")
+    return creds
 
 
 def _client() -> httpx.Client:
@@ -230,6 +287,9 @@ def delete(file_id: str) -> None:
 
 def check() -> tuple[bool, str]:
     """Sign in and look at the folder, without storing anything: is Drive really ready for uploads? (Settings)"""
+    problem = _env_problem()
+    if problem:
+        return False, problem
     if not enabled():
         c = connection(fresh=True)
         if c and c.get("lapsed"):
@@ -238,19 +298,11 @@ def check() -> tuple[bool, str]:
             return False, "Google Drive is not connected yet. Click Connect Google Drive."
         return False, ("Google Drive is not set up: add GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in Vercel "
                        "and redeploy, then click Connect Google Drive here (DEPLOY.md has the steps).")
-    try:
-        personal = _personal()
-        if personal:
-            who = personal.get("email") or (connection() or {}).get("email") or "your Google account"
-            personal["client_id"], personal["client_secret"], personal["refresh_token"]
-        else:
-            creds = _credentials()
-            who = creds["client_email"]
-            creds["private_key"]
-    except (ValueError, KeyError, TypeError):
-        if os.getenv("GOOGLE_DRIVE_OAUTH"):
-            return False, "GOOGLE_DRIVE_OAUTH is not what drive_connect.py printed. Paste that whole line again, from { to }."
-        return False, "GOOGLE_DRIVE_CREDENTIALS is not the service account's JSON key. Paste the whole .json file, from { to }."
+    personal = _personal()   # enabled() and _env_problem() above mean the settings in use can be read
+    if personal:
+        who = personal.get("email") or (connection() or {}).get("email") or "your Google account"
+    else:
+        who = _credentials()["client_email"]
     try:
         with _client() as http:
             headers = _auth(http)

@@ -1,17 +1,21 @@
 # Runtime dependencies for the Vercel function (api/index.py). Keep in step with backend/requirements.txt,
 # minus the test-only packages.
-fastapi
-uvicorn
-sqlalchemy
-psycopg[binary]
-alembic
-boto3
-python-dotenv
-pytz
-passlib
+# Versions are pinned: every deploy installs afresh, and an unpinned upgrade can change behaviour with no code change
+# (FastAPI 0.159 started reading a missing `bool = Form(default=True)` field as False). Upgrade on purpose, after the
+# tests pass.
+fastapi==0.115.14
+pydantic==2.14.1
+uvicorn==0.54.0
+sqlalchemy==2.1.6
+psycopg[binary]==3.3.6
+alembic==1.20.1
+boto3==1.43.117
+python-dotenv==1.2.4
+pytz==2026.5
+passlib==1.7.4
 bcrypt==4.0.1
-pyjwt
-cryptography   # signs the Google Drive service-account token (RS256)
-python-multipart
-httpx
-reportlab
+pyjwt==2.15.1
+cryptography==50.0.2   # signs the Google Drive service-account token (RS256)
+python-multipart==0.0.32
+httpx==0.28.1
+reportlab==5.0.1

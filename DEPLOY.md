@@ -61,7 +61,29 @@ up (Zoho Mail, below). Without it the page says to ask the Design Lead, who uses
 New uploads go to one Drive folder once it is connected. Files uploaded before that stay where they were (the database)
 and keep working. In DesignDesk, **Settings > Email & storage > Check Google Drive** says whether it works, and what to
 fix if not. `GOOGLE_DRIVE_FOLDER_ID` is the folder's id from its URL (`https://drive.google.com/drive/folders/<this
-part>`); the whole link works too. There are two ways to connect; use one.
+part>`); the whole link works too. There are three ways to connect; use one. The first is the simplest.
+
+If a `GOOGLE_DRIVE_*` setting can't be read, uploads don't fail: they go to the database, and **Check Google Drive**
+says what to fix.
+
+### Connect from Settings (recommended)
+
+Nothing to run on your computer and no tokens to paste: a Design Lead signs in to Google on the website.
+
+1. In [Google Cloud Console](https://console.cloud.google.com), in a project: enable the **Google Drive API**.
+2. APIs & Services > **OAuth consent screen**: app name "DesignDesk", your email. User type **Internal** if the Google
+   account is in a Google Workspace, otherwise **External**. With External, click **Publish app** so it is
+   "In production": in "Testing" Google ends the sign-in after 7 days. DesignDesk asks only for `drive.file` (its own
+   files), which needs no Google review.
+3. APIs & Services > Credentials > **Create credentials > OAuth client ID** > type **Web application**. Under
+   **Authorized redirect URIs** add the address shown in Settings > Email & storage ("Redirect URI for the Google
+   OAuth client"), exactly: on Vercel it is `https://<your site>/api/api/integrations/drive/callback` (the double
+   `/api` is correct). Create, then copy the client ID and client secret.
+4. In Vercel > Settings > Environment Variables: add `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`, and
+   **delete** `GOOGLE_DRIVE_OAUTH`, `GOOGLE_DRIVE_CREDENTIALS` and `GOOGLE_DRIVE_FOLDER_ID` if they are there (they
+   take priority over this way). `PUBLIC_APP_URL` must be the site's address. Redeploy.
+5. Settings > Email & storage > **Connect Google Drive**, sign in with the account whose Drive should hold the files,
+   allow access. DesignDesk makes the folder "DesignDesk files" there. Then click **Check Google Drive**.
 
 ### A. Your own Drive (works with My Drive)
 
@@ -72,10 +94,11 @@ Files are saved as the Google account that signs in, and count against its stora
    "DesignDesk", your email; save.
 2. APIs & Services > Credentials > **Create credentials > OAuth client ID** > type **Desktop app** > Create >
    **Download JSON**.
-3. On your computer, in `backend` (with the venv active): `python drive_connect.py path	o	hat-file.json`. A browser
+3. On your computer, in `backend` (with the venv active): `python drive_connect.py path\to\that-file.json`. A browser
    opens; sign in with the account whose Drive should hold the files, and allow access. It prints one line.
 4. In Vercel > Settings > Environment Variables:
-   * `GOOGLE_DRIVE_OAUTH` = that whole line (keep it private: it gives access to that Drive).
+   * `GOOGLE_DRIVE_OAUTH` = that whole line, the one starting `{"client_id"` (keep it private: it gives access to that
+     Drive). Not the JSON file downloaded in step 2, and not the `GOOGLE_DRIVE_OAUTH =` label above the line.
    * `GOOGLE_DRIVE_FOLDER_ID` = the folder's id.
 5. Redeploy, then click **Check Google Drive**. Deleted tickets' files go to that Drive's trash (30 days).
 

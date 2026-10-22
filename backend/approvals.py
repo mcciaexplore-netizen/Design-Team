@@ -84,9 +84,12 @@ def _open_review(db: Session, ticket: models.Ticket, proof: models.ProofVersion,
 
 @router.post("/api/tickets/{ticket_id}/proofs", status_code=201)
 async def upload_proof(ticket_id: int, file: UploadFile = File(...), note: Optional[str] = Form(default=None, max_length=1000),
-                       send_for_approval: bool = Form(default=True),
+                       send_for_approval: Optional[str] = Form(default=None),
                        db: Session = Depends(get_db), user: models.User = Depends(require_staff)):
-    """Upload a design version. By default it is sent to the client for approval in the same step."""
+    """Upload a design version. By default it is sent to the client for approval in the same step. The field is read as
+    text: newer FastAPI treats a missing bool form field like an unticked checkbox (False), so a missing field must not
+    be a bool to mean "send"."""
+    send = (send_for_approval or "").strip().lower() not in ("false", "0", "no", "off")
     ticket = get_ticket_for_user(db, ticket_id, user)
     if ticket.is_locked:
         raise HTTPException(status_code=409, detail="This version is closed. Upload the design on the newest version of the request.")
@@ -100,7 +103,7 @@ async def upload_proof(ticket_id: int, file: UploadFile = File(...), note: Optio
     db.flush()
     log_audit(db, ticket.id, user, "Uploaded proof", {"version": proof.version, "file_name": name})
     approval = None
-    if send_for_approval:
+    if send:
         req, link = _open_review(db, ticket, proof, user, DEFAULT_TTL_HOURS)
         approval = (req, link)
     db.commit()
