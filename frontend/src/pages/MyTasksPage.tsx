@@ -63,6 +63,22 @@ const MyTasksPage = () => {
     } catch (e) { addToast(e instanceof Error ? e.message : 'Could not decline this request.', 'error'); }
   };
 
+  const handleBulkAcceptRequest = async (toAccept: Ticket[]) => {
+    let count = 0;
+    for (const t of toAccept) {
+      try {
+        await apiJson(`/api/tickets/${t.id}/accept`, { method: 'POST' });
+        count++;
+      } catch (e) {
+        addToast(e instanceof Error ? e.message : `Could not accept ${t.number}.`, 'error');
+      }
+    }
+    if (count > 0) {
+      await refresh();
+      addToast(`Accepted ${count} request${count === 1 ? '' : 's'}`, 'success');
+    }
+  };
+
   const mine = tickets
     .filter(t => t.assignee_id === myId && !DONE.includes(t.status))
     .sort((a, b) => dueMs(a) - dueMs(b) || (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9));
@@ -94,7 +110,12 @@ const MyTasksPage = () => {
       </section>
 
       {isLead && (
-        <PendingReviewPanel tickets={pendingReview} onAccept={t => void handleAcceptRequest(t)} onDecline={t => void handleDeclineRequest(t)} />
+        <PendingReviewPanel
+          tickets={pendingReview}
+          onAccept={t => void handleAcceptRequest(t)}
+          onDecline={t => void handleDeclineRequest(t)}
+          onBulkAccept={ts => void handleBulkAcceptRequest(ts)}
+        />
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '1.25rem', alignItems: 'start' }}>
