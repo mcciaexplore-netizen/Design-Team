@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import hmac
 import os
+from typing import Optional
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 
 import models
 from auth import ALGORITHM, SECRET_KEY
-from common import app_url, as_utc
+from common import app_url, as_utc, match_existing_company_name
 from database import get_db
 
 router = APIRouter(tags=["tracking"])
@@ -74,41 +75,83 @@ def track(token: str, db: Session = Depends(get_db)):
     }
 
 
-# ── All of a requester's requests, without signing in ────────────────────────
-# The link is emailed, so only the inbox owner can open it. It is a signed token with its own purpose, which the
-# sign-in code refuses as a session.
+# ── A client's one-time sign-in link, instead of a password ──────────────────
+# The link is emailed and carries a signed token (purpose=client). Opening it exchanges that token,
+# once, for a normal session (the same shape /api/auth/token returns) — everything downstream (tickets,
+# campaigns, notifications, approvals) keeps using that ordinary session exactly as it always has.
 
-MY_REQUESTS_TTL = datetime.timedelta(days=30)
-LINK_SENT = "If that email has sent us requests, a link to see them all is on its way."
+CLIENT_LINK_TTL = datetime.timedelta(days=90)
+LINK_SENT = "If we can match that email (plus a company name, for a first link), one is on its way."
 
 
-def my_requests_url(user: models.User) -> str:
+def client_link_url(user: models.User) -> str:
     now = datetime.datetime.now(datetime.timezone.utc)
-    token = jwt.encode({"sub": str(user.id), "purpose": "my-requests", "iat": now, "exp": now + MY_REQUESTS_TTL},
+    token = jwt.encode({"sub": str(user.id), "purpose": "client", "iat": now, "exp": now + CLIENT_LINK_TTL},
                        SECRET_KEY, algorithm=ALGORITHM)
-    return f"{app_url()}/my-requests?token={token}"
+    return f"{app_url()}/client/{token}"
 
 
-class MyRequestsLink(BaseModel):
+def client_user_for_token(token: str, db: Session) -> models.User:
+    """Shared identity check behind every passwordless client page and API call."""
+    invalid = HTTPException(status_code=404, detail="This link is not valid or has expired. Ask for a new one.")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = int(payload["sub"])
+    except (jwt.PyJWTError, KeyError, ValueError):
+        raise invalid
+    if payload.get("purpose") != "client":
+        raise invalid
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user or not user.is_active:
+        raise invalid
+    return user
+
+
+class ClientLinkRequest(BaseModel):
     email: str = Field(min_length=3, max_length=254)
+    # Only needed the first time: it creates or joins a company so Campaigns has somewhere to scope to.
+    company: Optional[str] = Field(default=None, min_length=2, max_length=80)
 
 
-@router.post("/api/public/my-requests/link")
-def email_my_requests_link(body: MyRequestsLink, request: Request, db: Session = Depends(get_db)):
-    """Email a link to the list of this person's requests. The answer never says whether the email is known."""
+@router.post("/api/public/client-link")
+def email_client_link(body: ClientLinkRequest, request: Request, db: Session = Depends(get_db)):
+    """Email one link to a client's requests and campaigns. The answer never says whether the email is
+    known, so it can't be used to probe for one."""
+    import auth
     import delivery
     import ratelimit
     if not delivery.email_configured():
         raise HTTPException(status_code=503, detail="Sending links by email is not set up yet. Use the tracking link from your confirmation, or contact the design team.")
     email = body.email.strip().lower()
-    ratelimit.check(db, f"my-requests-ip:{ratelimit.client_ip(request)}", 10, 3600)
-    ratelimit.check(db, f"my-requests-email:{email}", 3, 3600)
+    ratelimit.check(db, f"client-link-ip:{ratelimit.client_ip(request)}", 10, 3600)
+    ratelimit.check(db, f"client-link-email:{email}", 3, 3600)
+    company = " ".join(body.company.split()) if body.company else None
     user = db.query(models.User).filter(models.User.email == email).first()
-    if user and user.is_active and db.query(models.Ticket.id).filter(models.Ticket.requester_id == user.id).first():
-        delivery.run_in_background(delivery.send_email, user.email, "Your MCCIA design requests", (
-            f"Hi {user.full_name},\n\nSee all your design requests and where each one stands:\n\n{my_requests_url(user)}\n\n"
-            "The link works for 30 days. Don't forward it: anyone with it can see your requests.\n\nMCCIA Applied AI Studio\n"))
+    if user and user.role != models.RoleEnum.REQUESTER:
+        return {"detail": LINK_SENT}   # a staff email: say nothing, same as an unknown one
+    if not user and company:
+        user = models.User(email=email, full_name=email.split("@")[0], role=models.RoleEnum.REQUESTER,
+                           client_org=match_existing_company_name(db, company) or company,
+                           hashed_password=auth.hash_password(auth.generate_temp_password()))
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    elif user and company and not user.client_org:
+        user.client_org = match_existing_company_name(db, company) or company
+        db.commit()
+    if user and user.is_active:
+        delivery.run_in_background(delivery.send_email, user.email, "Your DesignDesk sign-in link", (
+            f"Hi {user.full_name},\n\nOpen this link to see your design requests and campaigns (no password needed):\n\n{client_link_url(user)}\n\n"
+            "The link works for 90 days. Don't forward it: anyone with it can sign in as you.\n"))
     return {"detail": LINK_SENT}
+
+
+@router.post("/api/public/client-link/exchange")
+def exchange_client_link(token: str, db: Session = Depends(get_db)):
+    """Turn an emailed client-link token into a normal session, the one time the link is opened."""
+    import auth
+    user = client_user_for_token(token, db)
+    return {"access_token": auth.create_access_token(user), "token_type": "bearer", "user": auth.user_payload(user)}
 
 
 # ── Public board: every request, grouped by organisation ─────────────────────
@@ -150,17 +193,7 @@ def requests_board(db: Session = Depends(get_db)):
 
 @router.get("/api/public/my-requests")
 def my_requests(token: str, db: Session = Depends(get_db)):
-    invalid = HTTPException(status_code=404, detail="This link is not valid or has expired. Ask for a new one.")
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = int(payload["sub"])
-    except (jwt.PyJWTError, KeyError, ValueError):
-        raise invalid
-    if payload.get("purpose") != "my-requests":
-        raise invalid
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user or not user.is_active:
-        raise invalid
+    user = client_user_for_token(token, db)
     tickets = db.query(models.Ticket).filter(models.Ticket.requester_id == user.id) \
         .order_by(models.Ticket.created_at.desc(), models.Ticket.id.desc()).limit(200).all()
     return {

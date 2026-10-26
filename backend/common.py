@@ -10,6 +10,7 @@ from typing import Annotated, Optional
 import pytz
 from pydantic import StringConstraints
 from fastapi import HTTPException, Request, Response, UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import models
@@ -20,6 +21,15 @@ Email = Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, m
                                          pattern=r"^[^@\s]+@[^@\s]+$")]
 
 logger = logging.getLogger(__name__)
+
+
+def match_existing_company_name(db: Session, company: str) -> Optional[str]:
+    """Case-insensitive lookup of a company already on a User or a Ticket. Returns it exactly as first
+    written, so a second person from the same company joins that record instead of a second casing of it."""
+    row = db.query(models.User.client_org).filter(func.lower(models.User.client_org) == company.lower()).first()
+    if not row:
+        row = db.query(models.Ticket.client_org).filter(func.lower(models.Ticket.client_org) == company.lower()).first()
+    return row[0] if row else None
 
 
 # ── Audit trail ──────────────────────────────────────────────────────────────

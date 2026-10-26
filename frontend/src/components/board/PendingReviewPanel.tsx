@@ -57,7 +57,7 @@ export default function PendingReviewPanel({ tickets, onAccept, onDecline, onBul
           )}
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', fontWeight: 700, color: '#64748B', marginBottom: 6, cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', fontWeight: 700, color: '#737373', marginBottom: 6, cursor: 'pointer' }}>
           <input type="checkbox" checked={allSelected} onChange={toggleAll} /> Select all
         </label>
 
@@ -70,14 +70,14 @@ export default function PendingReviewPanel({ tickets, onAccept, onDecline, onBul
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '0.6rem 0.75rem', background: 'white', borderRadius: 10, border: '1px solid rgba(226,232,240,0.9)', position: 'relative' }}>
                 <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggle(t.id)} aria-label={`Select ${t.number}`} />
                 <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                  <p style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: '#475569', fontWeight: 700 }}>{t.number}{t.design_type ? ` · ${t.design_type}` : ''}</p>
+                  <p style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: '#525252', fontWeight: 700 }}>{t.number}{t.design_type ? ` · ${t.design_type}` : ''}</p>
                   <p
                     onClick={() => setPeekTicket(t)}
                     title="Click to preview details"
-                    style={{ fontSize: '0.88rem', fontWeight: 700, overflowWrap: 'anywhere', margin: 0, cursor: 'pointer', color: '#0F172A' }}>
+                    style={{ fontSize: '0.88rem', fontWeight: 700, overflowWrap: 'anywhere', margin: 0, cursor: 'pointer', color: '#0B1F3A' }}>
                     {t.title}
                   </p>
-                  <p style={{ fontSize: '0.76rem', color: '#64748B', marginTop: 2 }}>
+                  <p style={{ fontSize: '0.76rem', color: '#737373', marginTop: 2 }}>
                     From {t.requester_name ?? 'a client'}{t.client_org ? ` · ${t.client_org}` : ''}{typeof department === 'string' && department ? ` · ${department}` : ''}
                   </p>
                 </div>
@@ -111,7 +111,7 @@ export default function PendingReviewPanel({ tickets, onAccept, onDecline, onBul
 
                     {isDropdownOpen && (
                       <div className="glass-card" style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, width: 220, zIndex: 50, background: 'white', padding: '0.4rem 0', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)', border: '1px solid #E2E8F0', borderRadius: 8 }}>
-                        <div style={{ padding: '0.35rem 0.75rem', fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                        <div style={{ padding: '0.35rem 0.75rem', fontSize: '0.7rem', fontWeight: 700, color: '#737373', textTransform: 'uppercase' }}>
                           Accept &amp; Assign to:
                         </div>
                         <button
@@ -164,44 +164,44 @@ export default function PendingReviewPanel({ tickets, onAccept, onDecline, onBul
           <div style={{ width: 'min(100vw, 520px)', height: '100%', background: 'white', padding: '1.75rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '-10px 0 30px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <span style={{ fontSize: '0.74rem', fontFamily: 'monospace', fontWeight: 700, color: '#64748B' }}>{peekTicket.number} · {peekTicket.design_type || 'Design'}</span>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', marginTop: 2 }}>{peekTicket.title}</h3>
+                <span style={{ fontSize: '0.74rem', fontFamily: 'monospace', fontWeight: 700, color: '#737373' }}>{peekTicket.number} · {peekTicket.design_type || 'Design'}</span>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0B1F3A', marginTop: 2 }}>{peekTicket.title}</h3>
               </div>
               <button type="button" className="chip" onClick={() => setPeekTicket(null)} aria-label="Close drawer">
                 <X size={16} />
               </button>
             </div>
 
-            <div style={{ background: '#F8FAFC', padding: '0.85rem 1rem', borderRadius: 10, border: '1px solid #E2E8F0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
+            <div style={{ background: '#FAFAFA', padding: '0.85rem 1rem', borderRadius: 10, border: '1px solid #E2E8F0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
               <div>
-                <p style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600 }}>Requester</p>
-                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>{peekTicket.requester_name || 'Client'}</p>
+                <p style={{ fontSize: '0.7rem', color: '#737373', fontWeight: 600 }}>Requester</p>
+                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0B1F3A' }}>{peekTicket.requester_name || 'Client'}</p>
               </div>
               <div>
-                <p style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600 }}>Organisation</p>
-                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>{peekTicket.client_org || '—'}</p>
+                <p style={{ fontSize: '0.7rem', color: '#737373', fontWeight: 600 }}>Organisation</p>
+                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0B1F3A' }}>{peekTicket.client_org || '—'}</p>
               </div>
               <div>
-                <p style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600 }}>Needed by</p>
-                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>{peekTicket.due_at ? new Date(peekTicket.due_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Flexible'}</p>
+                <p style={{ fontSize: '0.7rem', color: '#737373', fontWeight: 600 }}>Needed by</p>
+                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0B1F3A' }}>{peekTicket.due_at ? new Date(peekTicket.due_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Flexible'}</p>
               </div>
             </div>
 
             <div>
-              <h4 style={{ fontSize: '0.76rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', marginBottom: 6 }}>Brief / Requirements</h4>
-              <div style={{ background: '#F8FAFC', padding: '1rem', borderRadius: 10, fontSize: '0.88rem', color: '#334155', whiteSpace: 'pre-wrap', lineHeight: 1.6, border: '1px solid #E2E8F0' }}>
+              <h4 style={{ fontSize: '0.76rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#737373', marginBottom: 6 }}>Brief / Requirements</h4>
+              <div style={{ background: '#FAFAFA', padding: '1rem', borderRadius: 10, fontSize: '0.88rem', color: '#334155', whiteSpace: 'pre-wrap', lineHeight: 1.6, border: '1px solid #E2E8F0' }}>
                 {peekTicket.description || 'No description provided.'}
               </div>
             </div>
 
             {peekTicket.type_specific_fields && Object.keys(peekTicket.type_specific_fields).length > 0 && (
               <div>
-                <h4 style={{ fontSize: '0.76rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', marginBottom: 6 }}>Specifications</h4>
+                <h4 style={{ fontSize: '0.76rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#737373', marginBottom: 6 }}>Specifications</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
                   {Object.entries(peekTicket.type_specific_fields).map(([k, v]) => (
                     <div key={k} style={{ padding: '0.6rem 0.8rem', background: '#F1F5F9', borderRadius: 8 }}>
-                      <p style={{ fontSize: '0.68rem', color: '#64748B', textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</p>
-                      <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginTop: 2 }}>{String(v)}</p>
+                      <p style={{ fontSize: '0.68rem', color: '#737373', textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</p>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0B1F3A', marginTop: 2 }}>{String(v)}</p>
                     </div>
                   ))}
                 </div>

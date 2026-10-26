@@ -9,14 +9,14 @@ interface Item { id: number; content: string; type: string; ticket_id: number | 
 interface Feed { unread: number; items: Item[] }
 
 const TYPE_CONFIG: Record<string, { icon: typeof Info; color: string; bg: string; border: string }> = {
-  sla_breach:        { icon: AlertTriangle, color: '#B91C1C', bg: 'rgba(239,68,68,0.07)',  border: 'rgba(239,68,68,0.15)' },
-  mention:           { icon: AtSign,        color: '#003F8A', bg: 'rgba(124,58,237,0.07)', border: 'rgba(124,58,237,0.15)' },
-  comment_added:     { icon: MessageSquare, color: '#003F8A', bg: 'rgba(0,63,138,0.06)',   border: 'rgba(0,63,138,0.12)' },
-  ticket_assigned:   { icon: UserPlus,      color: '#003F8A', bg: 'rgba(0,63,138,0.06)',   border: 'rgba(0,63,138,0.12)' },
-  approval_decision: { icon: CheckCircle2,  color: '#059669', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.15)' },
-  approval_requested: { icon: Eye,          color: '#0056B3', bg: 'rgba(37,99,235,0.08)',  border: 'rgba(37,99,235,0.18)' },
+  sla_breach:        { icon: AlertTriangle, color: '#B91C1C', bg: 'rgba(225,29,72,0.07)',  border: 'rgba(225,29,72,0.15)' },
+  mention:           { icon: AtSign,        color: '#0B1F3A', bg: 'rgba(124,58,237,0.07)', border: 'rgba(124,58,237,0.15)' },
+  comment_added:     { icon: MessageSquare, color: '#0B1F3A', bg: 'rgba(11,31,58,0.06)',   border: 'rgba(11,31,58,0.12)' },
+  ticket_assigned:   { icon: UserPlus,      color: '#0B1F3A', bg: 'rgba(11,31,58,0.06)',   border: 'rgba(11,31,58,0.12)' },
+  approval_decision: { icon: CheckCircle2,  color: '#256B45', bg: 'rgba(46,139,87,0.08)', border: 'rgba(46,139,87,0.15)' },
+  approval_requested: { icon: Eye,          color: '#1E3A5F', bg: 'rgba(37,99,235,0.08)',  border: 'rgba(37,99,235,0.18)' },
 };
-const DEFAULT_CFG = { icon: Info, color: '#003F8A', bg: 'rgba(0,63,138,0.06)', border: 'rgba(0,63,138,0.12)' };
+const DEFAULT_CFG = { icon: Info, color: '#0B1F3A', bg: 'rgba(11,31,58,0.06)', border: 'rgba(11,31,58,0.12)' };
 
 function ago(iso: string | null): string {
   if (!iso) return '';
@@ -96,7 +96,7 @@ const NotificationBell = () => {
         onClick={() => { setIsOpen(o => !o); if (!isOpen) void load(); }}
         aria-label={feed.unread ? `Notifications, ${feed.unread} unread` : 'Notifications'}
         aria-expanded={isOpen}
-        style={{ position: 'relative', padding: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', borderRadius: 'var(--radius-sm)' }}
+        style={{ position: 'relative', padding: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: '#737373', borderRadius: 'var(--radius-sm)' }}
       >
         <Bell size={20} />
         {feed.unread > 0 && (
@@ -108,22 +108,22 @@ const NotificationBell = () => {
 
       {isOpen && (
         <div className="animate-fade-in-up" role="dialog" aria-label="Notifications"
-          style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 340, maxWidth: 'calc(100vw - 1.5rem)', background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(16px)', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 'var(--radius-lg)', boxShadow: '0 20px 40px rgba(0,63,138,0.1)', zIndex: 50, overflow: 'hidden' }}>
-          <div style={{ padding: '0.875rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(226,232,240,0.85)', background: '#F8FAFC' }}>
+          style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 340, maxWidth: 'calc(100vw - 1.5rem)', background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(16px)', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 'var(--radius-lg)', boxShadow: '0 20px 40px rgba(11,31,58,0.1)', zIndex: 50, overflow: 'hidden' }}>
+          <div style={{ padding: '0.875rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(226,232,240,0.85)', background: '#FAFAFA' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Bell size={14} style={{ color: '#003F8A' }} />
-              <h3 style={{ fontSize: '0.82rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0F172A' }}>Notifications</h3>
+              <Bell size={14} style={{ color: '#0B1F3A' }} />
+              <h3 style={{ fontSize: '0.82rem', fontWeight: 700, fontFamily: 'var(--font-body)', color: '#0B1F3A' }}>Notifications</h3>
               {feed.unread > 0 && <span className="badge-red">{feed.unread} new</span>}
             </div>
             <button type="button" onClick={() => void markAllRead()} disabled={feed.unread === 0}
-              style={{ fontSize: '0.72rem', fontWeight: 700, color: feed.unread ? '#003F8A' : '#94a3b8', background: 'none', border: 'none', cursor: feed.unread ? 'pointer' : 'default' }}>
+              style={{ fontSize: '0.72rem', fontWeight: 700, color: feed.unread ? '#0B1F3A' : '#94a3b8', background: 'none', border: 'none', cursor: feed.unread ? 'pointer' : 'default' }}>
               Mark all read
             </button>
           </div>
 
           <div style={{ maxHeight: 360, overflowY: 'auto' }}>
             {error && <p role="alert" style={{ padding: '1rem', fontSize: '0.8rem', color: '#b91c1c' }}>Couldn't load notifications. <button type="button" className="chip" onClick={() => void load()}>Retry</button></p>}
-            {!error && feed.items.length === 0 && <p style={{ padding: '1.5rem 1rem', fontSize: '0.82rem', color: '#64748B', textAlign: 'center' }}>You're all caught up.</p>}
+            {!error && feed.items.length === 0 && <p style={{ padding: '1.5rem 1rem', fontSize: '0.82rem', color: '#737373', textAlign: 'center' }}>You're all caught up.</p>}
             {feed.items.map(n => {
               const cfg = TYPE_CONFIG[n.type] ?? DEFAULT_CFG;
               const Icon = cfg.icon;
@@ -135,21 +135,21 @@ const NotificationBell = () => {
                     <Icon size={14} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '0.8rem', color: '#0F172A', lineHeight: 1.5, fontWeight: n.is_read ? 400 : 600, overflowWrap: 'anywhere' }}>{n.content}</p>
-                    <p style={{ fontSize: '0.68rem', color: '#64748B', marginTop: 3 }}>{ago(n.created_at)}</p>
+                    <p style={{ fontSize: '0.8rem', color: '#0B1F3A', lineHeight: 1.5, fontWeight: n.is_read ? 400 : 600, overflowWrap: 'anywhere' }}>{n.content}</p>
+                    <p style={{ fontSize: '0.68rem', color: '#737373', marginTop: 3 }}>{ago(n.created_at)}</p>
                   </div>
-                  {!n.is_read && <span aria-label="Unread" style={{ width: 7, height: 7, borderRadius: 99, background: '#003F8A', flexShrink: 0, marginTop: 6 }} />}
+                  {!n.is_read && <span aria-label="Unread" style={{ width: 7, height: 7, borderRadius: 99, background: '#0B1F3A', flexShrink: 0, marginTop: 6 }} />}
                 </button>
                 {n.type === 'approval_requested' && n.ticket_id && user?.role === 'Client' && (
                   <div style={{ padding: '0 1rem 0.8rem 3.4rem', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     {!approval[n.id]?.ok && (
                       <button type="button" className="btn-primary" disabled={approval[n.id]?.busy} onClick={() => void approve(n)}
-                        style={{ padding: '0.3rem 0.75rem', fontSize: '0.74rem', background: '#059669', borderColor: '#059669' }}>
+                        style={{ padding: '0.3rem 0.75rem', fontSize: '0.74rem', background: '#256B45', borderColor: '#256B45' }}>
                         <CheckCircle2 size={12} /> {approval[n.id]?.busy ? 'Approving…' : 'Approve design'}
                       </button>
                     )}
                     <button type="button" className="chip" onClick={() => open(n)}>Review first</button>
-                    {approval[n.id]?.text && <span role="status" style={{ fontSize: '0.74rem', fontWeight: 600, color: approval[n.id]?.ok ? '#059669' : '#b91c1c' }}>{approval[n.id]?.text}</span>}
+                    {approval[n.id]?.text && <span role="status" style={{ fontSize: '0.74rem', fontWeight: 600, color: approval[n.id]?.ok ? '#256B45' : '#b91c1c' }}>{approval[n.id]?.text}</span>}
                   </div>
                 )}
                 </div>

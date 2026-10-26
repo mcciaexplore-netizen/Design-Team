@@ -77,8 +77,19 @@ def test_public_form_cannot_post_as_staff_or_into_a_company_portal(client):
     assert t.client_org is None        # not shown in TATA's portal just because someone typed that email
 
 
-def test_registering_a_company_name_still_on_old_tickets_is_refused(client):
+def test_a_client_link_for_a_company_name_still_on_old_tickets_joins_it(client, monkeypatch):
+    import re
+    import delivery
+    sent = []
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://app.example.com")
+    monkeypatch.setattr(delivery, "send_email", lambda to, subject, body: sent.append((to, subject, body)) or (True, "Sent"))
+
     t = make_ticket(client, "a@tata.com")
     update(models.Ticket, t["id"], client_org="Old Co")
-    r = client.post("/api/auth/register", json={"full_name": "New Person", "email": "new@old.co", "company": "old co", "password": "long-enough-1"})
-    assert r.status_code == 409
+    r = client.post("/api/public/client-link", json={"full_name": "New Person", "email": "new@old.co", "company": "old co"})
+    assert r.status_code == 200
+    mail = next(m for m in sent if m[0] == "new@old.co")
+    token = re.search(r"https://app\.example\.com/client/(\S+)", mail[2]).group(1)
+    exchanged = client.post("/api/public/client-link/exchange", params={"token": token})
+    assert exchanged.json()["user"]["client_org"] == "Old Co"   # joins using the ticket's existing casing, not the typed one

@@ -199,22 +199,22 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      {error && <p role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>{error}</p>}
+      {error && <p role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c', background: 'rgba(225,29,72,0.06)', border: '1px solid rgba(225,29,72,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>{error}</p>}
       {nextVersion && (
         <p style={{ fontSize: '0.82rem', color: '#1e3a8a', background: 'rgba(37,99,235,0.07)', border: '1px solid rgba(37,99,235,0.22)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
           The team continues on a new version: <Link to={`/tickets/${nextVersion.id}`} style={{ fontWeight: 800 }}>{nextVersion.ticket_number}</Link>
         </p>
       )}
-      {info && <p role="status" style={{ fontSize: '0.8rem', color: '#059669', background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>{info}</p>}
+      {info && <p role="status" style={{ fontSize: '0.8rem', color: '#256B45', background: 'rgba(46,139,87,0.07)', border: '1px solid rgba(46,139,87,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>{info}</p>}
 
       {/* Client decision (signed-in portal) */}
       {isClient && pending && latest && (
-        <div className="glass-card" style={{ padding: '1.1rem', borderColor: 'rgba(0,63,138,0.25)' }}>
-          <p style={{ fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0F172A', marginBottom: 4 }}>Your review is needed</p>
+        <div className="glass-card" style={{ padding: '1.1rem', borderColor: 'rgba(11,31,58,0.25)' }}>
+          <p style={{ fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0B1F3A', marginBottom: 4 }}>Your review is needed</p>
           <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 10 }}>Please review version {pending.proof_version ?? latest.version} below, then approve it or tell us what to change. You can click the design to mark exactly where.</p>
           {!deciding ? (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" className="btn-primary" style={{ background: '#059669', borderColor: '#059669' }} onClick={() => setDeciding({ id: pending.id, mode: 'approve' })}><CheckCircle2 size={14} /> Approve</button>
+              <button type="button" className="btn-primary" style={{ background: '#256B45', borderColor: '#256B45' }} onClick={() => setDeciding({ id: pending.id, mode: 'approve' })}><CheckCircle2 size={14} /> Approve</button>
               <button type="button" className="btn-ghost" onClick={() => setDeciding({ id: pending.id, mode: 'request_changes' })}><RotateCcw size={14} /> Request changes</button>
             </div>
           ) : (
@@ -224,7 +224,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
               {deciding.mode === 'approve' && <p style={{ fontSize: '0.74rem', color: '#64748b' }}>Approving tells the team this design is final.</p>}
               {deciding.mode === 'request_changes' && pendingMarks > 0 && <p style={{ fontSize: '0.74rem', color: '#64748b' }}>Your {pendingMarks} marked spot{pendingMarks > 1 ? 's' : ''} will be sent with this. A note is optional.</p>}
               <div style={{ display: 'flex', gap: 8 }}>
-                <button type="submit" className="btn-primary" disabled={busy} style={deciding.mode === 'approve' ? { background: '#059669', borderColor: '#059669' } : undefined}>{busy ? 'Sending…' : deciding.mode === 'approve' ? 'Confirm approval' : 'Send feedback'}</button>
+                <button type="submit" className="btn-primary" disabled={busy} style={deciding.mode === 'approve' ? { background: '#256B45', borderColor: '#256B45' } : undefined}>{busy ? 'Sending…' : deciding.mode === 'approve' ? 'Confirm approval' : 'Send feedback'}</button>
                 <button type="button" className="btn-ghost" onClick={() => { setDeciding(null); setComment(''); }}>Cancel</button>
               </div>
             </form>
@@ -239,8 +239,8 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
             <label htmlFor="proof-note" className="section-label" style={{ display: 'block', marginBottom: 4 }}>Note for this version (optional)</label>
             <input id="proof-note" className="input-field" maxLength={1000} value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Updated logo size" />
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', width: '100%' }}>
-            <input type="checkbox" checked={sendNow} onChange={e => setSendNow(e.target.checked)} style={{ accentColor: '#003F8A' }} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#525252', width: '100%' }}>
+            <input type="checkbox" checked={sendNow} onChange={e => setSendNow(e.target.checked)} style={{ accentColor: '#0B1F3A' }} />
             Send to the client for approval when uploaded
           </label>
           <input ref={fileRef} type="file" hidden aria-label="Choose proof file" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.zip,.psd,.ai" onChange={e => void upload(e.target.files?.[0])} />
@@ -250,8 +250,8 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
 
       {/* One-time link */}
       {created && (
-        <div className="glass-card" style={{ padding: '1rem', borderColor: 'rgba(16,185,129,0.35)' }}>
-          <p style={{ fontWeight: 800, color: '#059669', fontSize: '0.85rem', marginBottom: 4 }}><Link2 size={13} style={{ display: 'inline', marginRight: 5 }} />Review link</p>
+        <div className="glass-card" style={{ padding: '1rem', borderColor: 'rgba(46,139,87,0.35)' }}>
+          <p style={{ fontWeight: 800, color: '#256B45', fontSize: '0.85rem', marginBottom: 4 }}><Link2 size={13} style={{ display: 'inline', marginRight: 5 }} />Review link</p>
           <p style={{ fontSize: '0.74rem', color: '#64748b', marginBottom: 8 }}>The client can review in their portal. This link is only for people without an account. For security it is shown once — if you lose it, create a new one.</p>
           <div style={{ display: 'flex', gap: 6 }}>
             <input className="input-field" readOnly aria-label="Review link" value={created.review_url} onFocus={e => e.currentTarget.select()} style={{ fontSize: '0.76rem' }} />
@@ -261,10 +261,10 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
         </div>
       )}
 
-      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#64748B' }}>Loading proofs…</p>}
+      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#737373' }}>Loading proofs…</p>}
       {!loading && proofs.length === 0 && (
         <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', border: '2px dashed rgba(226,232,240,0.9)' }}>
-          <p style={{ fontWeight: 700, color: '#0F172A' }}>No proofs yet</p>
+          <p style={{ fontWeight: 700, color: '#0B1F3A' }}>No proofs yet</p>
           <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>{isClient ? 'The design team will share work for your review here.' : 'Upload the first version of the design to start the approval process.'}</p>
         </div>
       )}
@@ -287,9 +287,9 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
               {parentData.pins.map(m => (
                 <li key={m.id}>
                   <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: '0.82rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={m.is_resolved} onChange={() => void toggleOn(ticket.parent_id as string, { id: m.id, x: 0, y: 0, content: m.content, author: m.author_name ?? '', resolved: m.is_resolved })} style={{ marginTop: 3, accentColor: '#059669' }} />
+                    <input type="checkbox" checked={m.is_resolved} onChange={() => void toggleOn(ticket.parent_id as string, { id: m.id, x: 0, y: 0, content: m.content, author: m.author_name ?? '', resolved: m.is_resolved })} style={{ marginTop: 3, accentColor: '#256B45' }} />
                     <span style={{ textDecoration: m.is_resolved ? 'line-through' : 'none', color: m.is_resolved ? '#94a3b8' : '#334155', overflowWrap: 'anywhere' }}>
-                      <span style={{ color: '#64748B' }}>Version {earlierProofVersion.get(Number(m.image_url.slice(6)))}:</span> {m.content}
+                      <span style={{ color: '#737373' }}>Version {earlierProofVersion.get(Number(m.image_url.slice(6)))}:</span> {m.content}
                     </span>
                   </label>
                 </li>
@@ -315,15 +315,15 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
           <div style={{ padding: '0.75rem 1rem', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', borderBottom: '1px solid rgba(226,232,240,0.8)' }}>
             <span className="badge-blue">Version {p.version}</span>
             {p.id === latest?.id && <span className="badge-green">Latest</span>}
-            <span style={{ fontSize: '0.78rem', color: '#475569', flex: 1, minWidth: 120, overflowWrap: 'anywhere' }}>{p.file_name}{p.note ? ` — ${p.note}` : ''}</span>
-            <span style={{ fontSize: '0.68rem', color: '#64748B' }}>{fmt(p.created_at)}</span>
+            <span style={{ fontSize: '0.78rem', color: '#525252', flex: 1, minWidth: 120, overflowWrap: 'anywhere' }}>{p.file_name}{p.note ? ` — ${p.note}` : ''}</span>
+            <span style={{ fontSize: '0.68rem', color: '#737373' }}>{fmt(p.created_at)}</span>
             <button type="button" className="chip" onClick={() => downloadFile(`/api/proofs/${p.id}/file`, p.file_name).catch(e => setError(e instanceof Error ? e.message : 'Download failed'))}><Download size={11} /> Download</button>
             {!isClient && (
               <button type="button" className="chip" onClick={() => { setSendFor(sendFor === p.id ? null : p.id); setCreated(null); }}><Send size={11} /> {p.id === latest?.id ? 'Share link' : 'Send this version'}</button>
             )}
           </div>
           {sendFor === p.id && (
-            <form onSubmit={e => { e.preventDefault(); void sendForApproval(p); }} style={{ padding: '0.75rem 1rem', background: '#F8FAFC', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
+            <form onSubmit={e => { e.preventDefault(); void sendForApproval(p); }} style={{ padding: '0.75rem 1rem', background: '#FAFAFA', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
               <div>
                 <label htmlFor={`ttl-${p.id}`} className="section-label" style={{ display: 'block', marginBottom: 4 }}>Link valid for</label>
                 <select id={`ttl-${p.id}`} className="input-field" value={days} onChange={e => setDays(e.target.value)}>
@@ -354,12 +354,12 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
             {requests.map(r => {
               const st = STATUS_LABEL[r.status];
               return (
-                <li key={r.id} style={{ fontSize: '0.78rem', color: '#475569', borderLeft: '2px solid rgba(0,63,138,0.2)', paddingLeft: 10 }}>
+                <li key={r.id} style={{ fontSize: '0.78rem', color: '#525252', borderLeft: '2px solid rgba(11,31,58,0.2)', paddingLeft: 10 }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                     <span className={st.cls}>{st.text}</span>
                     <strong>Version {r.proof_version ?? '?'}</strong>
                     {r.decided_by_name && <span>by {r.decided_by_name} · {fmt(r.decided_at)}</span>}
-                    {r.status === 'pending' && <span style={{ color: '#64748B' }}>expires {fmt(r.expires_at)}</span>}
+                    {r.status === 'pending' && <span style={{ color: '#737373' }}>expires {fmt(r.expires_at)}</span>}
                     {!isClient && r.status === 'pending' && <button type="button" className="chip" style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, alignItems: 'center' }} onClick={() => void revoke(r.id)}><XCircle size={11} /> Withdraw link</button>}
                   </div>
                   {r.decision_comment && <p style={{ marginTop: 4, fontStyle: 'italic', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>“{r.decision_comment}”</p>}

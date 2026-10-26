@@ -47,18 +47,18 @@ export default function ClientChangesPanel({ ticket }: { ticket: Ticket }) {
         <ol style={{ listStyle: 'none', padding: 0, margin: '0 0 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {changes.map((c, i) => (
             <li key={`${c.at}-${i}`} style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '0.6rem 0.75rem' }}>
-              <p style={{ fontSize: '0.85rem', color: '#0F172A', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.55 }}>{c.text}</p>
-              <p style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 4 }}>Added by {c.by} · {when(c.at)}</p>
+              <p style={{ fontSize: '0.85rem', color: '#0B1F3A', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.55 }}>{c.text}</p>
+              <p style={{ fontSize: '0.72rem', color: '#737373', marginTop: 4 }}>Added by {c.by} · {when(c.at)}</p>
             </li>
           ))}
         </ol>
       )}
 
       {isStaff && (ticket.is_locked ? (
-        <p style={{ fontSize: '0.8rem', color: '#64748B' }}>This request is closed. Further changes need a new request.</p>
+        <p style={{ fontSize: '0.8rem', color: '#737373' }}>This request is closed. Further changes need a new request.</p>
       ) : (
         <form onSubmit={e => void add(e)} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <label htmlFor={`cc-${ticket.id}`} style={{ fontSize: '0.8rem', color: '#475569' }}>
+          <label htmlFor={`cc-${ticket.id}`} style={{ fontSize: '0.8rem', color: '#525252' }}>
             The client asked for changes by phone, email or in person? Write them here: the designer is notified.
           </label>
           <textarea id={`cc-${ticket.id}`} className="input-field" rows={3} maxLength={2000} value={text} onChange={e => setText(e.target.value)}

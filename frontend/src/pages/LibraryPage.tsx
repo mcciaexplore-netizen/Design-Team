@@ -135,27 +135,27 @@ export default function LibraryPage() {
           {[{ id: null as number | null, name: 'All files', items: folders.reduce((n, f) => n + f.items, 0) }, ...folders].map(f => (
             <button key={f.id ?? 'all'} type="button" onClick={() => setFolderId(f.id)} aria-current={folderId === f.id ? 'page' : undefined}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.5rem 0.6rem', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left',
-                       background: folderId === f.id ? 'rgba(0,63,138,0.08)' : 'transparent', color: folderId === f.id ? '#003F8A' : '#0F172A',
+                       background: folderId === f.id ? 'rgba(11,31,58,0.08)' : 'transparent', color: folderId === f.id ? '#0B1F3A' : '#0B1F3A',
                        fontWeight: folderId === f.id ? 700 : 500, fontSize: '0.85rem' }}>
               <FolderOpen size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-              <span style={{ fontSize: '0.72rem', color: '#64748B' }}>{f.items}</span>
+              <span style={{ fontSize: '0.72rem', color: '#737373' }}>{f.items}</span>
             </button>
           ))}
         </nav>
-        {folders.length === 0 && <p style={{ fontSize: '0.78rem', color: '#64748B', padding: '0.5rem' }}>No folders yet. Create one to start adding files.</p>}
+        {folders.length === 0 && <p style={{ fontSize: '0.78rem', color: '#737373', padding: '0.5rem' }}>No folders yet. Create one to start adding files.</p>}
       </aside>
 
       <section style={{ minWidth: 0 }} aria-label="Files">
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', marginRight: 'auto' }}>{current?.name ?? 'All files'}</h2>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0B1F3A', marginRight: 'auto' }}>{current?.name ?? 'All files'}</h2>
           {current && (<>
             <button type="button" className="chip" onClick={renameFolder} disabled={busy}><Pencil size={11} aria-hidden="true" /> Rename</button>
             <button type="button" className="chip" onClick={deleteFolder} disabled={busy} style={{ color: '#B91C1C' }}><Trash2 size={11} aria-hidden="true" /> Delete folder</button>
           </>)}
           <label style={{ position: 'relative' }}>
             <span className="sr-only">Search the library</span>
-            <Search size={14} aria-hidden="true" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} />
+            <Search size={14} aria-hidden="true" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#737373' }} />
             <input type="search" className="input-field" placeholder="Search name or tag" value={q} onChange={e => setQ(e.target.value)} style={{ paddingLeft: 30, width: 220 }} />
           </label>
           <button type="button" className="btn-primary" disabled={busy || folderId === null} onClick={() => picker.current?.click()} style={{ gap: 6 }}
@@ -165,12 +165,12 @@ export default function LibraryPage() {
           <input ref={picker} type="file" multiple hidden aria-label="Choose files to upload" onChange={e => uploadFiles(e.target.files)} />
           <input ref={replacer} type="file" hidden aria-label="Choose the new version" onChange={e => replaceFile(e.target.files)} />
         </div>
-        {folderId === null && folders.length > 0 && <p style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: 10 }}>Open a folder on the left to upload into it.</p>}
+        {folderId === null && folders.length > 0 && <p style={{ fontSize: '0.8rem', color: '#737373', marginBottom: 10 }}>Open a folder on the left to upload into it.</p>}
         {error && <p role="alert" style={{ fontSize: '0.82rem', color: '#B91C1C', marginBottom: 10 }}>{error}</p>}
         {info && <p role="status" style={{ fontSize: '0.82rem', color: '#047857', marginBottom: 10 }}>{info}</p>}
-        {items === null && !error && <p role="status" style={{ color: '#64748B' }}>Loading…</p>}
+        {items === null && !error && <p role="status" style={{ color: '#737373' }}>Loading…</p>}
         {items?.length === 0 && (
-          <div className="glass-card" style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748B', fontSize: '0.88rem' }}>
+          <div className="glass-card" style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#737373', fontSize: '0.88rem' }}>
             {q ? 'Nothing matches your search.' : current ? 'This folder is empty. Use Upload files to add some.' : 'The library is empty.'}
           </div>
         )}
@@ -180,10 +180,10 @@ export default function LibraryPage() {
               <Preview item={item} />
               <div style={{ padding: '0.75rem 0.85rem', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                  <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0F172A', flex: 1, overflowWrap: 'anywhere' }}>{item.name}</h3>
+                  <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0B1F3A', flex: 1, overflowWrap: 'anywhere' }}>{item.name}</h3>
                   {item.is_approved_final && <span title="Approved final" style={{ color: '#047857' }}><CheckCircle2 size={15} aria-label="Approved final" /></span>}
                 </div>
-                <p style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                <p style={{ fontSize: '0.72rem', color: '#737373' }}>
                   v{item.latest?.version ?? 1} · {item.latest?.file_name} {item.latest?.size_bytes ? `· ${size(item.latest.size_bytes)}` : ''}
                   {folderId === null && <> · {folders.find(f => f.id === item.folder_id)?.name}</>}
                 </p>
@@ -210,10 +210,10 @@ export default function LibraryPage() {
           <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {history.versions.map(v => (
               <li key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.5rem 0.6rem', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 8, fontSize: '0.8rem' }}>
-                <strong style={{ color: '#003F8A' }}>v{v.version}</strong>
+                <strong style={{ color: '#0B1F3A' }}>v{v.version}</strong>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   {v.file_name} · {size(v.size_bytes)}<br />
-                  <span style={{ color: '#64748B' }}>{v.uploaded_by} · {day(v.uploaded_at)}{v.note ? ` · ${v.note}` : ''}</span>
+                  <span style={{ color: '#737373' }}>{v.uploaded_by} · {day(v.uploaded_at)}{v.note ? ` · ${v.note}` : ''}</span>
                 </span>
                 <button type="button" className="chip" onClick={() => void downloadFile(`/api/library/versions/${v.id}/file`, v.file_name).catch(e => setError(e instanceof Error ? e.message : 'Download failed.'))}>
                   <Download size={11} aria-hidden="true" /> Download

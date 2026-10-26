@@ -14,8 +14,8 @@ type Health = 'overdue' | 'at-risk' | 'on-track' | 'done';
 const COLOR: Record<Health, { bg: string; fg: string; label: string }> = {
   overdue:    { bg: '#b91c1c', fg: '#ffffff', label: 'Overdue' },
   'at-risk':  { bg: '#b45309', fg: '#ffffff', label: 'Due within 24h' },
-  'on-track': { bg: '#003F8A', fg: '#ffffff', label: 'On track' },
-  done:       { bg: '#059669', fg: '#ffffff', label: 'Delivered' },
+  'on-track': { bg: '#0B1F3A', fg: '#ffffff', label: 'On track' },
+  done:       { bg: '#256B45', fg: '#ffffff', label: 'Delivered' },
 };
 
 export default function CalendarPage() {
@@ -58,7 +58,7 @@ export default function CalendarPage() {
           ))}
         </ul>
         <label style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-strong)', cursor: 'pointer' }}>
-          <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} style={{ accentColor: '#003F8A' }} /> Show delivered
+          <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} style={{ accentColor: '#0B1F3A' }} /> Show delivered
         </label>
       </div>
 

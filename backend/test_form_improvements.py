@@ -25,7 +25,10 @@ def ticket(number):
 def test_options_list_questions_and_limits(client):
     o = client.get("/api/public/request-form").json()
     assert o["max_files"] == 5 and o["max_reference_links"] == 5
-    assert set(o["questions"]) == set(o["design_requirements"]) and o["questions"]["Other"] == []
+    assert set(o["questions"]) == set(o["design_requirements"])
+    assert [q["id"] for q in o["questions"]["Other"]] == ["language"]
+    language = o["questions"]["Other"][0]
+    assert language["type"] == "select" and language["options"] == ["English", "Hindi", "Marathi"]
     size = next(q for q in o["questions"]["Flyer (Email / Print)"] if q["id"] == "size")
     assert size["type"] == "select" and size["required"] and "A4" in size["options"]
 
@@ -129,15 +132,15 @@ def test_whatsapp_instagram_and_linkedin_are_separate_choices_with_their_own_que
     for name in ("Flyer (Email / Print)", "WhatsApp creative", "Instagram post", "LinkedIn post", "Twitter / X post"):
         assert name in choices
     assert "Flyer (Email/Whatsapp)" not in choices and not any("Insta, LinkedIn" in c for c in choices)   # no more bundles
-    for c in ("WhatsApp creative", "Instagram post", "LinkedIn post", "Twitter / X post"):   # free text, not a fixed list
-        q = next(q for q in o["questions"][c] if q["id"] == "format")
-        assert (q["label"], q["type"], q["required"]) == ("Format details", "text", False)
+    for c in ("WhatsApp creative", "Instagram post", "LinkedIn post", "Twitter / X post"):   # the shared language dropdown, not free text
+        q = next(q for q in o["questions"][c] if q["id"] == "language")
+        assert (q["label"], q["type"], q["required"], q["options"]) == ("Language", "select", False, ["English", "Hindi", "Marathi"])
 
 
 def test_each_channel_creates_its_own_design_type(client):
     seen = {}
-    for choice, details in (("WhatsApp creative", {"format": "Status (9:16)"}), ("Instagram post", {"format": "Carousel"}),
-                            ("LinkedIn post", {"format": "Single image (1:1)"})):
+    for choice, details in (("WhatsApp creative", {"language": "Hindi"}), ("Instagram post", {"language": "Marathi"}),
+                            ("LinkedIn post", {"language": "English"})):
         clear_hits()
         r = post(client, design_requirement=choice, details=json.dumps(details))
         assert r.status_code == 201, (choice, r.text)
@@ -150,8 +153,10 @@ def test_each_channel_creates_its_own_design_type(client):
 
 
 def test_a_choice_must_match_its_own_questions_and_old_bundled_names_are_rejected(client):
-    assert post(client, design_requirement="Instagram post", details=json.dumps({})).status_code == 201                     # format is optional
-    assert post(client, design_requirement="Instagram post", details=json.dumps({"format": "Story, 9:16, with a swipe-up"})).status_code == 201   # any wording
+    assert post(client, design_requirement="Instagram post", details=json.dumps({})).status_code == 201                     # language is optional
+    assert post(client, design_requirement="Instagram post", details=json.dumps({"language": "Marathi"})).status_code == 201
+    assert post(client, design_requirement="Instagram post", details=json.dumps({"language": "French"})).status_code == 422  # not one of the three
+    clear_hits()   # the public form allows only 5 submissions an hour
     assert post(client, design_requirement="Flyer (Email / Print)", details=json.dumps({"size": "A4", "channel": "WhatsApp"})).status_code == 422
     assert post(client, design_requirement="Flyer (Email/Whatsapp)").status_code == 422
     assert post(client, design_requirement="Social Media Post (Insta, LinkedIn, Twitter)").status_code == 422
@@ -166,7 +171,7 @@ def test_ticking_several_designs_creates_one_ticket(client, monkeypatch):
     sent = []
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
     monkeypatch.setattr(request_form.delivery, "send_email", lambda to, subject, body: sent.append((to, subject, body)) or (True, "Sent"))
-    details = {FLYER: {"size": "A4", "channel": "Print"}, INSTA: {"format": "Story (9:16)"}, OTHER: {}}
+    details = {FLYER: {"size": "A4", "channel": "Print"}, INSTA: {"language": "Hindi"}, OTHER: {}}
     data = form(details=json.dumps(details), other_details="A mascot")
     data["design_requirement"] = [FLYER, INSTA, OTHER, FLYER]   # a repeat is ignored
     r = client.post("/api/public/requests", data=data, files=[("files", ("brief.png", PNG, "image/png"))])
@@ -177,7 +182,7 @@ def test_ticking_several_designs_creates_one_ticket(client, monkeypatch):
 
     t = ticket(out[0]["ticket_number"])
     assert t.type_specific_fields["design_requirements"] == [FLYER, INSTA, OTHER]   # the repeat was dropped
-    assert t.type_specific_fields["details"] == {FLYER: {"size": "A4", "channel": "Print"}, INSTA: {"format": "Story (9:16)"}, OTHER: {}}
+    assert t.type_specific_fields["details"] == {FLYER: {"size": "A4", "channel": "Print"}, INSTA: {"language": "Hindi"}, OTHER: {}}
     assert t.type_specific_fields["other_details"] == "A mascot"
     db = TestingSessionLocal()
     flyer_type = db.query(models.DesignType).filter_by(name="Flyer").one()

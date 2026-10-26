@@ -15,14 +15,14 @@ export interface AuthUser {
 }
 
 interface AuthContextType {
-  user:            AuthUser | null;
-  isAuthenticated: boolean;
-  isLoading:       boolean;
-  login:           (email: string, password: string) => Promise<void>;
-  register:        (input: { fullName: string; email: string; company: string; password: string }) => Promise<void>;
-  logout:          () => void;
-  changePassword:  (currentPassword: string, newPassword: string) => Promise<void>;
-  error:           string | null;
+  user:               AuthUser | null;
+  isAuthenticated:    boolean;
+  isLoading:          boolean;
+  login:              (email: string, password: string) => Promise<void>;
+  exchangeClientLink: (token: string) => Promise<void>;
+  logout:             () => void;
+  changePassword:     (currentPassword: string, newPassword: string) => Promise<void>;
+  error:              string | null;
 }
 
 /* ─── Context ─────────────────────────────── */
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email:    u.email,
       role,
       initials: u.full_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
-      color:    role === 'Design Lead' ? '#003F8A' : role === 'Client' ? '#f97316' : '#8B5CF6',
+      color:    role === 'Design Lead' ? '#0B1F3A' : role === 'Client' ? '#f97316' : '#7C3AED',
       mustChangePassword: !!u.must_change_password,
     };
     localStorage.setItem(TOKEN_KEY, data.access_token);
@@ -61,26 +61,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(authUser);
   };
 
-  const register = async (input: { fullName: string; email: string; company: string; password: string }) => {
+  /** A client never has a password: opening their emailed link exchanges it, once, for a normal session. */
+  const exchangeClientLink = async (token: string) => {
     setError(null);
     let res: Response;
     try {
-      res = await fetch(`${API_BASE}/api/auth/register`, {
+      res = await fetch(`${API_BASE}/api/public/client-link/exchange?${new URLSearchParams({ token })}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name: input.fullName, email: input.email, company: input.company, password: input.password }),
         signal: AbortSignal.timeout(60000),
       });
     } catch {
       throw new Error('Cannot reach the server. It may be waking up (free hosting can take about a minute), or the backend may be down.');
     }
-    if (!res.ok) {
-      let detail = '';
-      try { detail = (await res.json()).detail; } catch { /* non-JSON error body */ }
-      throw new Error(res.status === 409 && typeof detail === 'string' ? detail
-        : res.status === 422 ? 'Please check your details. The password needs at least 8 characters.'
-        : 'Could not create the account. Please try again.');
-    }
+    if (!res.ok) throw new Error('This link is not valid or has expired. Ask for a new one.');
     startSession(await res.json());
   };
 
@@ -134,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [logout]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, logout, changePassword, error }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, exchangeClientLink, logout, changePassword, error }}>
       {children}
     </AuthContext.Provider>
   );

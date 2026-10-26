@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import KanbanBoard from './components/KanbanBoard';
 import NotificationBell from './components/NotificationBell';
 import TicketCreateModal from './components/TicketCreateModal';
@@ -129,7 +129,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
 
       <div className="app-user-area">
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--brand-soft)', border: '1px solid rgba(0,63,138,0.1)', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--brand-soft)', border: '1px solid rgba(11,31,58,0.1)', marginBottom: 8 }}>
             <div style={{ width: 32, height: 32, borderRadius: '99px', background: user.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800, color: 'white', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
               {user.initials}
             </div>
@@ -148,7 +148,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
         </button>
       </div>
 
-      <div className="app-brand-footer mt-3 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(0,63,138,0.03)', border: '1px solid rgba(0,63,138,0.07)' }}>
+      <div className="app-brand-footer mt-3 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(11,31,58,0.03)', border: '1px solid rgba(11,31,58,0.07)' }}>
         <div className="flex items-center gap-2">
           <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Zap size={13} color="white" />
@@ -306,9 +306,42 @@ function App() {
   );
 }
 
+/** Where an emailed client link lands: it exchanges itself for a session, once, then enters the portal. */
+function ClientLinkLanding() {
+  const { token } = useParams<{ token: string }>();
+  const { exchangeClientLink } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    exchangeClientLink(token)
+      .then(() => window.location.replace('/portal/client-portal'))
+      .catch(e => setError(e instanceof Error ? e.message : 'This link is not valid or has expired.'));
+  }, [token, exchangeClientLink]);
+
+  if (error) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, textAlign: 'center', padding: '2rem' }}>
+        <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-strong)' }}>{error}</p>
+        <a href="/request" className="btn-primary" style={{ textDecoration: 'none' }}>Submit a request instead</a>
+      </div>
+    );
+  }
+  return <FullScreenLoading text="Signing you in…" />;
+}
+
 function AppContent() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
+
+  /* An emailed client link signs itself in, no password. */
+  if (location.pathname.startsWith('/client/')) {
+    return (
+      <Routes>
+        <Route path="/client/:token" element={<ClientLinkLanding />} />
+      </Routes>
+    );
+  }
 
   /* The client review link works without signing in. */
   if (location.pathname.startsWith('/review/')) {
@@ -356,7 +389,7 @@ function AppContent() {
 
 function FullScreenLoading({ text }: { text: string }) {
   return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#003F8A' }}>
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0B1F3A' }}>
       <div style={{ textAlign: 'center', color: 'white' }}>
         <div className="app-spinner" role="status" aria-label="Loading" />
         <p style={{ fontSize: '0.9rem', fontFamily: 'var(--font-body)', opacity: 0.7, marginTop: 14 }}>{text}</p>

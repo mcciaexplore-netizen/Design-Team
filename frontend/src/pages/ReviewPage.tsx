@@ -14,7 +14,7 @@ interface Review {
   proof: { version: number; file_name: string; content_type: string | null; note: string | null } | null;
 }
 
-const BLUE = '#003F8A';
+const BLUE = '#0B1F3A';
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '';
 const MAX = 2000;
@@ -35,7 +35,7 @@ const labelStyle: CSSProperties = { display: 'block', fontSize: 14, fontWeight: 
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0f172a', overflowX: 'hidden' }}>
+    <div style={{ minHeight: '100vh', background: '#FAFAFA', color: '#0f172a', overflowX: 'hidden' }}>
       <header style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '10px 16px' }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 40, maxWidth: '100%', objectFit: 'contain' }} />
@@ -51,7 +51,7 @@ function Notice({ icon, color, title, children, action }: { icon: ReactNode; col
     <div style={{ ...cardStyle, textAlign: 'center' }}>
       <div style={{ color, display: 'flex', justifyContent: 'center', marginBottom: 12 }} aria-hidden="true">{icon}</div>
       <h1 style={{ fontFamily: 'var(--font-body)', fontSize: 22, margin: '0 0 8px', color: '#0f172a' }}>{title}</h1>
-      <div style={{ color: '#475569', fontSize: 16, lineHeight: 1.5, overflowWrap: 'anywhere' }}>{children}</div>
+      <div style={{ color: '#525252', fontSize: 16, lineHeight: 1.5, overflowWrap: 'anywhere' }}>{children}</div>
       {action && <div style={{ marginTop: 20, maxWidth: 240, marginInline: 'auto' }}>{action}</div>}
     </div>
   );
@@ -126,7 +126,7 @@ export default function ReviewPage() {
   if (loading) {
     return (
       <Shell>
-        <div role="status" aria-live="polite" style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 12, color: '#475569' }}>
+        <div role="status" aria-live="polite" style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 12, color: '#525252' }}>
           <Loader2 size={22} style={{ animation: 'app-spin 1s linear infinite' }} aria-hidden="true" />
           <span>Loading your review…</span>
         </div>
@@ -166,9 +166,9 @@ export default function ReviewPage() {
       const ok = done === 'approved';
       return (
         <div role="status" style={{ textAlign: 'center', padding: '8px 0' }}>
-          <div style={{ color: ok ? '#10B981' : '#f59e0b' }} aria-hidden="true">{ok ? <CheckCircle2 size={44} /> : <MessageSquare size={44} />}</div>
+          <div style={{ color: ok ? '#2E8B57' : '#f59e0b' }} aria-hidden="true">{ok ? <CheckCircle2 size={44} /> : <MessageSquare size={44} />}</div>
           <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>{ok ? 'Thanks — approved' : "Thanks — we've sent your feedback to the design team"}</h2>
-          <p style={{ color: '#475569', margin: 0 }}>You can now close this page.</p>
+          <p style={{ color: '#525252', margin: 0 }}>You can now close this page.</p>
         </div>
       );
     }
@@ -178,22 +178,22 @@ export default function ReviewPage() {
     if (effective === 'approved') return (
       <div style={{ textAlign: 'center' }}><div style={{ color: '#047857' }} aria-hidden="true"><CheckCircle2 size={40} /></div>
         <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>Approved</h2>
-        <p style={{ color: '#475569', margin: 0 }}>This design was approved on {fmt(data.decided_at)}.</p>{quote}</div>
+        <p style={{ color: '#525252', margin: 0 }}>This design was approved on {fmt(data.decided_at)}.</p>{quote}</div>
     );
     if (effective === 'changes_requested') return (
       <div style={{ textAlign: 'center' }}><div style={{ color: '#B45309' }} aria-hidden="true"><MessageSquare size={40} /></div>
         <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>Changes requested</h2>
-        <p style={{ color: '#475569', margin: 0 }}>Changes were requested on {fmt(data.decided_at)}.</p>{quote}</div>
+        <p style={{ color: '#525252', margin: 0 }}>Changes were requested on {fmt(data.decided_at)}.</p>{quote}</div>
     );
     if (effective === 'expired') return (
       <div style={{ textAlign: 'center' }}><div style={{ color: '#B45309' }} aria-hidden="true"><Clock size={40} /></div>
         <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>This link has expired</h2>
-        <p style={{ color: '#475569', margin: 0 }}>Please ask the design team for a new one.</p></div>
+        <p style={{ color: '#525252', margin: 0 }}>Please ask the design team for a new one.</p></div>
     );
     return (
       <div style={{ textAlign: 'center' }}><div style={{ color: '#B91C1C' }} aria-hidden="true"><Ban size={40} /></div>
         <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>This link was withdrawn</h2>
-        <p style={{ color: '#475569', margin: 0 }}>Please use the latest link from the design team.</p></div>
+        <p style={{ color: '#525252', margin: 0 }}>Please use the latest link from the design team.</p></div>
     );
   };
 
@@ -207,7 +207,7 @@ export default function ReviewPage() {
     <Shell>
       <div style={cardStyle}>
         {header}
-        {ticket.brief && <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: '#475569', fontSize: 15, lineHeight: 1.55, margin: '0 0 20px' }}>{ticket.brief}</p>}
+        {ticket.brief && <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: '#525252', fontSize: 15, lineHeight: 1.55, margin: '0 0 20px' }}>{ticket.brief}</p>}
 
         {proof && (
           <section aria-label="Design proof" style={{ marginBottom: 20 }}>
@@ -215,7 +215,7 @@ export default function ReviewPage() {
             {proof.note && <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', borderRadius: 10, padding: '10px 12px', margin: '12px 0 0', fontSize: 15 }}><strong>Note from the designer:</strong> {proof.note}</p>}
             <div style={{ marginTop: 12 }}>
               {!fileUrl && !imgErr ? (
-                <p role="status" style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Loading the design…</p>
+                <p role="status" style={{ color: '#737373', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Loading the design…</p>
               ) : imgErr ? (
                 <p role="alert" style={{ color: '#B91C1C', background: '#fef2f2', borderRadius: 10, padding: 12, margin: 0 }}>We couldn't load the design. Try refreshing, or ask the design team to resend the link.</p>
               ) : isImage ? (
@@ -244,14 +244,14 @@ export default function ReviewPage() {
               <div style={{ marginBottom: 16 }}>
                 <label htmlFor="rv-changes" style={labelStyle}>What would you like changed?</label>
                 <textarea id="rv-changes" style={{ ...inputStyle, minHeight: 120, resize: 'vertical' }} value={comment} maxLength={MAX} required onChange={(e) => setComment(e.target.value)} disabled={submitting} />
-                <div style={{ textAlign: 'right', fontSize: 13, color: comment.length > MAX - 100 ? '#B91C1C' : '#475569' }}>{comment.length} / {MAX}</div>
+                <div style={{ textAlign: 'right', fontSize: 13, color: comment.length > MAX - 100 ? '#B91C1C' : '#525252' }}>{comment.length} / {MAX}</div>
               </div>
             )}
             {mode === 'approve' && (
               <div style={{ marginBottom: 16 }}>
                 <label htmlFor="rv-comment" style={labelStyle}>Comment (optional)</label>
                 <textarea id="rv-comment" style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} value={comment} maxLength={MAX} onChange={(e) => setComment(e.target.value)} disabled={submitting} />
-                <div style={{ textAlign: 'right', fontSize: 13, color: '#475569' }}>{comment.length} / {MAX}</div>
+                <div style={{ textAlign: 'right', fontSize: 13, color: '#525252' }}>{comment.length} / {MAX}</div>
               </div>
             )}
 
@@ -265,7 +265,7 @@ export default function ReviewPage() {
               <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 12, padding: 16 }}>
                 <p style={{ margin: '0 0 12px', color: '#065f46', fontWeight: 600 }}>Approve version {proof?.version ?? ''}? This tells the team the design is final.</p>
                 <div style={{ display: 'grid', gap: 10 }}>
-                  <button type="button" disabled={submitting} onClick={() => void submit('approve')} style={{ ...btn, background: '#059669', color: '#fff', opacity: submitting ? 0.7 : 1 }}>
+                  <button type="button" disabled={submitting} onClick={() => void submit('approve')} style={{ ...btn, background: '#256B45', color: '#fff', opacity: submitting ? 0.7 : 1 }}>
                     {submitting ? <Loader2 size={18} style={{ animation: 'app-spin 1s linear infinite' }} aria-hidden="true" /> : <CheckCircle2 size={18} aria-hidden="true" />} Yes, approve
                   </button>
                   <button type="button" disabled={submitting} onClick={() => setMode('none')} style={{ ...btn, background: '#fff', color: '#0f172a', borderColor: '#94a3b8' }}>Cancel</button>
@@ -273,7 +273,7 @@ export default function ReviewPage() {
               </div>
             ) : (
               <div style={{ display: 'grid', gap: 10 }}>
-                <button type="button" disabled={submitting} onClick={() => { setFormErr(''); if (!name.trim()) { setFormErr('Please enter your name.'); return; } setMode('approve'); }} style={{ ...btn, background: '#059669', color: '#fff' }}>
+                <button type="button" disabled={submitting} onClick={() => { setFormErr(''); if (!name.trim()) { setFormErr('Please enter your name.'); return; } setMode('approve'); }} style={{ ...btn, background: '#256B45', color: '#fff' }}>
                   <CheckCircle2 size={18} aria-hidden="true" /> Approve this design
                 </button>
                 {mode === 'changes' ? (
@@ -290,7 +290,7 @@ export default function ReviewPage() {
           </form>
         )}
       </div>
-      <p style={{ textAlign: 'center', color: '#475569', fontSize: 13, marginTop: 16 }}>Link valid until {fmt(data.expires_at)}</p>
+      <p style={{ textAlign: 'center', color: '#525252', fontSize: 13, marginTop: 16 }}>Link valid until {fmt(data.expires_at)}</p>
     </Shell>
   );
 }

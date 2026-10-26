@@ -12,7 +12,7 @@ interface Props { onCreated: (ticket: { id: string; number: string }) => void; o
 export default function ClientRequestForm({ onCreated, onCancel, prefill }: Props) {
   const { options, error: loadError } = useRequestFormOptions();
   if (loadError) return <p role="alert" style={{ padding: '1.5rem', color: '#b91c1c' }}>{loadError}</p>;
-  if (!options) return <p role="status" style={{ padding: '1.5rem', color: '#64748B' }}>Loading…</p>;
+  if (!options) return <p role="status" style={{ padding: '1.5rem', color: '#737373' }}>Loading…</p>;
   return <Body options={options} onCreated={onCreated} onCancel={onCancel} prefill={prefill} />;
 }
 
@@ -48,7 +48,7 @@ function Body({ options, onCreated, onCancel, prefill }: Props & { options: Requ
   return (
     <form onSubmit={e => void submit(e)} noValidate style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
       <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-        <p style={{ fontSize: '0.8rem', color: '#64748B' }}>
+        <p style={{ fontSize: '0.8rem', color: '#737373' }}>
           Requesting as <strong>{user?.name}</strong>{org ? ` · ${org}` : ''}. Please submit a separate request for each recurring creative. Priority and the designer are set automatically.
         </p>
         <DraftBanner form={form} />

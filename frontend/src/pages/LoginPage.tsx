@@ -6,11 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 const FEATURES = ['Visual Board', 'SLA Tracking', 'CDR Approval', 'Design Proofing', 'Capacity Forecast', 'Client Portal'];
 
 const LoginPage: React.FC = () => {
-  const { login, register } = useAuth();
-  const [mode,      setMode]     = useState<'login' | 'register'>('login');
-  const [fullName,  setFullName] = useState('');
-  const [company,   setCompany]  = useState('');
-  const signup = mode === 'register';
+  const { login } = useAuth();
   const [email,     setEmail]    = useState('');
   const [password,  setPassword] = useState('');
   const [showPass,  setShowPass] = useState(false);
@@ -23,8 +19,7 @@ const LoginPage: React.FC = () => {
     setErrorMsg('');
     setLoading(true);
     try {
-      if (signup) await register({ fullName: fullName.trim(), email: email.trim(), company: company.trim(), password });
-      else await login(email.trim(), password);
+      await login(email.trim(), password);
     } catch (err: any) {
       setErrorMsg(err.message ?? 'Login failed. Please try again.');
     } finally {
@@ -45,20 +40,10 @@ const LoginPage: React.FC = () => {
       {/* ── Left Panel: Brand (hidden on narrow screens) ── */}
       <div className="login-brand">
         <GridBackground stroke="rgba(255,255,255,0.06)" fill="rgba(255,255,255,0.08)" />
-        <div style={{ position: 'absolute', top: '-10%',  left: '-10%', width: 400, height: 400, borderRadius: '50%', background: 'rgba(16,185,129,0.08)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: '-10%',  left: '-10%', width: 400, height: 400, borderRadius: '50%', background: 'rgba(46,139,87,0.08)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: '40%', right: '5%',   width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
 
         <div style={{ position: 'relative', textAlign: 'center', maxWidth: 400 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: '2rem' }}>
-            <div style={{ padding: '0.6rem 0.9rem', borderRadius: 14, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img src="/mccia_logo.png" alt="MCCIA" style={{ height: 32, width: 'auto', objectFit: 'contain', display: 'block' }} />
-            </div>
-            <div style={{ textAlign: 'left' }}>
-              <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 1 }}>MCCIA</p>
-              <p style={{ color: 'white', fontSize: '0.9rem', fontWeight: 800, letterSpacing: '-0.01em' }}>Applied AI Studio</p>
-            </div>
-          </div>
-
           <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, color: 'white', lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: '1.25rem' }}>
             Design Workflow<br />
             <span style={{ color: '#6ee7b7' }}>Reimagined.</span>
@@ -82,35 +67,17 @@ const LoginPage: React.FC = () => {
       <div className="login-panel">
         <div style={{ width: '100%', maxWidth: 400 }}>
 
-          <div className="login-mobile-brand">
-            <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 40, objectFit: 'contain' }} />
-          </div>
-
           <div style={{ marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.03em', marginBottom: 6 }}>
-              {signup ? 'Create your account' : 'Welcome back'}
+              Welcome back
             </h2>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)', lineHeight: 1.5 }}>
-              {signup ? 'Request designs and track them in one place.' : 'Sign in to your MCCIA DesignDesk workspace'}
+              Sign in to your DesignDesk workspace
             </p>
           </div>
 
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} noValidate={false}>
-            {signup && (
-              <>
-                <div>
-                  <label htmlFor="su-name" className="login-label">Full name</label>
-                  <input id="su-name" type="text" required minLength={2} maxLength={80} autoComplete="name" value={fullName}
-                    onChange={e => setFullName(e.target.value)} className="input-field" style={field} autoFocus />
-                </div>
-                <div>
-                  <label htmlFor="su-company" className="login-label">Company</label>
-                  <input id="su-company" type="text" required minLength={2} maxLength={80} autoComplete="organization" value={company}
-                    onChange={e => setCompany(e.target.value)} className="input-field" style={field} />
-                </div>
-              </>
-            )}
             <div>
               <label htmlFor="auth-email" className="login-label">Email address</label>
               <input
@@ -120,26 +87,23 @@ const LoginPage: React.FC = () => {
                 autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="you@mccia.in"
+                placeholder="you@company.com"
                 className="input-field"
                 style={field}
-                autoFocus={!signup}
+                autoFocus
               />
             </div>
 
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <label htmlFor="auth-password" className="login-label" style={{ marginBottom: 0 }}>Password</label>
-                {signup && <span id="pw-hint" style={{ fontSize: '0.75rem', color: 'var(--text-hint)' }}>At least 8 characters</span>}
               </div>
               <div style={{ position: 'relative' }}>
                 <input
                   id="auth-password"
                   type={showPass ? 'text' : 'password'}
                   required
-                  minLength={signup ? 8 : undefined}
-                  autoComplete={signup ? 'new-password' : 'current-password'}
-                  aria-describedby={signup ? 'pw-hint' : undefined}
+                  autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -156,11 +120,9 @@ const LoginPage: React.FC = () => {
                   {showPass ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                 </button>
               </div>
-              {!signup && (
-                <p style={{ fontSize: '0.78rem', marginTop: 6 }}>
-                  <a className="login-link-btn" href="/forgot-password">Forgot your password?</a>
-                </p>
-              )}
+              <p style={{ fontSize: '0.78rem', marginTop: 6 }}>
+                <a className="login-link-btn" href="/forgot-password">Forgot your password?</a>
+              </p>
             </div>
 
             {errorMsg && (
@@ -185,9 +147,9 @@ const LoginPage: React.FC = () => {
               style={{ justifyContent: 'center', padding: '0.8rem', fontSize: '0.9rem', opacity: loading ? 0.75 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }}
             >
               {loading ? (
-                <><span className="app-spinner app-spinner--sm" role="status" aria-label="Please wait" /> {signup ? 'Creating account…' : 'Signing in…'}</>
+                <><span className="app-spinner app-spinner--sm" role="status" aria-label="Please wait" /> Signing in…</>
               ) : (
-                <><LogIn size={16} aria-hidden="true" /> {signup ? 'Create account' : 'Sign In'}</>
+                <><LogIn size={16} aria-hidden="true" /> Sign In</>
               )}
             </button>
             {loading && (
@@ -198,10 +160,8 @@ const LoginPage: React.FC = () => {
           </form>
 
           <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-soft)', marginTop: '1.25rem' }}>
-            {signup ? 'Already have an account?' : 'New client?'}{' '}
-            <button type="button" className="login-link-btn" onClick={() => { setMode(signup ? 'login' : 'register'); setErrorMsg(''); }}>
-              {signup ? 'Sign in' : 'Create an account'}
-            </button>
+            This sign-in is for the design team. Clients don't need a password —
+            the link in your confirmation email opens your requests and campaigns directly.
           </p>
 
           <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-soft)', marginTop: '0.75rem' }}>
@@ -211,9 +171,6 @@ const LoginPage: React.FC = () => {
             Already requested a design? <a className="login-link-btn" href="/requests">See all requests</a>, no sign-in needed
           </p>
 
-          <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-hint)', marginTop: '1.5rem', lineHeight: 1.6 }}>
-            Protected by MCCIA Applied AI Studio.
-          </p>
         </div>
       </div>
     </div>

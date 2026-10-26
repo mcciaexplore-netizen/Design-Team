@@ -316,7 +316,7 @@ export function useTickets() {
 }
 
 /** Deterministic avatar colour for a person's name. */
-const PALETTE = ['#8B5CF6', '#059669', '#f97316', '#0ea5e9', '#EF4444', '#ca8a04', '#0d9488'];
+const PALETTE = ['#7C3AED', '#256B45', '#f97316', '#0ea5e9', '#EF4444', '#ca8a04', '#0d9488'];
 export function colorFor(name: string): string {
   if (!name) return '#94a3b8';
   let h = 0;

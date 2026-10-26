@@ -94,7 +94,7 @@ export default function RequestsBoardPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #F8FAFC)', padding: '2rem 1rem 3rem' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #FAFAFA)', padding: '2rem 1rem 3rem' }}>
       <main style={{ maxWidth: 1040, margin: '0 auto' }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
           <div>
@@ -203,9 +203,9 @@ function Tile({ icon: Icon, label, value }: { icon: typeof Clock; label: string;
 
 function RequestCard({ r, steps, now }: { r: BoardRequest; steps: string[]; now: number }) {
   const late = !r.finished && r.due_at !== null && new Date(r.due_at).getTime() < now;
-  const tone = r.finished ? ['rgba(16,185,129,0.12)', '#047857']
+  const tone = r.finished ? ['rgba(46,139,87,0.12)', '#047857']
     : r.status === 'In Review' ? ['rgba(245,158,11,0.15)', '#92400e']
-    : ['rgba(0,63,138,0.08)', '#003F8A'];
+    : ['rgba(11,31,58,0.08)', '#0B1F3A'];
   return (
     <li className="glass-card" style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
@@ -219,7 +219,7 @@ function RequestCard({ r, steps, now }: { r: BoardRequest; steps: string[]; now:
       <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-strong)', lineHeight: 1.35 }}>{r.title}</h3>
       <div role="img" aria-label={`Step ${r.current_step + 1} of ${steps.length}: ${steps[r.current_step]}`} style={{ display: 'flex', gap: 4 }}>
         {steps.map((s, i) => (
-          <span key={s} title={s} style={{ flex: 1, height: 5, borderRadius: 99, background: i <= r.current_step ? (r.finished ? '#10B981' : '#003F8A') : '#E2E8F0' }} />
+          <span key={s} title={s} style={{ flex: 1, height: 5, borderRadius: 99, background: i <= r.current_step ? (r.finished ? '#2E8B57' : '#0B1F3A') : '#E2E8F0' }} />
         ))}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginTop: 'auto', fontSize: '0.8rem' }}>

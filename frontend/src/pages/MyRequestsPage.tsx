@@ -11,13 +11,14 @@ interface MyRequests { name: string; steps: string[]; requests: MyRequest[] }
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 
 /**
- * Everything one person has asked for, without signing in. /my-requests asks for an email and sends a link;
- * the link (/my-requests?token=…) opens the list. Only the inbox owner gets the link.
+ * Everything one person has asked for, without signing in. /my-requests asks for an email and sends a link
+ * (the client link now opens /client/<token>, which exchanges for a session); a request with ?token= here
+ * still works directly against the no-login list. Only the inbox owner gets the link.
  */
 export default function MyRequestsPage() {
   const token = new URLSearchParams(window.location.search).get('token');
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #F8FAFC)', padding: '2rem 1rem' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #FAFAFA)', padding: '2rem 1rem' }}>
       <main style={{ maxWidth: 760, margin: '0 auto' }}>
         <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 44, marginBottom: 16 }} />
         {token ? <RequestList token={token} /> : <AskForLink />}
@@ -36,7 +37,7 @@ function AskForLink() {
     e.preventDefault();
     setError(''); setBusy(true);
     try {
-      setSent((await publicJson<{ detail: string }>('/api/public/my-requests/link', { method: 'POST', json: { email: email.trim() } })).detail);
+      setSent((await publicJson<{ detail: string }>('/api/public/client-link', { method: 'POST', json: { email: email.trim() } })).detail);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally { setBusy(false); }
@@ -120,7 +121,7 @@ function RequestList({ token }: { token: string }) {
             </div>
             <div aria-hidden="true" style={{ display: 'flex', gap: 4, marginTop: 10 }}>
               {data.steps.map((s, i) => (
-                <span key={s} title={s} style={{ flex: 1, height: 5, borderRadius: 99, background: i <= r.current_step ? '#003F8A' : '#E2E8F0' }} />
+                <span key={s} title={s} style={{ flex: 1, height: 5, borderRadius: 99, background: i <= r.current_step ? '#0B1F3A' : '#E2E8F0' }} />
               ))}
             </div>
           </li>

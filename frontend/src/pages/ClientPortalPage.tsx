@@ -49,7 +49,7 @@ function nowLine(t: Ticket): string {
 
 /** "Expected Tue 20 Oct · in 3 days", or a warning once the date has passed. */
 function expectedLine(due: string): { text: string; tone: string } {
-  if (!due) return { text: 'Delivery date to be confirmed', tone: '#475569' };
+  if (!due) return { text: 'Delivery date to be confirmed', tone: '#525252' };
   const d = new Date(due);
   const days = Math.ceil((d.getTime() - Date.now()) / DAY);
   if (days < 0) return { text: `Was expected ${niceDate(d)}`, tone: '#B91C1C' };
@@ -77,12 +77,12 @@ function Thumb({ proof, height = 120 }: { proof: Overview['latest_proof']; heigh
     return () => { live = false; if (made) URL.revokeObjectURL(made); };
   }, [proof, isImage]);
   const box = { height, borderRadius: 10, background: '#F1F5F9', border: '1px solid #E2E8F0', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' } as const;
-  if (!proof) return <div style={box} aria-hidden="true"><Hourglass size={22} style={{ color: '#64748B' }} /></div>;
+  if (!proof) return <div style={box} aria-hidden="true"><Hourglass size={22} style={{ color: '#737373' }} /></div>;
   if (isImage && url) return <div style={box}><img src={url} alt={`Version ${proof.version}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>;
   return (
     <div style={{ ...box, flexDirection: 'column', gap: 4 }}>
-      <FileText size={24} aria-hidden="true" style={{ color: '#475569' }} />
-      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>{proof.file_name.split('.').pop()}</span>
+      <FileText size={24} aria-hidden="true" style={{ color: '#525252' }} />
+      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#525252', textTransform: 'uppercase' }}>{proof.file_name.split('.').pop()}</span>
     </div>
   );
 }
@@ -93,8 +93,8 @@ function Progress({ status }: { status: string }) {
     <ol aria-label="Progress" style={{ listStyle: 'none', display: 'flex', gap: 4, margin: 0, padding: 0 }}>
       {STEPS.map((step, i) => (
         <li key={step} className="portal-step" aria-current={i === current ? 'step' : undefined} style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ height: 5, borderRadius: 99, background: i <= current ? '#003F8A' : '#E2E8F0' }} />
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 6, fontSize: '0.68rem', fontWeight: i === current ? 800 : 600, color: i <= current ? '#0F172A' : '#64748B', whiteSpace: 'nowrap' }}>
+          <div style={{ height: 5, borderRadius: 99, background: i <= current ? '#0B1F3A' : '#E2E8F0' }} />
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 6, fontSize: '0.68rem', fontWeight: i === current ? 800 : 600, color: i <= current ? '#0B1F3A' : '#737373', whiteSpace: 'nowrap' }}>
             {i < current && <Check size={10} aria-hidden="true" style={{ color: '#047857', flexShrink: 0 }} />}
             <span className="portal-step-text" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{step}</span>
           </span>
@@ -107,16 +107,16 @@ function Progress({ status }: { status: string }) {
 function Tile({ icon, label, value, hint, tone }: { icon: React.ReactNode; label: string; value: string | number; hint?: string; tone: string }) {
   return (
     <div className="glass-card" style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#475569' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#525252' }}>
         <span aria-hidden="true" style={{ color: tone, display: 'inline-flex' }}>{icon}</span>{label}
       </span>
-      <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.1, overflowWrap: 'anywhere' }}>{value}</span>
-      {hint && <span style={{ fontSize: '0.76rem', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hint}</span>}
+      <span style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0B1F3A', lineHeight: 1.1, overflowWrap: 'anywhere' }}>{value}</span>
+      {hint && <span style={{ fontSize: '0.76rem', color: '#525252', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hint}</span>}
     </div>
   );
 }
 
-const sectionTitle = { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', margin: '1.75rem 0 0.75rem', display: 'flex', alignItems: 'center', gap: 8 } as const;
+const sectionTitle = { fontSize: '1.05rem', fontWeight: 800, color: '#0B1F3A', margin: '1.75rem 0 0.75rem', display: 'flex', alignItems: 'center', gap: 8 } as const;
 
 const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
   const { user } = useAuth();
@@ -185,10 +185,10 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
         {/* Greeting and the one primary action */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: '1.25rem' }}>
           <div>
-            <h1 style={{ fontSize: 'clamp(1.4rem,3vw,1.9rem)', fontFamily: 'var(--font-body)', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+            <h1 style={{ fontSize: 'clamp(1.4rem,3vw,1.9rem)', fontFamily: 'var(--font-body)', fontWeight: 800, color: '#0B1F3A', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
               {firstName ? `Hi ${firstName}` : 'Your design requests'}
             </h1>
-            <p style={{ fontSize: '0.9rem', color: '#475569', marginTop: 6 }}>
+            <p style={{ fontSize: '0.9rem', color: '#525252', marginTop: 6 }}>
               {stats.waiting > 0 ? `${stats.waiting} request${stats.waiting === 1 ? ' needs' : 's need'} you.` : 'Nothing needs you right now.'}{' '}
               {stats.open > 0 ? `${stats.open} in progress.` : ''}
             </p>
@@ -205,20 +205,20 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
 
         {/* Summary */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
-          <Tile icon={<Clock size={14} />} label="In progress" value={stats.open} tone="#0056B3" />
-          <Tile icon={<AlertCircle size={14} />} label="Waiting for you" value={stats.waiting} tone={stats.waiting ? '#B45309' : '#475569'} />
+          <Tile icon={<Clock size={14} />} label="In progress" value={stats.open} tone="#1E3A5F" />
+          <Tile icon={<AlertCircle size={14} />} label="Waiting for you" value={stats.waiting} tone={stats.waiting ? '#B45309' : '#525252'} />
           <Tile icon={<CheckCircle2 size={14} />} label="Delivered this month" value={stats.deliveredThisMonth} tone="#047857" />
-          <Tile icon={<CalendarClock size={14} />} label="Next delivery" value={stats.next?.date ?? '—'} hint={stats.next?.title} tone="#003F8A" />
+          <Tile icon={<CalendarClock size={14} />} label="Next delivery" value={stats.next?.date ?? '—'} hint={stats.next?.title} tone="#0B1F3A" />
         </div>
 
         {/* Search and filters apply to every section below */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginTop: '1.25rem' }}>
           <div style={{ position: 'relative', flex: '1 1 240px', minWidth: 180 }}>
-            <Search size={15} aria-hidden="true" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} />
+            <Search size={15} aria-hidden="true" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#737373' }} />
             <input className="input-field" aria-label="Search requests" placeholder="Search your requests" value={query} onChange={e => setQuery(e.target.value)} style={{ width: '100%', paddingLeft: '2.2rem' }} />
           </div>
           <button type="button" className="btn-ghost" aria-expanded={showFilters} aria-controls="portal-filters" onClick={() => setShowFilters(v => !v)} style={{ gap: 6 }}>
-            <SlidersHorizontal size={14} aria-hidden="true" /> Filters{advanced > 0 && <span style={{ background: '#003F8A', color: 'white', borderRadius: 99, fontSize: '0.66rem', fontWeight: 800, padding: '0 6px' }}>{advanced}</span>}
+            <SlidersHorizontal size={14} aria-hidden="true" /> Filters{advanced > 0 && <span style={{ background: '#0B1F3A', color: 'white', borderRadius: 99, fontSize: '0.66rem', fontWeight: 800, padding: '0 6px' }}>{advanced}</span>}
           </button>
           {hasFilters && (
             <button type="button" className="chip" onClick={clearFilters} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><X size={12} aria-hidden="true" /> Clear</button>
@@ -226,23 +226,23 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
         </div>
         {showFilters && (
           <div id="portal-filters" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, padding: '0.9rem', background: 'white', border: '1px solid rgba(226,232,240,0.9)', borderRadius: 12, marginTop: 10 }}>
-            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>Design type
+            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#525252' }}>Design type
               <select className="input-field" value={designType} onChange={e => setDesignType(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4 }}>
                 <option value="">All design types</option>
                 {designTypes.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </label>
-            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>Requested from
+            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#525252' }}>Requested from
               <input className="input-field" type="date" value={from} max={to || undefined} onChange={e => setFrom(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4 }} />
             </label>
-            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>Requested to
+            <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#525252' }}>Requested to
               <input className="input-field" type="date" value={to} min={from || undefined} onChange={e => setTo(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4 }} />
             </label>
           </div>
         )}
 
         {error && <p role="alert" style={{ color: '#B91C1C', fontSize: '0.85rem', marginTop: 12 }}>{error} <button type="button" className="chip" onClick={() => void refresh()}>Retry</button></p>}
-        {loading && tickets.length === 0 && <p role="status" style={{ color: '#475569', marginTop: 12 }}>Loading your requests…</p>}
+        {loading && tickets.length === 0 && <p role="status" style={{ color: '#525252', marginTop: 12 }}>Loading your requests…</p>}
 
         {/* 1. Needs your action */}
         {needsYou.length > 0 && (
@@ -258,8 +258,8 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 150px) 1fr', gap: '1rem', padding: '1rem 1.1rem', alignItems: 'center' }} className="portal-action">
                       <Thumb proof={o?.latest_proof ?? null} height={110} />
                       <div style={{ minWidth: 0 }}>
-                        <p style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: '#475569', fontWeight: 700 }}>{t.number}{t.design_type ? ` · ${t.design_type}` : ''}</p>
-                        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', margin: '2px 0 4px', overflowWrap: 'anywhere' }}>{t.title}</h3>
+                        <p style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: '#525252', fontWeight: 700 }}>{t.number}{t.design_type ? ` · ${t.design_type}` : ''}</p>
+                        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0B1F3A', margin: '2px 0 4px', overflowWrap: 'anywhere' }}>{t.title}</h3>
                         <p style={{ fontSize: '0.88rem', color: '#334155' }}>{nowLine(t)}</p>
                         {reviewing && o?.review && (
                           <p style={{ fontSize: '0.82rem', fontWeight: 800, color: '#B45309', marginTop: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -274,7 +274,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
                       </div>
                     </div>
                     {open && (
-                      <div style={{ padding: '1.1rem', background: '#F8FAFC', borderTop: '1px solid rgba(226,232,240,0.85)' }}>
+                      <div style={{ padding: '1.1rem', background: '#FAFAFA', borderTop: '1px solid rgba(226,232,240,0.85)' }}>
                         <ProofApprovalPanel ticket={t} />
                       </div>
                     )}
@@ -287,11 +287,11 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
 
         {/* 2. In progress */}
         <section aria-labelledby="progress-h">
-          <h2 id="progress-h" style={sectionTitle}><Clock size={18} aria-hidden="true" style={{ color: '#0056B3' }} /> In progress</h2>
+          <h2 id="progress-h" style={sectionTitle}><Clock size={18} aria-hidden="true" style={{ color: '#1E3A5F' }} /> In progress</h2>
           {inProgress.length === 0 ? (
             <div className="glass-card" style={{ textAlign: 'center', padding: '2rem 1.5rem', border: '2px dashed rgba(226,232,240,0.85)' }}>
-              <TicketIcon size={22} aria-hidden="true" style={{ color: '#003F8A', margin: '0 auto 8px' }} />
-              <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A' }}>
+              <TicketIcon size={22} aria-hidden="true" style={{ color: '#0B1F3A', margin: '0 auto 8px' }} />
+              <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0B1F3A' }}>
                 {hasFilters ? 'No requests in progress match your search' : tickets.length === 0 ? 'Make your first request' : 'Nothing in progress right now'}
               </p>
               {!hasFilters && (
@@ -311,10 +311,10 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
                       {o?.latest_proof && <Thumb proof={o.latest_proof} height={84} />}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                          <p style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: '#475569', fontWeight: 700 }}>{t.number}{t.design_type ? ` · ${t.design_type}` : ''}</p>
+                          <p style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: '#525252', fontWeight: 700 }}>{t.number}{t.design_type ? ` · ${t.design_type}` : ''}</p>
                           <p style={{ fontSize: '0.8rem', fontWeight: 700, color: expected.tone }}>{expected.text}</p>
                         </div>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0F172A', margin: '2px 0 4px', overflowWrap: 'anywhere' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0B1F3A', margin: '2px 0 4px', overflowWrap: 'anywhere' }}>
                           <Link to={`/tickets/${t.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>{t.title}</Link>
                         </h3>
                         <p style={{ fontSize: '0.86rem', color: '#334155', marginBottom: 10 }}>{nowLine(t)}</p>
@@ -330,7 +330,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
                       </div>
                     </div>
                     {open && (
-                      <div style={{ padding: '1.1rem', background: '#F8FAFC', borderTop: '1px solid rgba(226,232,240,0.85)' }}>
+                      <div style={{ padding: '1.1rem', background: '#FAFAFA', borderTop: '1px solid rgba(226,232,240,0.85)' }}>
                         <ProofApprovalPanel ticket={t} />
                       </div>
                     )}
@@ -345,7 +345,7 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
         <section aria-labelledby="finished-h">
           <h2 id="finished-h" style={sectionTitle}><CheckCircle2 size={18} aria-hidden="true" style={{ color: '#047857' }} /> Finished designs</h2>
           {finished.length === 0 ? (
-            <p style={{ fontSize: '0.88rem', color: '#475569' }}>{hasFilters ? 'No finished designs match your search.' : 'Delivered designs will appear here, ready to download.'}</p>
+            <p style={{ fontSize: '0.88rem', color: '#525252' }}>{hasFilters ? 'No finished designs match your search.' : 'Delivered designs will appear here, ready to download.'}</p>
           ) : (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
@@ -356,10 +356,10 @@ const ClientPortalPage = ({ onNewRequest }: { onNewRequest?: () => void }) => {
                     <article key={t.id} aria-label={`${t.number} ${t.title}`} className="glass-card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
                       <Thumb proof={o?.latest_proof ?? null} height={130} />
                       <div style={{ minWidth: 0 }}>
-                        <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0F172A', overflowWrap: 'anywhere', lineHeight: 1.3 }}>
+                        <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0B1F3A', overflowWrap: 'anywhere', lineHeight: 1.3 }}>
                           <Link to={`/tickets/${t.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>{t.title}</Link>
                         </h3>
-                        <p style={{ fontSize: '0.74rem', color: '#475569', marginTop: 2 }}>{t.number}{delivered ? ` · Delivered ${delivered}` : ''}</p>
+                        <p style={{ fontSize: '0.74rem', color: '#525252', marginTop: 2 }}>{t.number}{delivered ? ` · Delivered ${delivered}` : ''}</p>
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 'auto', flexWrap: 'wrap' }}>
                         <button type="button" className="btn-primary" style={{ gap: 5, fontSize: '0.78rem', padding: '0.4rem 0.7rem' }}

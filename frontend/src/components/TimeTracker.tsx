@@ -95,27 +95,27 @@ export default function TimeTracker({ ticket, showEntries = true }: { ticket: Ti
   const over = est != null && elapsed / 3600 > est;
 
   return (
-    <div style={{ background: running ? 'rgba(16,185,129,0.05)' : '#F8FAFC', border: `1px solid ${running ? 'rgba(16,185,129,0.2)' : 'rgba(226,232,240,0.85)'}`, borderRadius: 'var(--radius-md)', padding: '0.875rem 1rem' }}>
+    <div style={{ background: running ? 'rgba(46,139,87,0.05)' : '#FAFAFA', border: `1px solid ${running ? 'rgba(46,139,87,0.2)' : 'rgba(226,232,240,0.85)'}`, borderRadius: 'var(--radius-md)', padding: '0.875rem 1rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: running ? 'rgba(16,185,129,0.12)' : 'rgba(0,63,138,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: running ? '#059669' : '#003F8A' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: running ? 'rgba(46,139,87,0.12)' : 'rgba(11,31,58,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: running ? '#256B45' : '#0B1F3A' }}>
             <Clock size={15} />
           </div>
           <div>
             <p className="section-label">Time logged</p>
-            <p style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: running ? '#059669' : '#0F172A', lineHeight: 1 }}>{fmtClock(elapsed)}</p>
+            <p style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: running ? '#256B45' : '#0B1F3A', lineHeight: 1 }}>{fmtClock(elapsed)}</p>
           </div>
         </div>
         <button type="button" onClick={() => void toggle()} disabled={busy}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.5rem 1rem', borderRadius: 'var(--radius-btn)', border: 'none', cursor: busy ? 'wait' : 'pointer',
-                   background: running ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', color: running ? '#b91c1c' : '#059669', fontSize: '0.78rem', fontWeight: 800 }}>
+                   background: running ? 'rgba(225,29,72,0.1)' : 'rgba(46,139,87,0.1)', color: running ? '#b91c1c' : '#256B45', fontSize: '0.78rem', fontWeight: 800 }}>
           {running ? <><Pause size={13} /> Stop</> : <><Play size={13} /> Start</>}
         </button>
       </div>
 
       {running && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: '0.7rem', color: '#059669', fontWeight: 700 }}>
-          <span style={{ width: 6, height: 6, borderRadius: 99, background: '#10B981', display: 'inline-block', animation: 'pulse-dot 1.2s ease-in-out infinite' }} /> Timer running…
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: '0.7rem', color: '#256B45', fontWeight: 700 }}>
+          <span style={{ width: 6, height: 6, borderRadius: 99, background: '#2E8B57', display: 'inline-block', animation: 'pulse-dot 1.2s ease-in-out infinite' }} /> Timer running…
         </div>
       )}
 
@@ -134,7 +134,7 @@ export default function TimeTracker({ ticket, showEntries = true }: { ticket: Ti
         {pct !== null && (
           <>
             <div style={{ height: 5, background: 'rgba(226,232,240,0.8)', borderRadius: 99, marginTop: 6, overflow: 'hidden' }} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Time used versus estimate">
-              <div style={{ height: '100%', width: `${pct}%`, background: over ? '#EF4444' : '#10B981', transition: 'width 0.3s' }} />
+              <div style={{ height: '100%', width: `${pct}%`, background: over ? '#EF4444' : '#2E8B57', transition: 'width 0.3s' }} />
             </div>
             <p style={{ fontSize: '0.68rem', color: over ? '#b91c1c' : '#64748b', marginTop: 3 }}>{over ? 'Over estimate' : `${pct}% of estimate used`}</p>
           </>
@@ -166,17 +166,17 @@ export default function TimeTracker({ ticket, showEntries = true }: { ticket: Ti
           )}
 
           {entries.length === 0 ? (
-            <p style={{ fontSize: '0.74rem', color: '#64748B', marginTop: 6 }}>No time recorded yet.</p>
+            <p style={{ fontSize: '0.74rem', color: '#737373', marginTop: 6 }}>No time recorded yet.</p>
           ) : (
             <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 150, overflowY: 'auto' }}>
               {entries.map(en => (
-                <li key={en.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', color: '#475569' }}>
+                <li key={en.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', color: '#525252' }}>
                   <strong style={{ minWidth: 48 }}>{en.ended_at ? fmtHm(en.seconds) : 'running'}</strong>
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {en.user_name}{en.note ? ` — ${en.note}` : ''} <span style={{ color: '#64748B' }}>· {en.source} · {new Date(en.started_at).toLocaleDateString([], { day: 'numeric', month: 'short' })}</span>
+                    {en.user_name}{en.note ? ` — ${en.note}` : ''} <span style={{ color: '#737373' }}>· {en.source} · {new Date(en.started_at).toLocaleDateString([], { day: 'numeric', month: 'short' })}</span>
                   </span>
                   {en.ended_at && (en.user_id === myId || isLead) && (
-                    <button type="button" aria-label="Delete time entry" onClick={() => void removeEntry(en.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748B', padding: 2 }}><Trash2 size={12} /></button>
+                    <button type="button" aria-label="Delete time entry" onClick={() => void removeEntry(en.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#737373', padding: 2 }}><Trash2 size={12} /></button>
                   )}
                 </li>
               ))}

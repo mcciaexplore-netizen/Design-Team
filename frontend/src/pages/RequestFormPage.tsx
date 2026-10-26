@@ -13,7 +13,7 @@ interface Created { ticket_number: string; design: string; tracking_url: string 
 export default function RequestFormPage() {
   const { options, error: loadError } = useRequestFormOptions();
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #F8FAFC)', padding: '2rem 1rem' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #FAFAFA)', padding: '2rem 1rem' }}>
       <main style={{ maxWidth: 640, margin: '0 auto' }}>
         <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 44, marginBottom: 16 }} />
         <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-strong)' }}>Request for Creative / Graphic Design work</h1>
@@ -62,7 +62,7 @@ function RequestFormBody({ options }: { options: RequestFormOptions }) {
   if (done) {
     return (
       <div className="glass-card" role="status" style={{ padding: '2rem', textAlign: 'center' }}>
-        <CheckCircle2 size={36} color="#059669" style={{ margin: '0 auto 10px' }} />
+        <CheckCircle2 size={36} color="#256B45" style={{ margin: '0 auto 10px' }} />
         <h2 style={{ fontWeight: 800, marginBottom: 6 }}>Request received</h2>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)' }}>
           {done.tickets[0] && <>Your ticket number is <strong>{done.tickets[0].ticket_number}</strong>. </>}The design team has been notified and will be in touch.

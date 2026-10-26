@@ -39,7 +39,7 @@ export default function FileDropzone({ id, files, notes, maxFiles, maxMb, totalM
       <div
         onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
         onDrop={e => { e.preventDefault(); setDragging(false); onAdd(Array.from(e.dataTransfer.files)); }}
-        style={{ border: `2px dashed ${dragging ? '#003F8A' : 'rgba(203,213,225,0.9)'}`, background: dragging ? 'var(--brand-soft)' : '#F8FAFC', borderRadius: 12, padding: '0.9rem', textAlign: 'center' }}>
+        style={{ border: `2px dashed ${dragging ? '#0B1F3A' : 'rgba(203,213,225,0.9)'}`, background: dragging ? 'var(--brand-soft)' : '#FAFAFA', borderRadius: 12, padding: '0.9rem', textAlign: 'center' }}>
         <input id={id} ref={input} type="file" multiple hidden aria-describedby={notes.length ? `${id}-notes` : undefined}
           onChange={e => { onAdd(Array.from(e.target.files ?? [])); e.target.value = ''; }} />
         <p style={{ fontSize: '0.8rem', color: '#64748b' }}>
@@ -54,10 +54,10 @@ export default function FileDropzone({ id, files, notes, maxFiles, maxMb, totalM
       {files.length > 0 && (
         <ul aria-label="Attached files" style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {files.map((f, i) => (
-            <li key={`${f.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem', color: '#475569' }}>
+            <li key={`${f.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.8rem', color: '#525252' }}>
               <Thumb file={f} />
               <span style={{ flex: 1, overflowWrap: 'anywhere' }}>{f.name}</span>
-              <span style={{ color: '#64748B' }}>{fmtSize(f.size)}</span>
+              <span style={{ color: '#737373' }}>{fmtSize(f.size)}</span>
               <button type="button" aria-label={`Remove ${f.name}`} onClick={() => onRemove(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'flex' }}><X size={14} /></button>
             </li>
           ))}

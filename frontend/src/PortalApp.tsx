@@ -49,7 +49,7 @@ function PortalContent() {
 
   if (isLoading) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#003F8A' }}>
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0B1F3A' }}>
         <div style={{ textAlign: 'center', color: 'white' }}>
           <div className="app-spinner" role="status" aria-label="Loading" />
           <p style={{ fontSize: '0.9rem', fontFamily: 'var(--font-body)', opacity: 0.7, marginTop: 14 }}>Loading your portal…</p>

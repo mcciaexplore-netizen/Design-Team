@@ -24,7 +24,7 @@ def to(outbox, email):
 
 
 def link_token(body):
-    return re.search(r"https://app\.example\.com/my-requests\?token=(\S+)", body).group(1)
+    return re.search(r"https://app\.example\.com/client/(\S+)", body).group(1)
 
 
 def submit(client, email, event):
@@ -53,8 +53,8 @@ def test_confirmation_email_links_to_all_requests_and_shows_only_that_persons(cl
 def test_asking_for_the_link_by_email_gives_the_same_answer_for_anyone(client, outbox):
     submit(client, "meera@example.com", "Expo")
     outbox.clear()
-    known = client.post("/api/public/my-requests/link", json={"email": " MEERA@example.com "})
-    unknown = client.post("/api/public/my-requests/link", json={"email": "nobody@example.com"})
+    known = client.post("/api/public/client-link", json={"email": " MEERA@example.com "})
+    unknown = client.post("/api/public/client-link", json={"email": "nobody@example.com"})
     assert known.status_code == unknown.status_code == 200 and known.json() == unknown.json()
     assert [to for to, _, _ in outbox] == ["meera@example.com"]
     assert client.get("/api/public/my-requests", params={"token": link_token(to(outbox, "meera@example.com")[0][2])}).status_code == 200
@@ -70,7 +70,7 @@ def test_bad_or_wrong_purpose_tokens_are_refused(client, outbox):
 
 
 def test_link_requests_are_rate_limited_and_need_email_set_up(client, outbox, monkeypatch):
-    codes = [client.post("/api/public/my-requests/link", json={"email": "x@example.com"}).status_code for _ in range(4)]
+    codes = [client.post("/api/public/client-link", json={"email": "x@example.com"}).status_code for _ in range(4)]
     assert codes == [200, 200, 200, 429]
     monkeypatch.delenv("SMTP_HOST")
-    assert client.post("/api/public/my-requests/link", json={"email": "y@example.com"}).status_code == 503
+    assert client.post("/api/public/client-link", json={"email": "y@example.com"}).status_code == 503

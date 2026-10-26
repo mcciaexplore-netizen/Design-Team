@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -175,14 +177,32 @@ def test_live_feed_delivers_events_only_to_people_who_may_see_them(client):
         assert ws_acme.receive_json()["title"] == "Acme flyer"
 
 
-def test_register_creates_scoped_client_only(client):
-    c = client
-    body = {"full_name": "New Client", "email": "NewClient@Example.com", "company": "Zeta Corp Test", "password": "longenough1"}
-    r = c.post("/api/auth/register", json=body)
-    assert r.status_code == 201
-    assert r.json()["user"]["role"] == "Client" and r.json()["user"]["client_org"] == "Zeta Corp Test"
-    assert c.post("/api/auth/register", json=body).status_code == 409
-    assert c.post("/api/auth/register", json={**body, "email": "other@example.com", "company": "zeta corp test"}).status_code == 409
-    assert c.post("/api/auth/register", json={**body, "email": "q@example.com", "company": "tata"}).status_code == 409
-    assert c.post("/api/auth/register", json={**body, "email": "x@example.com", "company": "Y Co", "password": "short"}).status_code == 422
-    assert c.post("/api/auth/register", json={**body, "email": "z@example.com", "company": "Z Co", "role": "ADMIN"}).json()["user"]["role"] == "Client"
+def test_client_link_creates_scoped_client_and_exchanges_for_a_session(client, monkeypatch):
+    import delivery
+    sent = []
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://app.example.com")
+    monkeypatch.setattr(delivery, "send_email", lambda to, subject, body: sent.append((to, subject, body)) or (True, "Sent"))
+
+    def link_token(sent_mail):
+        return re.search(r"https://app\.example\.com/client/(\S+)", sent_mail[0][2]).group(1)
+
+    r = client.post("/api/public/client-link", json={"email": "new@example.com", "company": "Zeta Corp Test"})
+    assert r.status_code == 200
+    assert len(sent) == 1 and sent[0][0] == "new@example.com"
+    token = link_token(sent)
+
+    sent.clear()   # a second person at the same company (any casing) joins it instead of a second record
+    r2 = client.post("/api/public/client-link", json={"email": "other@example.com", "company": "zeta corp test"})
+    assert r2.status_code == 200
+    token2 = link_token(sent)
+
+    exchanged = client.post("/api/public/client-link/exchange", params={"token": token})
+    assert exchanged.status_code == 200
+    user = exchanged.json()["user"]
+    assert user["role"] == "Client" and user["client_org"] == "Zeta Corp Test" and exchanged.json()["access_token"]
+
+    exchanged2 = client.post("/api/public/client-link/exchange", params={"token": token2})
+    assert exchanged2.json()["user"]["client_org"] == "Zeta Corp Test"   # joined, not a second casing
+
+    assert client.post("/api/public/client-link/exchange", params={"token": "nonsense"}).status_code == 404

@@ -18,7 +18,7 @@ import ratelimit
 from auth import get_current_user
 from common import MAX_CDR_BYTES, MAX_UPLOAD_BYTES, compute_due_at, log_audit, next_ticket_number, read_upload, store_bytes
 from database import get_db
-from tracking import my_requests_url, tracking_url
+from tracking import client_link_url, tracking_url
 
 router = APIRouter(tags=["request-form"])
 
@@ -51,6 +51,9 @@ def _q(id: str, label: str, type: str = "text", options: Optional[list] = None, 
     return {"id": id, "label": label, "type": type, "options": options or [], "required": required}
 
 
+# Every design asks the same language question, so it's added to each list below rather than repeated.
+LANGUAGE_Q = _q("language", "Language", "select", ["English", "Hindi", "Marathi"])
+
 # Extra questions per design requirement. The form renders whatever is listed here, and answers are stored
 # in type_specific_fields["details"] by question id. type is "text", "select", "multiselect" or "number".
 QUESTIONS = {
@@ -58,52 +61,56 @@ QUESTIONS = {
         _q("size", "Size", "select", ["A4", "A5", "Square", "Custom"], required=True),
         _q("custom_size", "Custom size (if Custom)"),
         _q("channel", "Where will it be shared?", "select", ["Email", "Print"], required=True),
+        LANGUAGE_Q,
     ],
     "WhatsApp creative": [
-        _q("format", "Format details"),
         _q("message", "Message or call-to-action to show on it"),
-        _q("language", "Language"),
+        LANGUAGE_Q,
     ],
     "Instagram post": [
-        _q("format", "Format details"),
         _q("slides", "Number of slides (for a carousel)", "number"),
         _q("tag", "Account or people to tag"),
+        LANGUAGE_Q,
     ],
     "LinkedIn post": [
-        _q("format", "Format details"),
         _q("slides", "Number of slides (for a carousel)", "number"),
         _q("tag", "Page or people to tag"),
+        LANGUAGE_Q,
     ],
     "Twitter / X post": [
-        _q("format", "Format details"),
+        LANGUAGE_Q,
     ],
     "Flex/Banner/Standee": [
         _q("size", "Size (width x height)", required=True),
         _q("medium", "Print or digital?", "select", ["Print", "Digital"], required=True),
         _q("quantity", "Quantity", "number"),
+        LANGUAGE_Q,
     ],
     "Digital Backdrop & Slides": [
         _q("slides", "Number of slides", "number", required=True),
         _q("aspect_ratio", "Aspect ratio", "select", ["16:9", "4:3"], required=True),
+        LANGUAGE_Q,
     ],
     "Book": [
         _q("pages", "Number of pages", "number", required=True),
         _q("content_ready", "Is the content ready?", "select", ["Yes, all of it", "Partly", "No"], required=True),
+        LANGUAGE_Q,
     ],
     "2 pages Brochure": [
         _q("copy", "Copy", "select", ["Copy provided", "Needs writing"], required=True),
-        _q("language", "Language", required=True),
+        LANGUAGE_Q,
     ],
     "4 pages Brochure": [
         _q("copy", "Copy", "select", ["Copy provided", "Needs writing"], required=True),
-        _q("language", "Language", required=True),
+        LANGUAGE_Q,
     ],
     "Photo/Video/Reel": [
         _q("duration", "Duration (if video or reel)"),
         _q("platform", "Platform"),
         _q("shoot", "Shoot date and location"),
+        LANGUAGE_Q,
     ],
-    OTHER: [],
+    OTHER: [LANGUAGE_Q],
 }
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -355,10 +362,8 @@ def _send_confirmation(requester: models.User, tickets: list, f: "RequestFields"
         "Follow progress any time, no login needed:",
         f"{ticket.ticket_number}: {tracking_url(ticket.ticket_number)}",
         "",
-        "See all your requests in one place (this link works for 30 days):",
-        my_requests_url(requester),
-        "",
-        "MCCIA Applied AI Studio",
+        "See all your requests and campaigns, no password needed (this link works for 90 days):",
+        client_link_url(requester),
     ])
     subject = f"Design request received: {ticket.ticket_number}"
     delivery.run_in_background(delivery.send_email, requester.email, subject[:150], body)

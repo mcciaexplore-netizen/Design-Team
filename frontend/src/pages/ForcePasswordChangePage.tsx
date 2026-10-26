@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 export default function ForcePasswordChangePage() {
   const { user, logout } = useAuth();
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1.25rem', background: 'var(--app-bg, #F8FAFC)' }}>
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1.25rem', background: 'var(--app-bg, #FAFAFA)' }}>
       <div className="glass-card" style={{ width: '100%', maxWidth: 460, padding: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <div className="icon-tile" aria-hidden="true"><ShieldAlert size={18} /></div>

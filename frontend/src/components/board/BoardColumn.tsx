@@ -4,10 +4,10 @@ import { AlertTriangle } from 'lucide-react';
 
 export const STATUS_COLORS: Record<string, string> = {
   'New':                  '#94a3b8',
-  'Assigned':             '#475569',
-  'In Progress':          '#0056B3',
+  'Assigned':             '#525252',
+  'In Progress':          '#1E3A5F',
   'Waiting on Requester': '#f59e0b',
-  'In Review':            '#003F8A',
+  'In Review':            '#0B1F3A',
   'Delivered':            '#10b981',
   'Closed':               '#047857',
 };
@@ -23,8 +23,8 @@ export function DroppableColumn({ id, label, count, wipLimit, isOver, children }
     <div ref={setNodeRef} className="glass-card" style={{
       flexShrink: 0, width: 276,
       display: 'flex', flexDirection: 'column',
-      background: isOver ? 'rgba(0,63,138,0.015)' : undefined,
-      border: isOver ? '1px solid rgba(0,63,138,0.18)' : undefined,
+      background: isOver ? 'rgba(11,31,58,0.015)' : undefined,
+      border: isOver ? '1px solid rgba(11,31,58,0.18)' : undefined,
       maxHeight: '100%', transition: 'border-color 0.2s, background 0.2s',
     }}>
       {/* Column header */}
@@ -36,15 +36,15 @@ export function DroppableColumn({ id, label, count, wipLimit, isOver, children }
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <span style={{ width: 8, height: 8, borderRadius: 99, background: dotColor, flexShrink: 0, opacity: isOver ? 1 : 0.85 }} />
-          <h3 style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: isOver ? '#0056B3' : '#374151' }}>{label}</h3>
+          <h3 style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: isOver ? '#1E3A5F' : '#374151' }}>{label}</h3>
         </div>
         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
           {exceeded && (
-            <span title={`WIP limit: ${wipLimit}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 6, padding: '1px 6px', color: '#B91C1C', fontSize: '0.62rem', fontWeight: 800 }}>
+            <span title={`WIP limit: ${wipLimit}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(225,29,72,0.08)', border: '1px solid rgba(225,29,72,0.18)', borderRadius: 6, padding: '1px 6px', color: '#B91C1C', fontSize: '0.62rem', fontWeight: 800 }}>
               <AlertTriangle size={9} /> {count}/{wipLimit}
             </span>
           )}
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 6, background: isOver ? 'rgba(0,63,138,0.12)' : '#f1f5f9', border: `1px solid ${isOver ? 'rgba(0,63,138,0.2)' : '#e2e8f0'}`, fontSize: '0.65rem', fontWeight: 800, color: isOver ? '#0056B3' : '#64748B', padding: '0 5px' }}>{count}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 6, background: isOver ? 'rgba(11,31,58,0.12)' : '#f1f5f9', border: `1px solid ${isOver ? 'rgba(11,31,58,0.2)' : '#e2e8f0'}`, fontSize: '0.65rem', fontWeight: 800, color: isOver ? '#1E3A5F' : '#737373', padding: '0 5px' }}>{count}</span>
         </div>
       </div>
       <div style={{ padding: '0.625rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

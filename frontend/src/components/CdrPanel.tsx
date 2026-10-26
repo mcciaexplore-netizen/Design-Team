@@ -65,10 +65,10 @@ export default function CdrPanel({ ticket }: { ticket: Ticket }) {
         )}
       </div>
 
-      {!releasable && <p style={{ fontSize: '0.8rem', color: '#64748B' }}>The editable source file can be requested once the design is approved.</p>}
+      {!releasable && <p style={{ fontSize: '0.8rem', color: '#737373' }}>The editable source file can be requested once the design is approved.</p>}
       {error && <p role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c' }}>{error}</p>}
-      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#64748B' }}>Loading…</p>}
-      {!loading && releasable && requests.length === 0 && <p style={{ fontSize: '0.8rem', color: '#64748B' }}>No source file requested yet.</p>}
+      {loading && <p role="status" style={{ fontSize: '0.8rem', color: '#737373' }}>Loading…</p>}
+      {!loading && releasable && requests.length === 0 && <p style={{ fontSize: '0.8rem', color: '#737373' }}>No source file requested yet.</p>}
 
       <input ref={fileRef} type="file" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void upload(f); }} />
 
@@ -76,7 +76,7 @@ export default function CdrPanel({ ticket }: { ticket: Ticket }) {
         <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '0.6rem 0.75rem', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 8 }}>
           <div>
             <span className={BADGE[r.status]}>{r.status === 'Requested' ? 'Awaiting lead approval' : r.status === 'Approved' ? 'Approved, awaiting upload' : r.status}</span>
-            <p style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 4 }}>
+            <p style={{ fontSize: '0.72rem', color: '#737373', marginTop: 4 }}>
               {r.requested_by ?? 'Someone'} · {fmt(r.created_at)}{r.decided_by ? ` · decided by ${r.decided_by}` : ''}
             </p>
           </div>
