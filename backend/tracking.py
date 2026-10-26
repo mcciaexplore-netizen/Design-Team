@@ -113,6 +113,18 @@ class ClientLinkRequest(BaseModel):
     company: Optional[str] = Field(default=None, min_length=2, max_length=80)
 
 
+def _company_domain_matches(db: Session, company: str, email: str) -> bool:
+    """Whether anyone already on `company` shares this email's domain: the only evidence, short of a staff
+    invite, that a new signup actually belongs there rather than just knowing (or guessing) the name."""
+    domain = email.rsplit("@", 1)[-1]
+    if not domain:
+        return False
+    members = {e for (e,) in db.query(models.User.email).filter(func.lower(models.User.client_org) == company.lower())}
+    members |= {e for (e,) in db.query(models.User.email).join(models.Ticket, models.Ticket.requester_id == models.User.id)
+                .filter(func.lower(models.Ticket.client_org) == company.lower())}
+    return any(m.rsplit("@", 1)[-1] == domain for m in members)
+
+
 @router.post("/api/public/client-link")
 def email_client_link(body: ClientLinkRequest, request: Request, db: Session = Depends(get_db)):
     """Email one link to a client's requests and campaigns. The answer never says whether the email is
@@ -129,15 +141,19 @@ def email_client_link(body: ClientLinkRequest, request: Request, db: Session = D
     user = db.query(models.User).filter(models.User.email == email).first()
     if user and user.role != models.RoleEnum.REQUESTER:
         return {"detail": LINK_SENT}   # a staff email: say nothing, same as an unknown one
+    if company:
+        existing = match_existing_company_name(db, company)
+        # An existing company only gets joined by an email on the same domain as someone already there; a
+        # name match alone (company names are public, on the requests board) must never grant its tickets.
+        company = existing if existing and _company_domain_matches(db, existing, email) else (None if existing else company)
     if not user and company:
         user = models.User(email=email, full_name=email.split("@")[0], role=models.RoleEnum.REQUESTER,
-                           client_org=match_existing_company_name(db, company) or company,
-                           hashed_password=auth.hash_password(auth.generate_temp_password()))
+                           client_org=company, hashed_password=auth.hash_password(auth.generate_temp_password()))
         db.add(user)
         db.commit()
         db.refresh(user)
     elif user and company and not user.client_org:
-        user.client_org = match_existing_company_name(db, company) or company
+        user.client_org = company
         db.commit()
     if user and user.is_active:
         delivery.run_in_background(delivery.send_email, user.email, "Your DesignDesk sign-in link", (

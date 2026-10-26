@@ -27,6 +27,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     created_at: UTCDateTime
+    is_active: bool
     model_config = ConfigDict(from_attributes=True)
 
 # Design Type Schemas

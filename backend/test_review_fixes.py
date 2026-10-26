@@ -87,9 +87,26 @@ def test_a_client_link_for_a_company_name_still_on_old_tickets_joins_it(client, 
 
     t = make_ticket(client, "a@tata.com")
     update(models.Ticket, t["id"], client_org="Old Co")
-    r = client.post("/api/public/client-link", json={"full_name": "New Person", "email": "new@old.co", "company": "old co"})
+    # Same domain as the ticket's own requester (a@tata.com): a real colleague, so the join is allowed.
+    r = client.post("/api/public/client-link", json={"full_name": "New Person", "email": "new@tata.com", "company": "old co"})
     assert r.status_code == 200
-    mail = next(m for m in sent if m[0] == "new@old.co")
+    mail = next(m for m in sent if m[0] == "new@tata.com")
     token = re.search(r"https://app\.example\.com/client/(\S+)", mail[2]).group(1)
     exchanged = client.post("/api/public/client-link/exchange", params={"token": token})
     assert exchanged.json()["user"]["client_org"] == "Old Co"   # joins using the ticket's existing casing, not the typed one
+
+
+def test_a_different_domain_cannot_claim_someone_elses_company(client, monkeypatch):
+    """Company names are public (the requests board shows them), so knowing one must never be enough to see
+    its tickets: only an email on the same domain as an existing member may join it."""
+    import delivery
+    sent = []
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://app.example.com")
+    monkeypatch.setattr(delivery, "send_email", lambda to, subject, body: sent.append((to, subject, body)) or (True, "Sent"))
+
+    make_ticket(client, "a@tata.com")   # client_org "TATA" from the shared fixture
+    sent.clear()
+    r = client.post("/api/public/client-link", json={"email": "attacker@evil.com", "company": "tata"})
+    assert r.status_code == 200
+    assert sent == []   # no account created, no link sent: the attempt is silently refused, not just unprivileged
