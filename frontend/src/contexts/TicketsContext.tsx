@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import type { Subtask, Ticket } from '../types';
 
 /* ── API shapes ───────────────────────────────── */
-interface ApiUser { id: number; email: string; full_name: string; role: 'Requester' | 'Designer' | 'Design Lead' | 'Admin' }
+interface ApiUser { id: number; email: string; full_name: string; role: 'Requester' | 'Designer' | 'Design Lead' | 'Admin'; is_active: boolean }
 
 export interface DesignType {
   id: number;
@@ -188,12 +188,15 @@ export function TicketsProvider({ children }: { children: React.ReactNode }) {
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
   }, [isAuthenticated, load]);
 
+  // Removed or deactivated accounts drop out of these lists; KanbanBoard still gives one a column if they
+  // hold a ticket (keyed off the tickets themselves), so past work stays visible without cluttering the
+  // person filter with accounts nobody can pick anymore.
   const staff = useMemo<StaffUser[]>(
-    () => users.filter(u => u.role !== 'Requester').map(u => ({ id: u.id, name: u.full_name, role: u.role, email: u.email })),
+    () => users.filter(u => u.role !== 'Requester' && u.is_active).map(u => ({ id: u.id, name: u.full_name, role: u.role, email: u.email })),
     [users],
   );
   const clients = useMemo<ClientUser[]>(
-    () => users.filter(u => u.role === 'Requester').map(u => ({ id: u.id, name: u.full_name, email: u.email })),
+    () => users.filter(u => u.role === 'Requester' && u.is_active).map(u => ({ id: u.id, name: u.full_name, email: u.email })),
     [users],
   );
 

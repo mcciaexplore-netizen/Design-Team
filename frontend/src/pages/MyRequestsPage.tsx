@@ -29,6 +29,7 @@ export default function MyRequestsPage() {
 
 function AskForLink() {
   const [email, setEmail] = useState('');
+  const [company, setCompany] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState('');
@@ -37,7 +38,9 @@ function AskForLink() {
     e.preventDefault();
     setError(''); setBusy(true);
     try {
-      setSent((await publicJson<{ detail: string }>('/api/public/client-link', { method: 'POST', json: { email: email.trim() } })).detail);
+      const body: { email: string; company?: string } = { email: email.trim() };
+      if (company.trim()) body.company = company.trim();
+      setSent((await publicJson<{ detail: string }>('/api/public/client-link', { method: 'POST', json: body })).detail);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally { setBusy(false); }
@@ -47,19 +50,24 @@ function AskForLink() {
     <div className="glass-card" style={{ padding: '1.75rem', maxWidth: 480 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
         <div className="icon-tile" aria-hidden="true"><Inbox size={18} /></div>
-        <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-strong)' }}>See all your requests</h1>
+        <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-strong)' }}>See your requests &amp; campaigns</h1>
       </div>
       {sent ? (
-        <p role="status" style={{ fontSize: '0.9rem', color: 'var(--text-soft)', lineHeight: 1.6 }}>{sent} Open it from your inbox to see every request and where it stands.</p>
+        <p role="status" style={{ fontSize: '0.9rem', color: 'var(--text-soft)', lineHeight: 1.6 }}>{sent} Open it from your inbox to see every request, and to add campaigns and posts.</p>
       ) : (
         <form onSubmit={e => void submit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <p style={{ fontSize: '0.88rem', color: 'var(--text-soft)', lineHeight: 1.6 }}>
-            No account or password needed. Enter the email you used for your requests and we'll send you a link to all of them.
+            No account or password needed. Enter your email and we'll send you a link to your requests and campaigns.
           </p>
           <div>
             <label htmlFor="mr-email" className="login-label">Email address</label>
             <input id="mr-email" type="email" required autoComplete="email" autoFocus className="input-field" style={{ width: '100%' }}
               value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+          </div>
+          <div>
+            <label htmlFor="mr-company" className="login-label">Company <span style={{ fontWeight: 400, color: 'var(--text-hint)' }}>(only needed the first time)</span></label>
+            <input id="mr-company" type="text" autoComplete="organization" className="input-field" style={{ width: '100%' }}
+              value={company} onChange={e => setCompany(e.target.value)} placeholder="Only if you haven't requested a design yet" />
           </div>
           {error && <p role="alert" style={{ fontSize: '0.84rem', color: 'var(--danger-text)', fontWeight: 600 }}>{error}</p>}
           <button type="submit" className="btn-primary" disabled={busy} aria-busy={busy} style={{ justifyContent: 'center' }}>
