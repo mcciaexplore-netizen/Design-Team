@@ -106,9 +106,9 @@ export default function RequestsBoardPage() {
               Every request to the design team and where it stands. No sign-in needed.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <a href="/my-requests" className="btn-ghost" style={{ textDecoration: 'none' }}>Campaigns &amp; your requests</a>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
             <a href="/request" className="btn-primary" style={{ textDecoration: 'none' }}>Submit a new request</a>
+            <a href="/my-requests" className="login-link-btn" style={{ fontSize: '0.82rem' }}>Campaigns &amp; your requests →</a>
           </div>
         </header>
 
