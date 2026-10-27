@@ -1,5 +1,6 @@
 # Pinned, like ../requirements.txt (the Vercel function's copy): keep the shared versions the same in both.
-fastapi==0.115.14
+fastapi==0.162.0
+starlette==1.10.0   # pinned explicitly: older releases have published advisories
 pydantic==2.14.1
 uvicorn==0.54.0
 sqlalchemy==2.1.6
@@ -16,5 +17,6 @@ cryptography==50.0.2   # signs the Google Drive service-account token (RS256)
 python-multipart==0.0.32
 httpx==0.28.1
 reportlab==5.0.1
+pillow==13.0.0   # reportlab dependency; 12.x has published advisories
 websockets==17.3
 pytest-xdist==3.8.0

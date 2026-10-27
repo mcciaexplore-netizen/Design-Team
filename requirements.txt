@@ -3,7 +3,8 @@
 # Versions are pinned: every deploy installs afresh, and an unpinned upgrade can change behaviour with no code change
 # (FastAPI 0.159 started reading a missing `bool = Form(default=True)` field as False). Upgrade on purpose, after the
 # tests pass.
-fastapi==0.115.14
+fastapi==0.162.0
+starlette==1.10.0   # pinned explicitly: older releases have published advisories
 pydantic==2.14.1
 uvicorn==0.54.0
 sqlalchemy==2.1.6
@@ -19,3 +20,4 @@ cryptography==50.0.2   # signs the Google Drive service-account token (RS256)
 python-multipart==0.0.32
 httpx==0.28.1
 reportlab==5.0.1
+pillow==13.0.0   # reportlab dependency; 12.x has published advisories
