@@ -326,7 +326,13 @@ function ClientLinkLanding() {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, textAlign: 'center', padding: '2rem' }}>
         <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-strong)' }}>{error}</p>
-        <a href="/request" className="btn-primary" style={{ textDecoration: 'none' }}>Submit a request instead</a>
+        {error.startsWith('This link') && (
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)', maxWidth: 420 }}>
+            Sign-in links now work once, for a short time. Enter your email and we'll send you a fresh one.
+          </p>
+        )}
+        <a href="/my-requests" className="btn-primary" style={{ textDecoration: 'none' }}>Get a new sign-in link</a>
+        <a href="/request" className="login-link-btn" style={{ fontSize: '0.85rem' }}>Or submit a new request</a>
       </div>
     );
   }
