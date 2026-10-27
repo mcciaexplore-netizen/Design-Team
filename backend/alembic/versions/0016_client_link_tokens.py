@@ -29,13 +29,13 @@ def upgrade() -> None:
         sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('used_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-        sa.ForeignKeyConstraint(['ticket_id'], ['tickets.id'], ),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['ticket_id'], ['tickets.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('token_hash')
     )
+    op.create_index('ix_client_link_tokens_id', 'client_link_tokens', ['id'], unique=False)
     op.create_index('ix_client_link_tokens_user_id', 'client_link_tokens', ['user_id'], unique=False)
-    op.create_index('ix_client_link_tokens_token_hash', 'client_link_tokens', ['token_hash'], unique=False)
+    op.create_index('ix_client_link_tokens_token_hash', 'client_link_tokens', ['token_hash'], unique=True)
     op.create_index('ix_client_link_tokens_expires_at', 'client_link_tokens', ['expires_at'], unique=False)
 
 
@@ -43,4 +43,5 @@ def downgrade() -> None:
     op.drop_index('ix_client_link_tokens_expires_at', table_name='client_link_tokens')
     op.drop_index('ix_client_link_tokens_token_hash', table_name='client_link_tokens')
     op.drop_index('ix_client_link_tokens_user_id', table_name='client_link_tokens')
+    op.drop_index('ix_client_link_tokens_id', table_name='client_link_tokens')
     op.drop_table('client_link_tokens')

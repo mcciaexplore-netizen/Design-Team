@@ -51,8 +51,9 @@ def is_limited(db: Session, key: str, limit: int, window_seconds: int) -> bool:
 def record(db: Session, key: str) -> None:
     """Record one hit for `key`. Call is_limited() first if you want to check before recording."""
     now = datetime.datetime.now(pytz.utc)
-    # Tidy old hits. Limits use different windows, so only remove what is older than any of them could need.
-    stale = now - datetime.timedelta(seconds=max(86400, 86400))
+    # Tidy old hits; keeps table size bounded. Max window is 24 hours (tracked separately in email/form limits).
+    MAX_HIT_AGE_SECONDS = 86400
+    stale = now - datetime.timedelta(seconds=MAX_HIT_AGE_SECONDS)
     db.query(models.RateLimitHit).filter(models.RateLimitHit.created_at < stale).delete(synchronize_session=False)
     db.add(models.RateLimitHit(key=key, created_at=now))
     db.commit()

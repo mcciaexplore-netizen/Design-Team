@@ -81,7 +81,7 @@ if not CRON_SECRET:
             "Set CRON_SECRET to a cryptographically random string (e.g., python -c 'import secrets; print(secrets.token_urlsafe(32))') "
             "and restart."
         )
-    CRON_SECRET = "local_dev_default"
+    CRON_SECRET = "default_secret"   # SQLite only; the tests use it
 
 # Warn if running behind a proxy without TRUSTED_PROXY_COUNT set
 if (not os.getenv("VERCEL") and

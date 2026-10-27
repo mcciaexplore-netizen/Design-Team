@@ -478,10 +478,10 @@ class ClientLinkToken(Base):
     """Short-lived, single-use tokens for passwordless client access and email confirmation."""
     __tablename__ = "client_link_tokens"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     token_hash = Column(String(64), nullable=False, unique=True, index=True)
     purpose = Column(String(20), nullable=False, default="client")  # "client" or "confirm_request"
-    ticket_id = Column(Integer, ForeignKey("tickets.id"), nullable=True)  # For confirm_request only
+    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=True)  # For confirm_request only
     expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
     used_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

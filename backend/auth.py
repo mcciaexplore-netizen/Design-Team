@@ -195,9 +195,8 @@ def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Ses
     email = form.username.strip().lower()
     ip = ratelimit.client_ip(request)
 
-    # Check rate limits by IP (20 failures per 15 min) and by email (5 failures per 15 min).
-    # Only failures count, so a correct password always works. Per-email limit prevents locking
-    # a victim out indefinitely; after 5 wrong guesses we block anyone claiming that email for 15 min.
+    # Only failures count. Known trade-offs: 5 wrong guesses lock that email (even the real owner) for 15 min,
+    # and concurrent requests can slip a few past the limit because the failure is recorded after bcrypt.
     ip_key = f"login:fail:ip:{ip}"
     email_key = f"login:fail:email:{email}"
     if ratelimit.is_limited(db, ip_key, limit=20, window_seconds=900):
