@@ -251,7 +251,7 @@ def exchange_client_link(body: ClientLinkExchange, request: Request, db: Session
     return {"access_token": auth.create_access_token(user), "token_type": "bearer", "user": auth.user_payload(user)}
 
 
-# ── Public board: every request, grouped by organisation ─────────────────────
+# ── Public board: every request and where it stands ──────────────────────────
 # Anyone can open it, so it carries only what a tracking link already shows: no brief, names, emails or files.
 # PUBLIC_BOARD=off turns it off.
 
@@ -267,7 +267,7 @@ def requests_board(db: Session = Depends(get_db)):
     if os.getenv("PUBLIC_BOARD", "on").strip().lower() in ("off", "false", "0", "no"):
         raise HTTPException(status_code=404, detail="The public requests board is turned off.")
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=BOARD_FINISHED_DAYS)
-    tickets = db.query(models.Ticket).options(joinedload(models.Ticket.requester), joinedload(models.Ticket.design_type)) \
+    tickets = db.query(models.Ticket).options(joinedload(models.Ticket.design_type)) \
         .filter(models.Ticket.status.notin_(NOT_ON_BOARD)) \
         .filter(or_(models.Ticket.status.notin_(FINISHED),
                     func.coalesce(models.Ticket.delivered_at, models.Ticket.updated_at) >= cutoff)) \
@@ -278,8 +278,6 @@ def requests_board(db: Session = Depends(get_db)):
         "requests": [{
             "ticket_number": t.ticket_number,
             "title": t.title,
-            # A public-form ticket has no organisation of its own; use the one the team set on the account.
-            "organisation": t.client_org or (t.requester.client_org if t.requester else None),
             "design_type": t.design_type.name if t.design_type else None,
             "status": t.status.value,
             "current_step": STATUS_STEP.get(t.status.value, 0),

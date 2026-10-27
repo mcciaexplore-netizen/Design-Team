@@ -1,4 +1,4 @@
-"""The public requests board: everyone's requests without signing in, grouped by organisation, nothing personal."""
+"""The public requests board: everyone's requests without signing in, nothing personal."""
 import datetime
 
 import models
@@ -40,13 +40,13 @@ def board(client):
     return {row["ticket_number"]: row for row in r.json()["requests"]}
 
 
-def test_board_lists_every_request_with_its_organisation_and_nothing_personal(client):
+def test_board_lists_every_request_and_nothing_personal(client):
     tata = submit(client, email="a@tata.com", event_name="Tata Expo")        # a client account the team put in TATA
     walk_in = submit(client, email="new.person@example.com", event_name="Open Day")
 
     rows = board(client)
-    assert rows[tata]["organisation"] == "TATA"
-    assert rows[walk_in]["organisation"] is None
+    assert walk_in in rows
+    assert "organisation" not in rows[tata]   # one organisation (MCCIA): no grouping or company names
     assert rows[tata]["title"].startswith("Tata Expo")
     assert "tracking_url" not in rows[tata]   # tracking links are private to the requester
     text = str(rows)

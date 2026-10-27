@@ -87,7 +87,7 @@ const LoginPage: React.FC = () => {
                 autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="you@company.com"
+                placeholder="you@mcciapune.com"
                 className="input-field"
                 style={field}
                 autoFocus
@@ -160,8 +160,8 @@ const LoginPage: React.FC = () => {
           </form>
 
           <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-soft)', marginTop: '1.25rem' }}>
-            This sign-in is for the design team. Clients don't need a password —
-            the link in your confirmation email opens your requests and campaigns directly.
+            This sign-in is for the design team. Requested a design? You don't need a password:{' '}
+            <a className="login-link-btn" href="/my-requests">get a sign-in link by email</a>.
           </p>
 
           <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-soft)', marginTop: '0.75rem' }}>
