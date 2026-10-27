@@ -2,20 +2,25 @@
 import datetime
 import hashlib
 import hmac
+import logging
 import os
+import secrets
 from typing import Optional
 
 import jwt
+import pytz
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 import models
+import ratelimit
 from auth import ALGORITHM, SECRET_KEY
 from common import app_url, as_utc, match_existing_company_name
 from database import get_db
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["tracking"])
 
 # The steps a requester sees, in order. Anything else (e.g. Waiting on Requester) maps onto the nearest one.
@@ -25,9 +30,18 @@ STATUS_STEP = {
     "Closed": 4, "Closed without approval": 4, "Revision Requested": 2,
 }
 
+# H2: Short-lived client link tokens (15-60 minutes, single-use via server-side tracking)
+CLIENT_LINK_TTL_MINUTES = int(os.getenv("CLIENT_LINK_TTL_MINUTES", "30"))
+CLIENT_LINK_TTL = datetime.timedelta(minutes=max(15, min(60, CLIENT_LINK_TTL_MINUTES)))
+
 
 def _sign(ticket_number: str) -> str:
     return hmac.new(SECRET_KEY.encode(), f"track:{ticket_number}".encode(), hashlib.sha256).hexdigest()[:24]
+
+
+def _hash_token(token: str) -> str:
+    """Hash a raw token for server-side storage (SHA256 hex, 64 chars)."""
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def tracking_token(ticket_number: str) -> str:
@@ -76,34 +90,92 @@ def track(token: str, db: Session = Depends(get_db)):
 
 
 # ── A client's one-time sign-in link, instead of a password ──────────────────
-# The link is emailed and carries a signed token (purpose=client). Opening it exchanges that token,
-# once, for a normal session (the same shape /api/auth/token returns) — everything downstream (tickets,
-# campaigns, notifications, approvals) keeps using that ordinary session exactly as it always has.
+# The link is emailed and carries a raw single-use token. Redeeming it via exchange_client_link()
+# marks it used and issues a normal 12-hour session. Read-only access via /my-requests doesn't use it up.
 
-CLIENT_LINK_TTL = datetime.timedelta(days=90)
 LINK_SENT = "If we can match that email (plus a company name, for a first link), one is on its way."
 
 
-def client_link_url(user: models.User) -> str:
-    now = datetime.datetime.now(datetime.timezone.utc)
-    token = jwt.encode({"sub": str(user.id), "purpose": "client", "iat": now, "exp": now + CLIENT_LINK_TTL},
-                       SECRET_KEY, algorithm=ALGORITHM)
+def client_link_url(user: models.User, db: Session) -> str:
+    """Generate a new single-use client link token. Invalidates older unused tokens for this user."""
+    token = secrets.token_urlsafe(32)
+    token_hash = _hash_token(token)
+    now = datetime.datetime.now(pytz.utc)
+    expires_at = now + CLIENT_LINK_TTL
+
+    # Mark older unused tokens as used so only the newest one works
+    db.query(models.ClientLinkToken).filter(
+        models.ClientLinkToken.user_id == user.id,
+        models.ClientLinkToken.purpose == "client",
+        models.ClientLinkToken.used_at.is_(None),
+    ).update({"used_at": now}, synchronize_session=False)
+
+    # Store the new token hash
+    db.add(models.ClientLinkToken(
+        user_id=user.id,
+        token_hash=token_hash,
+        purpose="client",
+        expires_at=expires_at,
+    ))
+    db.commit()
     return f"{app_url()}/client/{token}"
 
 
-def client_user_for_token(token: str, db: Session) -> models.User:
-    """Shared identity check behind every passwordless client page and API call."""
+def redeem_client_link(token: str, db: Session) -> models.User:
+    """Redeem a single-use client link token for a session. Token is marked used atomically."""
     invalid = HTTPException(status_code=404, detail="This link is not valid or has expired. Ask for a new one.")
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = int(payload["sub"])
-    except (jwt.PyJWTError, KeyError, ValueError):
+
+    token_hash = _hash_token(token)
+    now = datetime.datetime.now(pytz.utc)
+
+    # Atomic update: mark as used only if it exists, is unused, and not expired
+    claimed = db.query(models.ClientLinkToken).filter(
+        models.ClientLinkToken.token_hash == token_hash,
+        models.ClientLinkToken.purpose == "client",
+        models.ClientLinkToken.used_at.is_(None),
+        models.ClientLinkToken.expires_at > now,
+    ).update({"used_at": now}, synchronize_session=False)
+
+    if not claimed:
+        db.commit()
         raise invalid
-    if payload.get("purpose") != "client":
-        raise invalid
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+
+    # Load the user and verify active
+    token_row = db.query(models.ClientLinkToken).filter(
+        models.ClientLinkToken.token_hash == token_hash,
+    ).first()
+
+    user = db.query(models.User).filter(models.User.id == token_row.user_id).first()
     if not user or not user.is_active:
         raise invalid
+
+    db.commit()
+    return user
+
+
+def client_user_for_token(token: str, db: Session) -> models.User:
+    """Shared identity check for read-only passwordless access (e.g., /my-requests).
+    Does NOT mark the token as used, so the link stays valid for the user."""
+    invalid = HTTPException(status_code=404, detail="This link is not valid or has expired. Ask for a new one.")
+
+    token_hash = _hash_token(token)
+    now = datetime.datetime.now(pytz.utc)
+
+    # Check token is valid (unused, not expired)
+    token_row = db.query(models.ClientLinkToken).filter(
+        models.ClientLinkToken.token_hash == token_hash,
+        models.ClientLinkToken.purpose == "client",
+        models.ClientLinkToken.used_at.is_(None),
+        models.ClientLinkToken.expires_at > now,
+    ).first()
+
+    if not token_row:
+        raise invalid
+
+    user = db.query(models.User).filter(models.User.id == token_row.user_id).first()
+    if not user or not user.is_active:
+        raise invalid
+
     return user
 
 
@@ -156,17 +228,24 @@ def email_client_link(body: ClientLinkRequest, request: Request, db: Session = D
         user.client_org = company
         db.commit()
     if user and user.is_active:
+        link = client_link_url(user, db)
         delivery.run_in_background(delivery.send_email, user.email, "Your DesignDesk sign-in link", (
-            f"Hi {user.full_name},\n\nOpen this link to see your design requests and campaigns (no password needed):\n\n{client_link_url(user)}\n\n"
-            "The link works for 90 days. Don't forward it: anyone with it can sign in as you.\n"))
+            f"Hi {user.full_name},\n\nOpen this link to see your design requests and campaigns (no password needed):\n\n{link}\n\n"
+            f"The link works once, for {CLIENT_LINK_TTL_MINUTES} minutes. Don't forward it: anyone with it can sign in as you.\n"
+            f"Need another? Go to {app_url()}/my-requests to request one.\n"))
     return {"detail": LINK_SENT}
 
 
 @router.post("/api/public/client-link/exchange")
-def exchange_client_link(token: str, db: Session = Depends(get_db)):
-    """Turn an emailed client-link token into a normal session, the one time the link is opened."""
+def exchange_client_link(token: str, request: Request, db: Session = Depends(get_db)):
+    """Redeem an emailed client-link token into a normal session, the one time the link is opened."""
     import auth
-    user = client_user_for_token(token, db)
+
+    # Rate limit: 30 attempts per hour per IP
+    ip = ratelimit.client_ip(request)
+    ratelimit.check(db, f"client-exchange-ip:{ip}", limit=30, window_seconds=3600)
+
+    user = redeem_client_link(token, db)
     return {"access_token": auth.create_access_token(user), "token_type": "bearer", "user": auth.user_payload(user)}
 
 
