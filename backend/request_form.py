@@ -16,7 +16,7 @@ import events
 import models
 import ratelimit
 from auth import get_current_user
-from common import MAX_CDR_BYTES, MAX_UPLOAD_BYTES, app_url, compute_due_at, log_audit, next_ticket_number, read_upload, store_bytes
+from common import MAX_CDR_BYTES, MAX_UPLOAD_BYTES, app_url, require_allowed_email, compute_due_at, log_audit, next_ticket_number, read_upload, store_bytes
 from database import get_db
 from tracking import tracking_url
 
@@ -415,6 +415,7 @@ async def submit_request(
     name, email = name.strip(), email.strip().lower()
     if not EMAIL_RE.match(email):
         raise HTTPException(status_code=422, detail="Please enter a valid email address")
+    require_allowed_email(email)
     uploads = await fields.validated_uploads()
     tickets = create_tickets_from_form(db, _requester(db, name, email), fields, uploads, "request form")
     return {"ticket_number": tickets[0].ticket_number, "tracking_url": tracking_url(tickets[0].ticket_number),

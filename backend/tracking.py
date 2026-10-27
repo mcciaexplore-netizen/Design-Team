@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, joinedload
 import models
 import ratelimit
 from auth import ALGORITHM, SECRET_KEY
-from common import PUBLIC_EMAIL_DOMAINS, app_url, as_utc, match_existing_company_name
+from common import PUBLIC_EMAIL_DOMAINS, app_url, as_utc, match_existing_company_name, require_allowed_email
 from database import get_db
 
 logger = logging.getLogger(__name__)
@@ -207,6 +207,7 @@ def email_client_link(body: ClientLinkRequest, request: Request, db: Session = D
     if not delivery.email_configured():
         raise HTTPException(status_code=503, detail="Sending links by email is not set up yet. Use the tracking link from your confirmation, or contact the design team.")
     email = body.email.strip().lower()
+    require_allowed_email(email)
     ratelimit.check(db, f"client-link-ip:{ratelimit.client_ip(request)}", 10, 3600)
     ratelimit.check(db, f"client-link-email:{email}", 3, 3600)
     company = " ".join(body.company.split()) if body.company else None

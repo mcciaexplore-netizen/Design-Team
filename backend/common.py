@@ -32,6 +32,21 @@ PUBLIC_EMAIL_DOMAINS = frozenset({
 } | {d.strip().lower() for d in os.getenv("EXTRA_PUBLIC_EMAIL_DOMAINS", "").split(",") if d.strip()})
 
 
+def allowed_email_domains() -> set[str]:
+    """DesignDesk is for MCCIA only. ALLOWED_EMAIL_DOMAINS (comma-separated) overrides; "*" turns the rule off."""
+    raw = os.getenv("ALLOWED_EMAIL_DOMAINS", "mcciapune.com")
+    return {d.strip().lower().lstrip("@") for d in raw.split(",") if d.strip()}
+
+
+def require_allowed_email(email: str) -> None:
+    """Refuse an address outside MCCIA before it can submit a request, get a sign-in link or be given an account."""
+    domains = allowed_email_domains()
+    if "*" in domains or email.rsplit("@", 1)[-1].strip().lower() in domains:
+        return
+    shown = " or ".join(f"@{d}" for d in sorted(domains))
+    raise HTTPException(status_code=403, detail=f"DesignDesk is for MCCIA only. Please use your {shown} email address.")
+
+
 def match_existing_company_name(db: Session, company: str) -> Optional[str]:
     """Case-insensitive lookup of a company already on a User or a Ticket. Returns it exactly as first
     written, so a second person from the same company joins that record instead of a second casing of it."""

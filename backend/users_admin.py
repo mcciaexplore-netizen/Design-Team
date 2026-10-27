@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 import deletion
 import models
 from auth import frontend_role, generate_temp_password, hash_password, require_lead
-from common import Email
+from common import Email, require_allowed_email
 from database import get_db
 
 logger = logging.getLogger(__name__)
@@ -70,6 +70,7 @@ class CreateUser(BaseModel):
 @router.post("", status_code=201)
 def create_user(body: CreateUser, db: Session = Depends(get_db), lead: models.User = Depends(require_lead)):
     email = body.email.strip().lower()
+    require_allowed_email(email)
     if db.query(models.User).filter(func.lower(models.User.email) == email).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
     org = " ".join((body.client_org or "").split()) or None
@@ -127,7 +128,8 @@ def update_user(user_id: int, body: UpdateUser, db: Session = Depends(get_db), l
 
     new_email = body.email.strip().lower() if body.email else user.email
     if new_email != user.email:
-        taken = db.query(models.User).filter(func.lower(models.User.email) == new_email, models.User.id != user.id).first()
+        require_allowed_email(new_email)
+        taken =db.query(models.User).filter(func.lower(models.User.email) == new_email, models.User.id != user.id).first()
         if taken:
             raise HTTPException(status_code=409, detail="An account with this email already exists.")
         user.email = new_email   # they sign in with it from now on; tickets and emails follow the account
