@@ -13,6 +13,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 import models
+import ratelimit
 from common import app_url
 from database import get_db
 
@@ -44,9 +45,12 @@ if not SECRET_KEY:
         SECRET_KEY = _dev_secret_key()
         logger.info("SECRET_KEY is not set; using the local development key in backend/.dev_secret_key.")
     else:
-        # Random per process: tokens stop working on restart. Set SECRET_KEY in any real deployment.
-        SECRET_KEY = secrets.token_urlsafe(48)
-        logger.warning("SECRET_KEY is not set; using a temporary key. Sessions reset on restart.")
+        raise RuntimeError(
+            "FATAL: SECRET_KEY environment variable is not set. This is required for production deployments. "
+            "Tokens, session HMACs, password resets and client links depend on it. "
+            "Set SECRET_KEY to a cryptographically random string (e.g., python -c 'import secrets; print(secrets.token_urlsafe(48))') "
+            "and restart."
+        )
 
 ALGORITHM = "HS256"
 TOKEN_TTL = datetime.timedelta(hours=int(os.getenv("TOKEN_TTL_HOURS", "12")))
@@ -187,11 +191,27 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/token")
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == form.username.strip().lower()).first()
+def login(form: OAuth2PasswordRequestForm = Depends(), request: Request = None, db: Session = Depends(get_db)):
+    email = form.username.strip().lower()
+    ip = ratelimit.client_ip(request)
+
+    # Check rate limits by IP (20 failures per 15 min) and by email (5 failures per 15 min).
+    # Only failures count, so a correct password always works. Per-email limit prevents locking
+    # a victim out indefinitely; after 5 wrong guesses we block anyone claiming that email for 15 min.
+    ip_key = f"login:fail:ip:{ip}"
+    email_key = f"login:fail:email:{email}"
+    if ratelimit.is_limited(db, ip_key, limit=20, window_seconds=900):
+        raise HTTPException(status_code=429, detail="Too many sign-in attempts. Try again in 15 minutes.", headers={"Retry-After": "900"})
+    if ratelimit.is_limited(db, email_key, limit=5, window_seconds=900):
+        raise HTTPException(status_code=429, detail="Too many sign-in attempts. Try again in 15 minutes.", headers={"Retry-After": "900"})
+
+    user = db.query(models.User).filter(models.User.email == email).first()
     hashed = user.hashed_password if user else _DUMMY_HASH
     password_ok = pwd_context.verify(form.password, hashed)
     if not user or not password_ok or not user.is_active:
+        # Record failure on both keys
+        ratelimit.record(db, ip_key)
+        ratelimit.record(db, email_key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",

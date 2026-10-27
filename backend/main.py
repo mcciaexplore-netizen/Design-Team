@@ -72,8 +72,16 @@ for module in (auth, campaigns_api, users_admin, tickets_api, revisions_api, not
 app.include_router(forecasting.router, dependencies=[Depends(require_staff)])
 
 # Local development (SQLite) gets a default; anywhere else the tick is refused until CRON_SECRET is set.
-CRON_SECRET = os.getenv("CRON_SECRET") or (
-    "default_secret" if os.getenv("DATABASE_URL", "sqlite").startswith("sqlite") else None)
+CRON_SECRET = os.getenv("CRON_SECRET")
+if not CRON_SECRET:
+    if not os.getenv("DATABASE_URL", "sqlite").startswith("sqlite"):
+        raise RuntimeError(
+            "FATAL: CRON_SECRET environment variable is not set. This is required for production deployments. "
+            "The /internal/tick endpoint is public and can trigger reminders, emails and auto-closing. "
+            "Set CRON_SECRET to a cryptographically random string (e.g., python -c 'import secrets; print(secrets.token_urlsafe(32))') "
+            "and restart."
+        )
+    CRON_SECRET = "local_dev_default"
 
 @app.get("/")
 def read_root():
