@@ -474,6 +474,19 @@ class RateLimitHit(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
 
+class ClientLinkToken(Base):
+    """Short-lived, single-use tokens for passwordless client access and email confirmation."""
+    __tablename__ = "client_link_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    purpose = Column(String(20), nullable=False, default="client")  # "client" or "confirm_request"
+    ticket_id = Column(Integer, ForeignKey("tickets.id"), nullable=True)  # For confirm_request only
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class Campaign(Base):
     """A client's marketing campaign: a named date range that their social posts hang off."""
     __tablename__ = "campaigns"
