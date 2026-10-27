@@ -96,6 +96,23 @@ def test_a_client_link_for_a_company_name_still_on_old_tickets_joins_it(client, 
     assert exchanged.json()["user"]["client_org"] == "Old Co"   # joins using the ticket's existing casing, not the typed one
 
 
+def test_a_shared_free_mail_domain_is_not_proof_of_membership(client, monkeypatch):
+    import delivery
+    sent = []
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://app.example.com")
+    monkeypatch.setattr(delivery, "send_email", lambda to, subject, body: sent.append((to, subject, body)) or (True, "Sent"))
+
+    db = TestingSessionLocal()
+    db.add(models.User(email="member@gmail.com", full_name="Member", role=models.RoleEnum.REQUESTER,
+                       client_org="Gmail Team Co", hashed_password="x"))
+    db.commit()
+    db.close()
+    r = client.post("/api/public/client-link", json={"email": "Stranger@GMAIL.com", "company": "gmail team co"})
+    assert r.status_code == 200
+    assert sent == []   # sharing gmail.com with a member must not let anyone join the company
+
+
 def test_a_different_domain_cannot_claim_someone_elses_company(client, monkeypatch):
     """Company names are public (the requests board shows them), so knowing one must never be enough to see
     its tickets: only an email on the same domain as an existing member may join it."""

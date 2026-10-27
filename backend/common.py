@@ -23,6 +23,15 @@ Email = Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, m
 logger = logging.getLogger(__name__)
 
 
+# Anyone can get an address on these, so sharing one says nothing about belonging to the same company.
+PUBLIC_EMAIL_DOMAINS = frozenset({
+    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "yahoo.in", "ymail.com", "outlook.com", "outlook.in",
+    "hotmail.com", "live.com", "msn.com", "icloud.com", "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com",
+    "zoho.com", "zohomail.in", "zohomail.com", "rediffmail.com", "gmx.com", "gmx.net", "mail.com", "yandex.com",
+    "tutanota.com", "fastmail.com",
+} | {d.strip().lower() for d in os.getenv("EXTRA_PUBLIC_EMAIL_DOMAINS", "").split(",") if d.strip()})
+
+
 def match_existing_company_name(db: Session, company: str) -> Optional[str]:
     """Case-insensitive lookup of a company already on a User or a Ticket. Returns it exactly as first
     written, so a second person from the same company joins that record instead of a second casing of it."""

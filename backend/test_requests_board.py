@@ -7,11 +7,31 @@ from test_auth import TestingSessionLocal, client  # noqa: F401  (shared fixture
 from test_workflow_features import clear_hits, form, isolated  # noqa: F401
 
 
-def submit(client, **over):
+def set_status(number, status):
+    db = TestingSessionLocal()
+    db.query(models.Ticket).filter(models.Ticket.ticket_number == number).update({"status": status})
+    db.commit()
+    db.close()
+
+
+def submit(client, accept=True, **over):
     r = client.post("/api/public/requests", data=form(**over))
     assert r.status_code == 201, r.text
     clear_hits()
-    return r.json()["ticket_number"]
+    number = r.json()["ticket_number"]
+    if accept:   # what a Design Lead accepting it does to the status
+        set_status(number, models.TicketStatus.NEW)
+    return number
+
+
+def test_unreviewed_and_declined_requests_stay_off_the_board(client):
+    """Anyone can put a client's email and any title on the public form: nothing shows publicly,
+    under that client's organisation, until a Design Lead has accepted it."""
+    pending = submit(client, accept=False, email="a@tata.com", event_name="Forged")
+    declined = submit(client, accept=False, email="a@tata.com", event_name="Spam")
+    set_status(declined, models.TicketStatus.DECLINED)
+    rows = board(client)
+    assert pending not in rows and declined not in rows
 
 
 def board(client):

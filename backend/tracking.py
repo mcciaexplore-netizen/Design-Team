@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, joinedload
 import models
 import ratelimit
 from auth import ALGORITHM, SECRET_KEY
-from common import app_url, as_utc, match_existing_company_name
+from common import PUBLIC_EMAIL_DOMAINS, app_url, as_utc, match_existing_company_name
 from database import get_db
 
 logger = logging.getLogger(__name__)
@@ -188,8 +188,8 @@ class ClientLinkRequest(BaseModel):
 def _company_domain_matches(db: Session, company: str, email: str) -> bool:
     """Whether anyone already on `company` shares this email's domain: the only evidence, short of a staff
     invite, that a new signup actually belongs there rather than just knowing (or guessing) the name."""
-    domain = email.rsplit("@", 1)[-1]
-    if not domain:
+    domain = email.rsplit("@", 1)[-1].lower()
+    if not domain or domain in PUBLIC_EMAIL_DOMAINS:
         return False
     members = {e for (e,) in db.query(models.User.email).filter(func.lower(models.User.client_org) == company.lower())}
     members |= {e for (e,) in db.query(models.User.email).join(models.Ticket, models.Ticket.requester_id == models.User.id)
@@ -256,6 +256,9 @@ def exchange_client_link(body: ClientLinkExchange, request: Request, db: Session
 
 BOARD_FINISHED_DAYS = 90   # finished requests stay on the board this long
 FINISHED = (models.TicketStatus.DELIVERED, models.TicketStatus.CLOSED, models.TicketStatus.CLOSED_WITHOUT_APPROVAL)
+# Anyone can type anyone's email (and any title) on the public form, so a request reaches the board, under
+# its requester's organisation, only once a Design Lead has accepted it.
+NOT_ON_BOARD = (models.TicketStatus.PENDING_REVIEW, models.TicketStatus.DECLINED)
 
 
 @router.get("/api/public/requests-board")
@@ -264,6 +267,7 @@ def requests_board(db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="The public requests board is turned off.")
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=BOARD_FINISHED_DAYS)
     tickets = db.query(models.Ticket).options(joinedload(models.Ticket.requester), joinedload(models.Ticket.design_type)) \
+        .filter(models.Ticket.status.notin_(NOT_ON_BOARD)) \
         .filter(or_(models.Ticket.status.notin_(FINISHED),
                     func.coalesce(models.Ticket.delivered_at, models.Ticket.updated_at) >= cutoff)) \
         .order_by(models.Ticket.created_at.desc(), models.Ticket.id.desc()).limit(500).all()
