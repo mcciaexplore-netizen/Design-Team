@@ -83,6 +83,16 @@ if not CRON_SECRET:
         )
     CRON_SECRET = "local_dev_default"
 
+# Warn if running behind a proxy without TRUSTED_PROXY_COUNT set
+if (not os.getenv("VERCEL") and
+    os.getenv("DATABASE_URL", "sqlite").startswith("postgresql") and
+    not os.getenv("TRUSTED_PROXY_COUNT")):
+    logger.warning(
+        "TRUSTED_PROXY_COUNT is not set. If this deployment is behind a reverse proxy (Render, Fly, nginx, etc.), "
+        "all users will share the proxy's IP for rate-limiting, causing shared IP limits to block everyone. "
+        "Set TRUSTED_PROXY_COUNT=1 (or 2 for proxy chains) and restart."
+    )
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the DesignDesk API"}

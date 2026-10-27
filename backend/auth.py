@@ -191,7 +191,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/token")
-def login(form: OAuth2PasswordRequestForm = Depends(), request: Request = None, db: Session = Depends(get_db)):
+def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     email = form.username.strip().lower()
     ip = ratelimit.client_ip(request)
 
