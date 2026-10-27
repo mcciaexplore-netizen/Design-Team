@@ -2,7 +2,6 @@ import datetime
 import hashlib
 import io
 import secrets
-import time
 import zipfile
 from typing import Literal, Optional
 
@@ -15,6 +14,7 @@ import delivery
 import events
 import revision_engine
 import models
+import ratelimit
 from auth import get_current_user, get_ticket_for_user, is_client, require_staff
 from common import app_url, as_utc, ensure_changes_allowed, load_bytes, mark_delivered, stored_file_response, log_audit, read_upload, store_bytes
 from database import get_db
@@ -248,18 +248,24 @@ def revoke_approval_request(request_id: int, db: Session = Depends(get_db), user
 
 # ── Public review (no login; protected by the unguessable single-use link) ───
 
-_attempts: dict = {}  # ip -> [timestamps]; in-process throttle against token guessing
-THROTTLE_WINDOW, THROTTLE_MAX = 60.0, 30
+THROTTLE_WINDOW, THROTTLE_MAX = 60, 30
+# After a decision the reviewer can still download what they approved for this long.
+REVIEW_FILE_GRACE = datetime.timedelta(days=7)
 
 
-def _throttle(request: Request) -> None:
-    ip = request.client.host if request.client else "unknown"
-    now = time.monotonic()
-    hits = [t for t in _attempts.get(ip, []) if now - t < THROTTLE_WINDOW]
-    if len(hits) >= THROTTLE_MAX:
-        raise HTTPException(status_code=429, detail="Too many requests. Please wait a minute and try again.")
-    hits.append(now)
-    _attempts[ip] = hits
+def _throttle(request: Request, db: Session) -> None:
+    """Against token guessing. Shared by every server instance and keyed on the real client IP."""
+    ratelimit.check(db, f"review:{ratelimit.client_ip(request)}", THROTTLE_MAX, THROTTLE_WINDOW,
+                    "Too many requests. Please wait a minute and try again.")
+
+
+def _review_file_allowed(req: models.ApprovalRequest) -> bool:
+    now = _now()
+    if req.status == "pending":
+        return as_utc(req.expires_at) > now
+    if req.status in ("approved", "changes_requested") and req.decided_at:
+        return as_utc(req.decided_at) + REVIEW_FILE_GRACE > now
+    return False
 
 
 def _load_request(db: Session, token: str) -> models.ApprovalRequest:
@@ -271,7 +277,7 @@ def _load_request(db: Session, token: str) -> models.ApprovalRequest:
 
 @router.get("/api/public/review/{token}")
 def public_review(token: str, request: Request, db: Session = Depends(get_db)):
-    _throttle(request)
+    _throttle(request, db)
     req = _load_request(db, token)
     ticket = db.query(models.Ticket).filter(models.Ticket.id == req.ticket_id).first()
     proof = db.query(models.ProofVersion).filter(models.ProofVersion.id == req.proof_version_id).first()
@@ -287,10 +293,12 @@ def public_review(token: str, request: Request, db: Session = Depends(get_db)):
 
 @router.get("/api/public/review/{token}/file")
 def public_review_file(token: str, request: Request, db: Session = Depends(get_db)):
-    _throttle(request)
+    _throttle(request, db)
     req = _load_request(db, token)
-    if req.status in ("revoked",):
+    if req.status == "revoked":
         raise HTTPException(status_code=410, detail="This review link has been withdrawn")
+    if not _review_file_allowed(req):
+        raise HTTPException(status_code=410, detail="This review link has expired")
     proof = db.query(models.ProofVersion).filter(models.ProofVersion.id == req.proof_version_id).first()
     if not proof:
         raise HTTPException(status_code=404, detail="File not found")
@@ -357,7 +365,7 @@ def _apply_decision(db: Session, req: models.ApprovalRequest, body: "Decision", 
 
 @router.post("/api/public/review/{token}/decision")
 def public_review_decision(token: str, body: Decision, request: Request, db: Session = Depends(get_db)):
-    _throttle(request)
+    _throttle(request, db)
     return _apply_decision(db, _load_request(db, token), body, "via review link")
 
 

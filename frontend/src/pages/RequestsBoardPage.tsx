@@ -5,7 +5,6 @@ import { publicJson } from '../api';
 interface BoardRequest {
   ticket_number: string; title: string; organisation: string | null; design_type: string | null; status: string;
   current_step: number; finished: boolean; due_at: string | null; delivered_at: string | null; created_at: string | null;
-  tracking_url: string;
 }
 interface Board { steps: string[]; finished_days: number; requests: BoardRequest[] }
 type Show = 'active' | 'finished' | 'all';
@@ -229,7 +228,6 @@ function RequestCard({ r, steps, now }: { r: BoardRequest; steps: string[]; now:
         <span style={{ color: late ? 'var(--danger-text)' : 'var(--text-soft)', fontWeight: late ? 700 : 500 }}>
           {r.finished ? `Delivered ${day(r.delivered_at ?? r.due_at)}` : !r.due_at ? 'No date yet' : `${late ? 'Was expected' : 'Expected by'} ${day(r.due_at)}`}
         </span>
-        <a href={r.tracking_url} className="login-link-btn" style={{ fontWeight: 700 }}>Details</a>
       </div>
     </li>
   );

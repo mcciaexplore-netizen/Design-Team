@@ -15,13 +15,16 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 
 
 @pytest.fixture(autouse=True)
-def isolated(monkeypatch):
+def isolated(monkeypatch, client):   # after `client`, which creates the tables
     path = tempfile.mkdtemp(prefix="dd-uploads-")
     monkeypatch.setenv("UPLOAD_DIR", path)
     monkeypatch.delenv("S3_ENDPOINT_URL", raising=False)
     monkeypatch.delenv("SMTP_HOST", raising=False)
     monkeypatch.setattr(delivery, "run_in_background", lambda fn, *a: fn(*a))
-    approvals._attempts.clear()
+    db = TestingSessionLocal()
+    db.query(models.RateLimitHit).delete()
+    db.commit()
+    db.close()
     yield
     shutil.rmtree(path, ignore_errors=True)
 
@@ -185,6 +188,34 @@ def test_decision_input_is_validated(client):
 def test_public_endpoints_are_throttled(client):
     codes = [client.get("/api/public/review/guess-%d" % i).status_code for i in range(40)]
     assert codes[:30] == [404] * 30 and 429 in codes[30:]
+
+
+def _set_request(req_id, **fields):
+    db = TestingSessionLocal()
+    try:
+        db.query(models.ApprovalRequest).filter_by(id=req_id).update(fields)
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_review_file_is_served_only_while_the_link_is_live_or_just_decided(client):
+    now = datetime.datetime.now(pytz.utc)
+    _, _, req, token = setup_review(client)
+    file_url = f"/api/public/review/{token}/file"
+    assert client.get(file_url).status_code == 200
+
+    _set_request(req["id"], expires_at=now - datetime.timedelta(minutes=1))
+    assert client.get(file_url).status_code == 410   # pending but expired
+
+    _set_request(req["id"], status="approved", decided_at=now - datetime.timedelta(days=1))
+    assert client.get(file_url).status_code == 200   # can still download what was approved
+
+    _set_request(req["id"], decided_at=now - approvals.REVIEW_FILE_GRACE - datetime.timedelta(minutes=1))
+    assert client.get(file_url).status_code == 410   # grace period over
+
+    _set_request(req["id"], status="revoked")
+    assert client.get(file_url).status_code == 410
 
 
 # ── Portal decisions (signed-in clients) ─────────────────────────────────────

@@ -282,7 +282,6 @@ def requests_board(db: Session = Depends(get_db)):
             "due_at": as_utc(t.due_at).isoformat() if t.due_at else None,
             "delivered_at": as_utc(t.delivered_at).isoformat() if t.delivered_at else None,
             "created_at": as_utc(t.created_at).isoformat() if t.created_at else None,
-            "tracking_url": tracking_url(t.ticket_number),
         } for t in tickets],
     }
 

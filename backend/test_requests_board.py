@@ -28,7 +28,7 @@ def test_board_lists_every_request_with_its_organisation_and_nothing_personal(cl
     assert rows[tata]["organisation"] == "TATA"
     assert rows[walk_in]["organisation"] is None
     assert rows[tata]["title"].startswith("Tata Expo")
-    assert f"/track/{tata}." in rows[tata]["tracking_url"]
+    assert "tracking_url" not in rows[tata]   # tracking links are private to the requester
     text = str(rows)
     for private in ("a@tata.com", "new.person@example.com", "Meera", "brief", "requester"):
         assert private not in text
