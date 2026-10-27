@@ -311,9 +311,12 @@ function ClientLinkLanding() {
   const { token } = useParams<{ token: string }>();
   const { exchangeClientLink } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  // The token works once: StrictMode's double effect or a re-render must not spend it twice.
+  const exchanged = useRef(false);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || exchanged.current) return;
+    exchanged.current = true;
     exchangeClientLink(token)
       .then(() => window.location.replace('/portal/client-portal'))
       .catch(e => setError(e instanceof Error ? e.message : 'This link is not valid or has expired.'));

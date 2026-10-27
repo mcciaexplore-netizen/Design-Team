@@ -16,9 +16,9 @@ import events
 import models
 import ratelimit
 from auth import get_current_user
-from common import MAX_CDR_BYTES, MAX_UPLOAD_BYTES, compute_due_at, log_audit, next_ticket_number, read_upload, store_bytes
+from common import MAX_CDR_BYTES, MAX_UPLOAD_BYTES, app_url, compute_due_at, log_audit, next_ticket_number, read_upload, store_bytes
 from database import get_db
-from tracking import client_link_url, tracking_url
+from tracking import tracking_url
 
 router = APIRouter(tags=["request-form"])
 
@@ -362,8 +362,7 @@ def _send_confirmation(requester: models.User, tickets: list, f: "RequestFields"
         "Follow progress any time, no login needed:",
         f"{ticket.ticket_number}: {tracking_url(ticket.ticket_number)}",
         "",
-        "See all your requests and campaigns, no password needed (this link works for 90 days):",
-        client_link_url(requester),
+        f"To see all your requests and campaigns, ask for a sign-in link at {app_url()}/my-requests",
     ])
     subject = f"Design request received: {ticket.ticket_number}"
     delivery.run_in_background(delivery.send_email, requester.email, subject[:150], body)

@@ -197,12 +197,13 @@ def test_client_link_creates_scoped_client_and_exchanges_for_a_session(client, m
     assert r2.status_code == 200
     token2 = link_token(sent)
 
-    exchanged = client.post("/api/public/client-link/exchange", params={"token": token})
+    exchanged = client.post("/api/public/client-link/exchange", json={"token": token})
     assert exchanged.status_code == 200
     user = exchanged.json()["user"]
     assert user["role"] == "Client" and user["client_org"] == "Zeta Corp Test" and exchanged.json()["access_token"]
 
-    exchanged2 = client.post("/api/public/client-link/exchange", params={"token": token2})
+    exchanged2 = client.post("/api/public/client-link/exchange", json={"token": token2})
     assert exchanged2.json()["user"]["client_org"] == "Zeta Corp Test"   # joined, not a second casing
 
-    assert client.post("/api/public/client-link/exchange", params={"token": "nonsense"}).status_code == 404
+    assert client.post("/api/public/client-link/exchange", json={"token": token}).status_code == 404   # works once
+    assert client.post("/api/public/client-link/exchange", json={"token": "nonsense"}).status_code == 404

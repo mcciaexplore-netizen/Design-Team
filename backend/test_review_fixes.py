@@ -92,7 +92,7 @@ def test_a_client_link_for_a_company_name_still_on_old_tickets_joins_it(client, 
     assert r.status_code == 200
     mail = next(m for m in sent if m[0] == "new@tata.com")
     token = re.search(r"https://app\.example\.com/client/(\S+)", mail[2]).group(1)
-    exchanged = client.post("/api/public/client-link/exchange", params={"token": token})
+    exchanged = client.post("/api/public/client-link/exchange", json={"token": token})
     assert exchanged.json()["user"]["client_org"] == "Old Co"   # joins using the ticket's existing casing, not the typed one
 
 

@@ -36,11 +36,23 @@ def submit(client, email, event):
     return [t["ticket_number"] for t in r.json()["tickets"]]
 
 
-def test_confirmation_email_links_to_all_requests_and_shows_only_that_persons(client, outbox):
+def ask_for_link(client, outbox, email):
+    outbox.clear()
+    assert client.post("/api/public/client-link", json={"email": email}).status_code == 200
+    return link_token(to(outbox, email)[0][2])
+
+
+def test_confirmation_email_points_to_my_requests_without_a_sign_in_link(client, outbox):
+    submit(client, "meera@example.com", "Expo")
+    body = to(outbox, "meera@example.com")[0][2]
+    assert "https://app.example.com/my-requests" in body and "/client/" not in body
+
+
+def test_my_requests_link_shows_only_that_persons_requests(client, outbox):
     mine = submit(client, "meera@example.com", "Expo") + submit(client, "Meera@Example.com", "Open Day")
     clear_hits()
     theirs = submit(client, "someone.else@example.com", "Other event")
-    token = link_token(to(outbox, "meera@example.com")[0][2])
+    token = ask_for_link(client, outbox, "meera@example.com")
 
     r = client.get("/api/public/my-requests", params={"token": token})
     assert r.status_code == 200, r.text
@@ -65,8 +77,31 @@ def test_bad_or_wrong_purpose_tokens_are_refused(client, outbox):
     session = login(client, "a@tata.com").json()["access_token"]
     assert client.get("/api/public/my-requests", params={"token": session}).status_code == 404
     submit(client, "meera@example.com", "Expo")
-    token = link_token(to(outbox, "meera@example.com")[0][2])
+    token = ask_for_link(client, outbox, "meera@example.com")
     assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401   # not a session
+
+
+def test_a_link_expires_and_a_newer_one_replaces_it(client, outbox):
+    import datetime
+    import models
+    from test_auth import TestingSessionLocal
+    from tracking import _hash_token
+    submit(client, "meera@example.com", "Expo")
+    old = ask_for_link(client, outbox, "meera@example.com")
+    new = ask_for_link(client, outbox, "meera@example.com")
+    assert client.get("/api/public/my-requests", params={"token": old}).status_code == 404   # replaced
+    assert client.get("/api/public/my-requests", params={"token": new}).status_code == 200
+
+    db = TestingSessionLocal()
+    try:
+        assert not db.query(models.ClientLinkToken).filter(models.ClientLinkToken.token_hash == new).first()   # raw token never stored
+        row = db.query(models.ClientLinkToken).filter(models.ClientLinkToken.token_hash == _hash_token(new)).one()
+        row.expires_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
+        db.commit()
+    finally:
+        db.close()
+    assert client.get("/api/public/my-requests", params={"token": new}).status_code == 404
+    assert client.post("/api/public/client-link/exchange", json={"token": new}).status_code == 404
 
 
 def test_link_requests_are_rate_limited_and_need_email_set_up(client, outbox, monkeypatch):

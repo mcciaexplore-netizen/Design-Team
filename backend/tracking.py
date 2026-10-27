@@ -236,16 +236,17 @@ def email_client_link(body: ClientLinkRequest, request: Request, db: Session = D
     return {"detail": LINK_SENT}
 
 
+class ClientLinkExchange(BaseModel):
+    token: str = Field(min_length=1, max_length=200)
+
+
 @router.post("/api/public/client-link/exchange")
-def exchange_client_link(token: str, request: Request, db: Session = Depends(get_db)):
-    """Redeem an emailed client-link token into a normal session, the one time the link is opened."""
+def exchange_client_link(body: ClientLinkExchange, request: Request, db: Session = Depends(get_db)):
+    """Redeem an emailed client-link token into a normal session, the one time the link is opened.
+    The token travels in the body, not the query string, so it stays out of access logs."""
     import auth
-
-    # Rate limit: 30 attempts per hour per IP
-    ip = ratelimit.client_ip(request)
-    ratelimit.check(db, f"client-exchange-ip:{ip}", limit=30, window_seconds=3600)
-
-    user = redeem_client_link(token, db)
+    ratelimit.check(db, f"client-exchange-ip:{ratelimit.client_ip(request)}", limit=30, window_seconds=3600)
+    user = redeem_client_link(body.token, db)
     return {"access_token": auth.create_access_token(user), "token_type": "bearer", "user": auth.user_payload(user)}
 
 

@@ -66,8 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     let res: Response;
     try {
-      res = await fetch(`${API_BASE}/api/public/client-link/exchange?${new URLSearchParams({ token })}`, {
+      res = await fetch(`${API_BASE}/api/public/client-link/exchange`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
         signal: AbortSignal.timeout(60000),
       });
     } catch {
@@ -97,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (res.status === 401) throw new Error('Invalid email or password.');
+      if (res.status === 429) throw new Error('Too many sign-in attempts. Try again in 15 minutes.');
       if (!res.ok) throw new Error('Sign-in failed. Please try again.');
 
       startSession(await res.json());
