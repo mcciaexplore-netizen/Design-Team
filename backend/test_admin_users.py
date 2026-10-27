@@ -50,10 +50,9 @@ def user_id(client, headers, email):
 
 
 def test_only_leads_can_manage_users(client):
-    for email in ("des@x.com", "a@tata.com"):
-        h = login(client, email)
-        assert client.get("/api/admin/users", headers=h).status_code == 403
-        assert client.post("/api/admin/users", headers=h, json={"full_name": "Zed Zed", "email": "z@x.com", "role": "Designer"}).status_code == 403
+    h = login(client, "des@x.com")
+    assert client.get("/api/admin/users", headers=h).status_code == 403
+    assert client.post("/api/admin/users", headers=h, json={"full_name": "Zed Zed", "email": "z@x.com", "role": "Designer"}).status_code == 403
     assert client.get("/api/admin/users").status_code == 401
 
 
@@ -92,11 +91,12 @@ def test_lead_creates_staff_with_temp_password_that_must_be_changed(client):
     login(client, "new@x.com", "brand-new-pw1")
 
 
-def test_client_accounts_need_a_company(client):
+def test_clients_cannot_be_given_an_account(client):
+    """Accounts are for the design team; clients use the open User app."""
     lead = login(client, "lead@x.com")
     assert client.post("/api/admin/users", headers=lead, json={"full_name": "Cli Ent", "email": "c@y.com", "role": "Client"}).status_code == 422
-    r = client.post("/api/admin/users", headers=lead, json={"full_name": "Cli Ent", "email": "c@y.com", "role": "Client", "client_org": "  Acme   Corp "})
-    assert r.status_code == 201 and r.json()["user"]["client_org"] == "Acme Corp" and r.json()["user"]["role"] == "Client"
+    des_id = user_id(client, lead, "des@x.com")
+    assert client.patch(f"/api/admin/users/{des_id}", headers=lead, json={"role": "Client"}).status_code == 422
 
 
 def test_reset_password_signs_out_old_sessions(client):
@@ -141,14 +141,8 @@ def test_role_changes_and_guard_rails(client):
     assert client.get("/api/admin/users", headers=new_lead).status_code == 200
     assert client.patch(f"/api/admin/users/{lead_id}", headers=new_lead, json={"role": "Designer"}).status_code == 200
 
-    # Last remaining lead can't be demoted by anyone (self-guard) — and clients can't be turned into leads without a company flip
-    me_id = des_id
-    assert client.patch(f"/api/admin/users/{me_id}", headers=new_lead, json={"role": "Designer"}).status_code == 400
-
-    # Staff → Client requires a company
-    assert client.patch(f"/api/admin/users/{lead_id}", headers=new_lead, json={"role": "Client"}).status_code == 422
-    ok = client.patch(f"/api/admin/users/{lead_id}", headers=new_lead, json={"role": "Client", "client_org": "ZED"})
-    assert ok.status_code == 200 and ok.json()["client_org"] == "ZED"
+    # Last remaining lead can't be demoted by anyone (self-guard)
+    assert client.patch(f"/api/admin/users/{des_id}", headers=new_lead, json={"role": "Designer"}).status_code == 400
 
 
 def test_last_active_lead_cannot_be_removed_by_another_lead(client):

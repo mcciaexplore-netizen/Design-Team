@@ -58,13 +58,11 @@ def test_folders_need_unique_names(client):
     assert client.patch(f"/api/library/folders/{fid}", json={"name": "Logos"}, headers=des).json()["name"] == "Logos"
 
 
-def test_clients_and_strangers_cannot_reach_the_library(client):
-    des, cl = auth(client, "des@x.com"), auth(client, "a@tata.com")
+def test_strangers_cannot_reach_the_library(client):
+    des = auth(client, "des@x.com")
     fid = folder(client, des)
     item = upload(client, des, fid).json()
     version = client.get(f"/api/library/items/{item['id']}/versions", headers=des).json()[0]["id"]
     for method, url in (("get", "/api/library/folders"), ("get", "/api/library/items"), ("get", f"/api/library/versions/{version}/file"),
                         ("delete", f"/api/library/items/{item['id']}"), ("delete", f"/api/library/folders/{fid}")):
-        assert getattr(client, method)(url, headers=cl).status_code == 403, url
         assert getattr(client, method)(url).status_code == 401, url
-    assert upload(client, cl, fid).status_code == 403

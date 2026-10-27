@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, GitBranch, Tag, CheckSquare, Square, Trash2 } from 'lucide-react';
-import { STATUSES, DONE_STATUSES } from '../types';
+import { STATUSES } from '../types';
 import { apiJson } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
-import { useNewRequest } from '../contexts/NewRequestContext';
-import { prefillFromTicket } from '../requestForm';
 import AnnotatePanel from '../components/AnnotatePanel';
 import AttachmentsPanel from '../components/AttachmentsPanel';
 import ClientChangesPanel from '../components/ClientChangesPanel';
@@ -23,9 +21,7 @@ const TicketDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { tickets, staff, loading, updateTicket, toggleSubtask, refresh } = useTickets();
-  const { openNewRequest } = useNewRequest();
   const ticket = tickets.find(t => t.id === id);
-  const isClient = user?.role === 'Client';
   const isLead = user?.role === 'Design Lead';
   const label = useMemo(() => personLabeller(staff), [staff]);
 
@@ -56,7 +52,7 @@ const TicketDetailPage: React.FC = () => {
     return (
       <div style={{ padding: '3rem', textAlign: 'center' }} role={loading ? 'status' : undefined}>
         <p style={{ fontSize: '1rem', color: '#737373' }}>
-          {loading ? 'Loading ticket…' : <>Ticket not found. <Link to={isClient ? '/client-portal' : '/'} style={{ color: '#0B1F3A', fontWeight: 700 }}>← Back</Link></>}
+          {loading ? 'Loading ticket…' : <>Ticket not found. <Link to="/" style={{ color: '#0B1F3A', fontWeight: 700 }}>← Back</Link></>}
         </p>
       </div>
     );
@@ -78,7 +74,7 @@ const TicketDetailPage: React.FC = () => {
     { key: 'proofs',   label: 'Proofs & approval' },
     { key: 'source',   label: 'Source files' },
     { key: 'figma',    label: 'Figma' },
-    { key: 'annotate', label: 'Annotate', hidden: isClient },
+    { key: 'annotate', label: 'Annotate' },
   ];
 
   const checkFigma = async () => {
@@ -110,8 +106,8 @@ const TicketDetailPage: React.FC = () => {
   return (
     <div style={{ padding: '0 0 3rem', height: '100%', overflowY: 'auto' }}>
       <div style={{ marginBottom: '1.5rem' }}>
-        <Link to={isClient ? '/client-portal' : '/'} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 700, color: '#737373', textDecoration: 'none', marginBottom: '0.75rem' }}>
-          <ArrowLeft size={14} /> {isClient ? 'Back to my requests' : 'Back to Visual Board'}
+        <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 700, color: '#737373', textDecoration: 'none', marginBottom: '0.75rem' }}>
+          <ArrowLeft size={14} /> Back to Visual Board
         </Link>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
@@ -123,9 +119,6 @@ const TicketDetailPage: React.FC = () => {
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <span className="badge-blue">{ticket.status}</span>
-            {isClient && DONE_STATUSES.includes(ticket.status) && (
-              <button type="button" className="btn-ghost" onClick={() => openNewRequest(prefillFromTicket(ticket))}>Request again</button>
-            )}
           </div>
         </div>
       </div>
@@ -174,27 +167,23 @@ const TicketDetailPage: React.FC = () => {
 
           {activeTab === 'figma' && (
             <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {!isClient && (
-                <>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <label htmlFor="figma-url" className="section-label" style={{ width: '100%' }}>Figma link</label>
-                    <input id="figma-url" type="url" className="input-field" placeholder="https://www.figma.com/design/…" value={figmaInput}
-                      onChange={e => { setFigmaInput(e.target.value); setFigmaCheck(null); }} style={{ flex: 1, minWidth: 220 }} />
-                    <button type="button" className="btn-ghost" onClick={() => void checkFigma()}>Check link</button>
-                    <button type="button" className="btn-primary" onClick={() => void saveFigma()} disabled={figmaInput.trim() === (ticket.figma_url ?? '')}>Save</button>
-                  </div>
-                  {figmaCheck && (
-                    <p role="status" style={{ fontSize: '0.78rem', color: figmaCheck.valid ? '#256B45' : '#b91c1c' }}>
-                      {figmaCheck.valid ? `Looks good: “${figmaCheck.name}”.` : figmaCheck.detail}
-                    </p>
-                  )}
-                </>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <label htmlFor="figma-url" className="section-label" style={{ width: '100%' }}>Figma link</label>
+                <input id="figma-url" type="url" className="input-field" placeholder="https://www.figma.com/design/…" value={figmaInput}
+                  onChange={e => { setFigmaInput(e.target.value); setFigmaCheck(null); }} style={{ flex: 1, minWidth: 220 }} />
+                <button type="button" className="btn-ghost" onClick={() => void checkFigma()}>Check link</button>
+                <button type="button" className="btn-primary" onClick={() => void saveFigma()} disabled={figmaInput.trim() === (ticket.figma_url ?? '')}>Save</button>
+              </div>
+              {figmaCheck && (
+                <p role="status" style={{ fontSize: '0.78rem', color: figmaCheck.valid ? '#256B45' : '#b91c1c' }}>
+                  {figmaCheck.valid ? `Looks good: “${figmaCheck.name}”.` : figmaCheck.detail}
+                </p>
               )}
               <div style={{ minHeight: 300 }}><FigmaEmbed url={ticket.figma_url ?? ''} /></div>
             </div>
           )}
 
-          {activeTab === 'annotate' && !isClient && <AnnotatePanel ticketId={ticket.id} />}
+          {activeTab === 'annotate' && <AnnotatePanel ticketId={ticket.id} />}
         </div>
 
         <aside style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0 }}>
@@ -212,8 +201,7 @@ const TicketDetailPage: React.FC = () => {
             </p>
           )}
 
-          {!isClient && (
-            <div className="glass-card" style={{ padding: '1rem' }}>
+          <div className="glass-card" style={{ padding: '1rem' }}>
               <label htmlFor="d-status" className="section-label" style={{ marginBottom: 6, display: 'block' }}>Status</label>
               <div style={{ position: 'relative', marginBottom: 10 }}>
                 <select id="d-status" value={ticket.status} onChange={e => void run(() => updateTicket(ticket.id, { status: e.target.value }), 'Could not change status.')} className="input-field" style={{ width: '100%', fontSize: '0.82rem' }}>
@@ -241,8 +229,7 @@ Its designs, files, approvals and history are deleted too. Other versions of thi
                   </button>
                 </>
               )}
-            </div>
-          )}
+          </div>
 
           <div className="glass-card" style={{ padding: '1rem' }}>
             <h3 className="section-label" style={{ marginBottom: '0.75rem' }}>Details</h3>
@@ -261,7 +248,7 @@ Its designs, files, approvals and history are deleted too. Other versions of thi
             </div>
           </div>
 
-          {!isClient && <TimeTracker ticket={ticket} />}
+          <TimeTracker ticket={ticket} />
 
           {ticket.tags?.length > 0 && (
             <div className="glass-card" style={{ padding: '1rem' }}>
@@ -277,9 +264,9 @@ Its designs, files, approvals and history are deleted too. Other versions of thi
                 <div style={{ height: '100%', width: `${(done / ticket.subtasks.length) * 100}%`, background: 'linear-gradient(90deg,#256B45,#2E8B57)', borderRadius: 99, transition: 'width 0.3s' }} />
               </div>
               {ticket.subtasks.map(s => (
-                <button key={s.id} type="button" role="checkbox" aria-checked={s.is_completed} disabled={isClient}
+                <button key={s.id} type="button" role="checkbox" aria-checked={s.is_completed}
                   onClick={() => void run(() => toggleSubtask(ticket.id, s.id), 'Could not update the subtask.')}
-                  style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '4px 0', background: 'none', border: 'none', cursor: isClient ? 'default' : 'pointer', textAlign: 'left', fontSize: '0.78rem', color: s.is_completed ? '#94a3b8' : '#0B1F3A', textDecoration: s.is_completed ? 'line-through' : 'none' }}>
+                  style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '4px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: '0.78rem', color: s.is_completed ? '#94a3b8' : '#0B1F3A', textDecoration: s.is_completed ? 'line-through' : 'none' }}>
                   {s.is_completed ? <CheckSquare size={14} style={{ color: '#256B45', flexShrink: 0 }} /> : <Square size={14} style={{ color: '#737373', flexShrink: 0 }} />} {s.title}
                 </button>
               ))}

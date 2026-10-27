@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import KanbanBoard from './components/KanbanBoard';
 import NotificationBell from './components/NotificationBell';
 import TicketCreateModal from './components/TicketCreateModal';
@@ -11,12 +11,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
 const WorkloadPage = lazy(() => import('./pages/WorkloadPage'));
 const LibraryPage = lazy(() => import('./pages/LibraryPage'));
-const ReviewPage = lazy(() => import('./pages/ReviewPage'));
-const RequestFormPage = lazy(() => import('./pages/RequestFormPage'));
-const TrackPage = lazy(() => import('./pages/TrackPage'));
 const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
-const MyRequestsPage = lazy(() => import('./pages/MyRequestsPage'));
-const RequestsBoardPage = lazy(() => import('./pages/RequestsBoardPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 
 const PageLoading = () => <p role="status" style={{ color: 'var(--text-hint)', padding: '1rem' }}>Loading…</p>;
@@ -25,19 +20,10 @@ import { TicketsProvider, useTickets } from './contexts/TicketsContext';
 import { ToastContainer, useToast } from './components/Toast';
 import { useState, useEffect, useCallback, useRef, lazy, Suspense, type ReactNode } from 'react';
 import { useTicketSocket } from './hooks/useTicketSocket';
-import { NewRequestContext } from './contexts/NewRequestContext';
-import type { RequestPrefill } from './requestForm';
 import {
   LayoutDashboard, Plus, Zap, LogOut, Search,
   ChevronRight, Settings, ListChecks, CalendarDays, Library, type LucideIcon,
 } from 'lucide-react';
-
-/** The client experience now lives entirely in the separate /portal app (see PortalApp.tsx); these
- *  URLs only exist so old bookmarks, emails and notifications keep working. */
-function RedirectToPortal({ to }: { to: string }) {
-  useEffect(() => { window.location.replace(to); }, [to]);
-  return <FullScreenLoading text="Taking you to your portal…" />;
-}
 
 interface NavItem { to: string; label: string; icon: LucideIcon; roles: UserRole[] }
 interface NavGroup { title: string; items: NavItem[] }
@@ -173,7 +159,6 @@ function RequireRole({ roles, children }: { roles: UserRole[]; children: ReactNo
 
 function AppShell() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [prefill, setPrefill] = useState<RequestPrefill | null>(null);   // set by "Request again"
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const location = useLocation();
   const { user } = useAuth();
@@ -181,7 +166,7 @@ function AppShell() {
   const subtitle = PAGE_SUBTITLES[location.pathname];
   const { toasts, addToast, removeToast } = useToast();
   const { refresh, onChanges } = useTickets();
-  const openNewRequest = useCallback((answers?: RequestPrefill) => { setPrefill(answers ?? null); setIsCreateModalOpen(true); }, []);
+  const openNewRequest = useCallback(() => setIsCreateModalOpen(true), []);
 
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSocketMessage = useCallback((msg: import('./hooks/useTicketSocket').SocketMessage) => {
@@ -231,7 +216,6 @@ function AppShell() {
   const home = user?.role === 'Designer' ? '/my-tasks' : '/';
 
   return (
-    <NewRequestContext.Provider value={{ openNewRequest }}>
     <div className="app-shell flex h-screen font-body">
       <a href="#main-content" className="skip-link">Skip to content</a>
       <Sidebar onNewTicket={() => openNewRequest()} />
@@ -277,8 +261,6 @@ function AppShell() {
               <Route path="/workload" element={<RequireRole roles={STAFF}><WorkloadPage /></RequireRole>} />
               <Route path="/library" element={<RequireRole roles={STAFF}><LibraryPage /></RequireRole>} />
               <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/client-portal" element={<RedirectToPortal to="/portal/client-portal" />} />
-              <Route path="/campaigns" element={<RedirectToPortal to="/portal/campaigns" />} />
               <Route path="/tickets/:id"element={<TicketDetailPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={home} replace />} />
@@ -287,12 +269,11 @@ function AppShell() {
           </div>
         </div>
 
-        <TicketCreateModal isOpen={isCreateModalOpen} prefill={prefill} onClose={() => setIsCreateModalOpen(false)} />
+        <TicketCreateModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
         <CommandPalette    isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
         <ToastContainer    toasts={toasts} onRemove={removeToast} />
       </main>
     </div>
-    </NewRequestContext.Provider>
   );
 }
 
@@ -306,86 +287,17 @@ function App() {
   );
 }
 
-/** Where an emailed client link lands: it exchanges itself for a session, once, then enters the portal. */
-function ClientLinkLanding() {
-  const { token } = useParams<{ token: string }>();
-  const { exchangeClientLink } = useAuth();
-  const [error, setError] = useState<string | null>(null);
-  // The token works once: StrictMode's double effect or a re-render must not spend it twice.
-  const exchanged = useRef(false);
-
-  useEffect(() => {
-    if (!token || exchanged.current) return;
-    exchanged.current = true;
-    exchangeClientLink(token)
-      .then(() => window.location.replace('/portal/client-portal'))
-      .catch(e => setError(e instanceof Error ? e.message : 'This link is not valid or has expired.'));
-  }, [token, exchangeClientLink]);
-
-  if (error) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, textAlign: 'center', padding: '2rem' }}>
-        <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-strong)' }}>{error}</p>
-        {error.startsWith('This link') && (
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)', maxWidth: 420 }}>
-            Sign-in links now work once, for a short time. Enter your email and we'll send you a fresh one.
-          </p>
-        )}
-        <a href="/my-requests" className="btn-primary" style={{ textDecoration: 'none' }}>Get a new sign-in link</a>
-        <a href="/request" className="login-link-btn" style={{ fontSize: '0.85rem' }}>Or submit a new request</a>
-      </div>
-    );
-  }
-  return <FullScreenLoading text="Signing you in…" />;
-}
-
+/** The admin app: the design team only. Clients use the separate User app, with no account. */
 function AppContent() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
-  /* An emailed client link signs itself in, no password. */
-  if (location.pathname.startsWith('/client/')) {
-    return (
-      <Routes>
-        <Route path="/client/:token" element={<ClientLinkLanding />} />
-      </Routes>
-    );
-  }
-
-  /* The client review link works without signing in. */
-  if (location.pathname.startsWith('/review/')) {
-    return (
-      <Suspense fallback={<PageLoading />}>
-        <Routes>
-          <Route path="/review/:token" element={<ReviewPage />} />
-        </Routes>
-      </Suspense>
-    );
-  }
-
-  /* So does the design request form. */
-  if (location.pathname === '/request') return <Suspense fallback={<PageLoading />}><RequestFormPage /></Suspense>;
-  if (location.pathname === '/requests') return <Suspense fallback={<PageLoading />}><RequestsBoardPage /></Suspense>;
-  if (location.pathname === '/my-requests') return <Suspense fallback={<PageLoading />}><MyRequestsPage /></Suspense>;
   if (location.pathname === '/forgot-password' || location.pathname === '/reset-password') {
     return <Suspense fallback={<PageLoading />}><PasswordResetPage /></Suspense>;
-  }
-  if (location.pathname.startsWith('/track/')) {
-    return <Suspense fallback={<PageLoading />}><Routes><Route path="/track/:token" element={<TrackPage />} /></Routes></Suspense>;
   }
 
   if (isLoading) return <FullScreenLoading text="Loading MCCIA Studio…" />;
   if (!isAuthenticated) return <LoginPage />;
-
-  /* The client experience now lives entirely at /portal (see PortalApp.tsx); send a signed-in Client there,
-   * keeping any deep link (an emailed ticket link, say) instead of always landing on the main requests page. */
-  if (user?.role === 'Client') {
-    const target = location.pathname.startsWith('/tickets/') ? `/portal${location.pathname}`
-      : location.pathname === '/campaigns' ? '/portal/campaigns'
-      : location.pathname === '/settings' ? '/portal/settings'
-      : '/portal/client-portal';
-    return <RedirectToPortal to={target} />;
-  }
 
   if (user?.mustChangePassword) return <Suspense fallback={<PageLoading />}><ForcePasswordChangePage /></Suspense>;
 

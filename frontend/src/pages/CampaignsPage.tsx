@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Check, ExternalLink, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { apiJson, authFetch, fetchBlobUrl } from '../api';
-import { useAuth } from '../contexts/AuthContext';
-import { useTickets } from '../contexts/TicketsContext';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Check, ExternalLink, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { API_BASE, publicJson } from '../api';
 import { useReveal } from '../hooks/useReveal';
 import { ToastContainer, useToast } from '../components/Toast';
 
@@ -29,19 +26,14 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
   </label>
 );
 
-function PostImage({ id, title }: { id: number; title: string }) {
-  const [src, setSrc] = useState('');
-  useEffect(() => {
-    let url = '';
-    let live = true;
-    fetchBlobUrl(`/api/social-posts/${id}/image`).then(u => { url = u; if (live) setSrc(u); else URL.revokeObjectURL(u); }).catch(() => undefined);
-    return () => { live = false; if (url) URL.revokeObjectURL(url); };
-  }, [id]);
-  return src ? <img src={src} alt={`Image for ${title}`} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} /> : null;
+function PostImage({ id, title, version }: { id: number; title: string; version: string }) {
+  // `version` changes when the post is saved, so a replaced image isn't served from the browser cache.
+  return <img src={`${API_BASE}/api/public/social-posts/${id}/image?v=${encodeURIComponent(version)}`} alt={`Image for ${title}`} loading="lazy"
+    style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />;
 }
 
-function Timeline({ campaigns, posts, deadlines }: { campaigns: Campaign[]; posts: Post[]; deadlines: { id: string; label: string; date: string }[] }) {
-  const days = [...campaigns.flatMap(c => [c.start_date, c.end_date]), ...posts.map(p => p.post_date), ...deadlines.map(d => d.date), today()].map(dayNum);
+function Timeline({ campaigns, posts }: { campaigns: Campaign[]; posts: Post[] }) {
+  const days = [...campaigns.flatMap(c => [c.start_date, c.end_date]), ...posts.map(p => p.post_date), today()].map(dayNum);
   const first = Math.min(...days) - 3;
   const last = Math.max(...days) + 3;
   const span = last - first + 1;
@@ -62,7 +54,6 @@ function Timeline({ campaigns, posts, deadlines }: { campaigns: Campaign[]; post
   ];
   const loose = posts.filter(p => p.campaign_id === null);
   if (loose.length) rows.push({ key: 'loose', label: 'Not in a campaign', color: '#64748b', dots: loose.map(p => ({ id: `p${p.id}`, date: p.post_date, title: `${p.platform}: ${p.title}`, planned: p.status === 'Planned' })) });
-  if (deadlines.length) rows.push({ key: 'design', label: 'Design requests (due)', color: '#0B1F3A', dots: deadlines.map(d => ({ id: d.id, date: d.date, title: d.label, planned: false })) });
 
   return (
     <div role="region" aria-label="Campaign timeline" tabIndex={0} style={{ overflowX: 'auto', background: 'white', border: '1px solid rgba(226,232,240,0.9)', borderRadius: 12 }}>
@@ -94,16 +85,14 @@ function Timeline({ campaigns, posts, deadlines }: { campaigns: Campaign[]; post
         </div>
       </div>
       <p style={{ fontSize: '0.7rem', color: '#64748b', padding: '8px 12px' }}>
-        Bars are campaign dates. Filled dots are posts you made, hollow dots are planned. The red line is today.
+        Bars are campaign dates. Filled dots are posts made, hollow dots are planned. The red line is today.
       </p>
     </div>
   );
 }
 
+/** Campaigns and social posts: open to everyone in the User app, no sign-in. */
 const CampaignsPage = () => {
-  const { user } = useAuth();
-  const { tickets } = useTickets();
-  const isClient = user?.role === 'Client';
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,20 +104,20 @@ const CampaignsPage = () => {
   const [pDraft, setPDraft] = useState<PostDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [loadedAt, setLoadedAt] = useState('');
   const { toasts, addToast, removeToast } = useToast();
   const campaignListRef = useReveal<HTMLUListElement>(`${tab}:${campaigns.length}:${loading}`);
   const postListRef = useReveal<HTMLUListElement>(`${tab}:${posts.length}:${campaignFilter}:${platformFilter}:${loading}`);
 
   const load = useCallback(async () => {
     try {
-      const [c, p] = await Promise.all([apiJson<Campaign[]>('/api/campaigns'), apiJson<Post[]>('/api/social-posts')]);
-      setCampaigns(c); setPosts(p); setError('');
+      const [c, p] = await Promise.all([publicJson<Campaign[]>('/api/public/campaigns'), publicJson<Post[]>('/api/public/social-posts')]);
+      setCampaigns(c); setPosts(p); setError(''); setLoadedAt(String(Date.now()));
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not load'); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const deadlines = useMemo(() => tickets.filter(t => t.due_at).map(t => ({ id: `t${t.id}`, label: `${t.number} ${t.title}`, date: t.due_at })), [tickets]);
   const nameOf = (id: number | null) => campaigns.find(c => c.id === id);
   const shownPosts = posts.filter(p => (!campaignFilter || String(p.campaign_id ?? 'none') === campaignFilter) && (!platformFilter || p.platform === platformFilter));
 
@@ -143,29 +132,29 @@ const CampaignsPage = () => {
     e.preventDefault();
     if (!cDraft) return;
     const { id, ...json } = cDraft;
-    void run(() => apiJson(id ? `/api/campaigns/${id}` : '/api/campaigns', { method: id ? 'PUT' : 'POST', json: { ...json, description: json.description || null } }), () => setCDraft(null), id ? 'Campaign saved' : 'Campaign added');
+    void run(() => publicJson(id ? `/api/public/campaigns/${id}` : '/api/public/campaigns', { method: id ? 'PUT' : 'POST', json: { ...json, description: json.description || null } }), () => setCDraft(null), id ? 'Campaign saved' : 'Campaign added');
   };
   const savePost = (e: FormEvent) => {
     e.preventDefault();
     if (!pDraft) return;
     const { id, hasImage, file, removeImage, ...d } = pDraft;
     void run(async () => {
-      const saved = await apiJson<Post>(id ? `/api/social-posts/${id}` : '/api/social-posts', { method: id ? 'PUT' : 'POST',
+      const saved = await publicJson<Post>(id ? `/api/public/social-posts/${id}` : '/api/public/social-posts', { method: id ? 'PUT' : 'POST',
         json: { ...d, campaign_id: d.campaign_id ? Number(d.campaign_id) : null, post_url: d.post_url.trim() || null, notes: d.notes || null } });
       if (file) {
         const body = new FormData();
         body.append('file', file);
-        const res = await authFetch(`/api/social-posts/${saved.id}/image`, { method: 'POST', body });
-        if (!res.ok) throw new Error(`The post was saved, but the image was not: ${((await res.json().catch(() => null)) as { detail?: string } | null)?.detail ?? 'upload failed'}`);
+        try { await publicJson(`/api/public/social-posts/${saved.id}/image`, { method: 'POST', body }); }
+        catch (e) { throw new Error(`The post was saved, but the image was not: ${e instanceof Error ? e.message : 'upload failed'}`); }
       } else if (removeImage && hasImage) {
-        await apiJson(`/api/social-posts/${saved.id}/image`, { method: 'DELETE' });
+        await publicJson(`/api/public/social-posts/${saved.id}/image`, { method: 'DELETE' });
       }
     }, () => setPDraft(null), id ? 'Post saved' : 'Post logged');
   };
   const remove = (path: string, what: string) => {
     if (!window.confirm(`Delete ${what}?`)) return;
     setRemoving(path);                                   // collapse the row first, then delete it
-    window.setTimeout(() => { void run(() => apiJson(path, { method: 'DELETE' }), () => undefined, 'Deleted').finally(() => setRemoving(null)); }, 320);
+    window.setTimeout(() => { void run(() => publicJson(path, { method: 'DELETE' }), () => undefined, 'Deleted').finally(() => setRemoving(null)); }, 320);
   };
 
   const newCampaign = () => setCDraft({ name: '', description: '', color: COLORS[campaigns.length % COLORS.length], start_date: today(), end_date: today() });
@@ -175,20 +164,17 @@ const CampaignsPage = () => {
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '0.5rem 0 3rem' }}>
-      {isClient && <Link to="/client-portal" className="btn-ghost" style={{ gap: 6, textDecoration: 'none', marginBottom: 10 }}><ArrowLeft size={14} aria-hidden="true" /> My requests</Link>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
         <div>
           <h1 style={{ fontSize: 'clamp(1.3rem,3vw,1.7rem)', fontFamily: 'var(--font-body)', fontWeight: 800, color: '#0B1F3A' }}>Campaigns and posts</h1>
           <p style={{ fontSize: '0.85rem', color: '#737373', marginTop: 4 }}>
-            {isClient ? 'Keep a record of the posts you publish yourself. They never go to the design team.' : 'What clients have recorded (read only).'}
+            Plan campaigns and keep a record of the posts MCCIA publishes. Anyone here can add or change them.
           </p>
         </div>
-        {isClient && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" className="btn-ghost" onClick={newCampaign} style={{ gap: 6 }}><Plus size={14} aria-hidden="true" /> Campaign</button>
-            <button type="button" className="btn-primary" onClick={() => newPost()} style={{ gap: 6 }}><Plus size={14} aria-hidden="true" /> Log a post</button>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn-ghost" onClick={newCampaign} style={{ gap: 6 }}><Plus size={14} aria-hidden="true" /> Campaign</button>
+          <button type="button" className="btn-primary" onClick={() => newPost()} style={{ gap: 6 }}><Plus size={14} aria-hidden="true" /> Log a post</button>
+        </div>
       </div>
 
       {error && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem', marginBottom: 10 }}>{error}</p>}
@@ -254,22 +240,20 @@ const CampaignsPage = () => {
 
       {!loading && tab === 'timeline' && (
         campaigns.length === 0 && posts.length === 0
-          ? <Empty text={isClient ? 'Add a campaign to plan it on a timeline, or log a post you have made.' : 'No campaigns yet.'} />
+          ? <Empty text="Add a campaign to plan it on a timeline, or log a post that has gone out." />
           : <>
-              <Timeline campaigns={campaigns} posts={posts} deadlines={isClient ? deadlines : []} />
+              <Timeline campaigns={campaigns} posts={posts} />
               {campaigns.length > 0 && (
                 <ul ref={campaignListRef} style={{ listStyle: 'none', padding: 0, margin: '14px 0 0', display: 'grid', gap: 8 }}>
                   {campaigns.map(c => (
-                    <li key={c.id} className={`glass-card collapsible${removing === `/api/campaigns/${c.id}` ? ' removing' : ''}`} style={{ padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderLeft: `4px solid ${c.color}` }}>
+                    <li key={c.id} className={`glass-card collapsible${removing === `/api/public/campaigns/${c.id}` ? ' removing' : ''}`} style={{ padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderLeft: `4px solid ${c.color}` }}>
                       <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                         <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0B1F3A' }}>{c.name}</p>
                         <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{fmt(c.start_date)} to {fmt(c.end_date)} · {c.post_count} post{c.post_count === 1 ? '' : 's'}{c.description ? ` · ${c.description}` : ''}</p>
                       </div>
-                      {isClient && <>
-                        <button type="button" className="chip" onClick={() => newPost(String(c.id))}>Log a post</button>
-                        <button type="button" className="btn-ghost" aria-label={`Edit ${c.name}`} onClick={() => setCDraft({ id: c.id, name: c.name, description: c.description ?? '', color: c.color, start_date: c.start_date, end_date: c.end_date })}><Pencil size={13} aria-hidden="true" /></button>
-                        <button type="button" className="btn-ghost" aria-label={`Delete ${c.name}`} onClick={() => remove(`/api/campaigns/${c.id}`, `the campaign "${c.name}" (its posts stay in your record)`)}><Trash2 size={13} aria-hidden="true" /></button>
-                      </>}
+                      <button type="button" className="chip" onClick={() => newPost(String(c.id))}>Log a post</button>
+                      <button type="button" className="btn-ghost" aria-label={`Edit ${c.name}`} onClick={() => setCDraft({ id: c.id, name: c.name, description: c.description ?? '', color: c.color, start_date: c.start_date, end_date: c.end_date })}><Pencil size={13} aria-hidden="true" /></button>
+                      <button type="button" className="btn-ghost" aria-label={`Delete ${c.name}`} onClick={() => remove(`/api/public/campaigns/${c.id}`, `the campaign "${c.name}" (its posts are kept)`)}><Trash2 size={13} aria-hidden="true" /></button>
                     </li>
                   ))}
                 </ul>
@@ -289,22 +273,20 @@ const CampaignsPage = () => {
             {(campaignFilter || platformFilter) && <button type="button" className="chip" onClick={() => { setCampaignFilter(''); setPlatformFilter(''); }}><X size={12} aria-hidden="true" /> Clear</button>}
           </div>
           {shownPosts.length === 0
-            ? <Empty text={posts.length === 0 ? (isClient ? 'No posts recorded yet. Use "Log a post" after you publish something.' : 'No posts recorded yet.') : 'No posts match these filters.'} />
+            ? <Empty text={posts.length === 0 ? 'No posts recorded yet. Use "Log a post" after something is published.' : 'No posts match these filters.'} />
             : <ul ref={postListRef} style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
                 {shownPosts.map(p => {
                   const c = nameOf(p.campaign_id);
                   return (
-                    <li key={p.id} className={`glass-card collapsible${removing === `/api/social-posts/${p.id}` ? ' removing' : ''}`} style={{ padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderLeft: `4px solid ${c?.color ?? '#cbd5e1'}` }}>
-                      {p.has_image && <PostImage id={p.id} title={p.title} />}
+                    <li key={p.id} className={`glass-card collapsible${removing === `/api/public/social-posts/${p.id}` ? ' removing' : ''}`} style={{ padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderLeft: `4px solid ${c?.color ?? '#cbd5e1'}` }}>
+                      {p.has_image && <PostImage id={p.id} title={p.title} version={loadedAt} />}
                       <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                         <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0B1F3A', overflowWrap: 'anywhere' }}>{p.title}</p>
                         <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{p.platform} · {fmt(p.post_date)} · {p.status}{c ? ` · ${c.name}` : ''}{p.notes ? ` · ${p.notes}` : ''}</p>
                       </div>
                       {p.post_url && <a href={p.post_url} target="_blank" rel="noopener noreferrer" className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>View post <ExternalLink size={11} aria-hidden="true" /></a>}
-                      {isClient && <>
-                        <button type="button" className="btn-ghost" aria-label={`Edit ${p.title}`} onClick={() => setPDraft({ id: p.id, campaign_id: p.campaign_id ? String(p.campaign_id) : '', platform: p.platform, title: p.title, post_url: p.post_url ?? '', post_date: p.post_date, status: p.status, notes: p.notes ?? '', hasImage: p.has_image, file: null, removeImage: false })}><Pencil size={13} aria-hidden="true" /></button>
-                        <button type="button" className="btn-ghost" aria-label={`Delete ${p.title}`} onClick={() => remove(`/api/social-posts/${p.id}`, `"${p.title}"`)}><Trash2 size={13} aria-hidden="true" /></button>
-                      </>}
+                      <button type="button" className="btn-ghost" aria-label={`Edit ${p.title}`} onClick={() => setPDraft({ id: p.id, campaign_id: p.campaign_id ? String(p.campaign_id) : '', platform: p.platform, title: p.title, post_url: p.post_url ?? '', post_date: p.post_date, status: p.status, notes: p.notes ?? '', hasImage: p.has_image, file: null, removeImage: false })}><Pencil size={13} aria-hidden="true" /></button>
+                      <button type="button" className="btn-ghost" aria-label={`Delete ${p.title}`} onClick={() => remove(`/api/public/social-posts/${p.id}`, `"${p.title}"`)}><Trash2 size={13} aria-hidden="true" /></button>
                     </li>
                   );
                 })}

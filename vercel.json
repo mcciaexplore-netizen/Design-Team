@@ -12,8 +12,6 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/portal", "destination": "/portal.html" },
-    { "source": "/portal/(.*)", "destination": "/portal.html" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
   "crons": [

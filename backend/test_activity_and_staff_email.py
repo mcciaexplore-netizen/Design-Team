@@ -30,7 +30,6 @@ def test_the_feed_shows_new_requests_and_changes_newest_first(client):
 
     just_mine = client.get("/api/activity", params={"mine": True}, headers=des).json()
     assert just_mine and {f["ticket_number"] for f in just_mine} == {mine["ticket_number"]}
-    assert client.get("/api/activity", headers=auth(client, "a@tata.com")).status_code == 403
 
 
 def test_designers_are_emailed_about_their_work_and_can_turn_it_off(client, outbox):
@@ -52,14 +51,6 @@ def test_designers_are_emailed_about_their_work_and_can_turn_it_off(client, outb
     client.post(f"/api/tickets/{t['id']}/client-changes", json={"text": "And blue"}, headers=lead)
     assert [to for to, _, _ in outbox] == []
     assert client.get("/api/notifications", headers=des).json()["unread"] >= 3   # still told in the app
-
-
-def test_a_new_request_emails_the_leads_the_designer_it_went_to_and_confirms_to_the_client(client, outbox):
-    t = make_ticket(client, "a@tata.com", "Expo")
-    assert t["assignee_id"] == 2   # assigned automatically
-    assert sorted(to for to, _, _ in outbox) == ["a@tata.com", "des@x.com", "lead@x.com"]
-    [(subject, body)] = [(s, b) for to, s, b in outbox if to == "a@tata.com"]   # one confirmation, no team emails
-    assert subject == f"Design request received: {t['ticket_number']}" and f"Your ticket number is {t['ticket_number']}" in body
 
 
 def test_a_form_request_tells_the_client_their_number_and_the_leads_who_asked_then_the_assignee(client, outbox):

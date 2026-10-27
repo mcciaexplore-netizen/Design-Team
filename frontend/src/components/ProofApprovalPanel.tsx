@@ -1,8 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CheckCircle2, Clipboard, Columns2, Download, Link2, RotateCcw, Send, Upload, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Clipboard, Columns2, Download, Link2, Send, Upload, XCircle } from 'lucide-react';
 import { apiJson, authFetch, downloadFile } from '../api';
-import { useAuth } from '../contexts/AuthContext';
 import { useTickets } from '../contexts/TicketsContext';
 import { DONE_STATUSES, type Ticket } from '../types';
 import { ProofCompare, RevisionTimeline } from './ProofCompare';
@@ -29,9 +27,7 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { da
 
 export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   const limits = useUploadLimits();
-  const { user } = useAuth();
   const { refresh, tickets } = useTickets();
-  const isClient = user?.role === 'Client';
   const [proofs, setProofs] = useState<Proof[]>([]);
   const [requests, setRequests] = useState<ApprovalReq[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +40,6 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   const [pins, setPins] = useState<ApiPin[]>([]);
   // When this ticket is a later version (V2, V3...), the version it grew from: its designs, decisions and marked spots.
   const [parentData, setParentData] = useState<{ proofs: Proof[]; requests: ApprovalReq[]; pins: ApiPin[] } | null>(null);
-  const [nextVersion, setNextVersion] = useState<{ id: number; ticket_number: string } | null>(null);
   const autoCompared = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -52,9 +47,6 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   const [days, setDays] = useState('2');
   const [created, setCreated] = useState<Created | null>(null);
   const [copied, setCopied] = useState(false);
-
-  const [deciding, setDeciding] = useState<{ id: number; mode: 'approve' | 'request_changes' } | null>(null);
-  const [comment, setComment] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -77,7 +69,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   }, [ticket.id, ticket.parent_id]);
 
   useEffect(() => {
-    setLoading(true); setCreated(null); setSendFor(null); setDeciding(null); setInfo(null); setNextVersion(null); autoCompared.current = false;
+    setLoading(true); setCreated(null); setSendFor(null); setInfo(null); autoCompared.current = false;
     void load();
     const id = setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 20_000);
     return () => clearInterval(id);
@@ -156,26 +148,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   };
   const togglePin = (pin: PinItem) => toggleOn(ticket.id, pin);
 
-  const decide = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!deciding) return;
-    setBusy(true); setError(null);
-    try {
-      // Marked spots can stand in for a written note.
-      const marked = pending?.proof_version_id ? pinItems(pending.proof_version_id).length : 0;
-      const text = comment.trim() || (deciding.mode === 'request_changes' && marked ? `Please see the ${marked} marked spot${marked > 1 ? 's' : ''} on the design.` : null);
-      const res = await apiJson<{ new_ticket?: { id: number; ticket_number: string } }>(`/api/approval-requests/${deciding.id}/decision`, { method: 'POST', json: { decision: deciding.mode, comment: text } });
-      setNextVersion(res.new_ticket ?? null);
-      setDeciding(null); setComment('');
-      setInfo(deciding.mode === 'approve' ? 'Thank you — the design is approved.' : 'Thanks — your feedback was sent to the design team.');
-      await load(); void refresh();
-    } catch (err) { setError(err instanceof Error ? err.message : 'Could not record your decision.'); }
-    finally { setBusy(false); }
-  };
-
-  const pending = requests.find(r => r.status === 'pending');
   const latest = proofs[0];
-  const pendingMarks = pending?.proof_version_id ? pinItems(pending.proof_version_id).length : 0;
 
   // "What changed": on a later version, show the client's feedback on the version before as a checklist and open
   // the comparison. Designs of both versions are numbered as one series so they can be compared.
@@ -200,59 +173,26 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {error && <p role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c', background: 'rgba(225,29,72,0.06)', border: '1px solid rgba(225,29,72,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>{error}</p>}
-      {nextVersion && (
-        <p style={{ fontSize: '0.82rem', color: '#1e3a8a', background: 'rgba(37,99,235,0.07)', border: '1px solid rgba(37,99,235,0.22)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
-          The team continues on a new version: <Link to={`/tickets/${nextVersion.id}`} style={{ fontWeight: 800 }}>{nextVersion.ticket_number}</Link>
-        </p>
-      )}
       {info && <p role="status" style={{ fontSize: '0.8rem', color: '#256B45', background: 'rgba(46,139,87,0.07)', border: '1px solid rgba(46,139,87,0.2)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>{info}</p>}
 
-      {/* Client decision (signed-in portal) */}
-      {isClient && pending && latest && (
-        <div className="glass-card" style={{ padding: '1.1rem', borderColor: 'rgba(11,31,58,0.25)' }}>
-          <p style={{ fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0B1F3A', marginBottom: 4 }}>Your review is needed</p>
-          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: 10 }}>Please review version {pending.proof_version ?? latest.version} below, then approve it or tell us what to change. You can click the design to mark exactly where.</p>
-          {!deciding ? (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" className="btn-primary" style={{ background: '#256B45', borderColor: '#256B45' }} onClick={() => setDeciding({ id: pending.id, mode: 'approve' })}><CheckCircle2 size={14} /> Approve</button>
-              <button type="button" className="btn-ghost" onClick={() => setDeciding({ id: pending.id, mode: 'request_changes' })}><RotateCcw size={14} /> Request changes</button>
-            </div>
-          ) : (
-            <form onSubmit={decide} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <label htmlFor="decision-comment" className="section-label">{deciding.mode === 'approve' ? 'Comment (optional)' : 'What should we change?'}</label>
-              <textarea id="decision-comment" className="input-field" rows={3} maxLength={2000} required={deciding.mode === 'request_changes' && pendingMarks === 0} value={comment} onChange={e => setComment(e.target.value)} />
-              {deciding.mode === 'approve' && <p style={{ fontSize: '0.74rem', color: '#64748b' }}>Approving tells the team this design is final.</p>}
-              {deciding.mode === 'request_changes' && pendingMarks > 0 && <p style={{ fontSize: '0.74rem', color: '#64748b' }}>Your {pendingMarks} marked spot{pendingMarks > 1 ? 's' : ''} will be sent with this. A note is optional.</p>}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="submit" className="btn-primary" disabled={busy} style={deciding.mode === 'approve' ? { background: '#256B45', borderColor: '#256B45' } : undefined}>{busy ? 'Sending…' : deciding.mode === 'approve' ? 'Confirm approval' : 'Send feedback'}</button>
-                <button type="button" className="btn-ghost" onClick={() => { setDeciding(null); setComment(''); }}>Cancel</button>
-              </div>
-            </form>
-          )}
+      <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <label htmlFor="proof-note" className="section-label" style={{ display: 'block', marginBottom: 4 }}>Note for this version (optional)</label>
+          <input id="proof-note" className="input-field" maxLength={1000} value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Updated logo size" />
         </div>
-      )}
-
-      {/* Staff: upload */}
-      {!isClient && (
-        <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
-          <div style={{ flex: 1, minWidth: 180 }}>
-            <label htmlFor="proof-note" className="section-label" style={{ display: 'block', marginBottom: 4 }}>Note for this version (optional)</label>
-            <input id="proof-note" className="input-field" maxLength={1000} value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Updated logo size" />
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#525252', width: '100%' }}>
-            <input type="checkbox" checked={sendNow} onChange={e => setSendNow(e.target.checked)} style={{ accentColor: '#0B1F3A' }} />
-            Send to the client for approval when uploaded
-          </label>
-          <input ref={fileRef} type="file" hidden aria-label="Choose proof file" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.zip,.psd,.ai" onChange={e => void upload(e.target.files?.[0])} />
-          <button type="button" className="btn-primary" disabled={busy} onClick={() => fileRef.current?.click()}><Upload size={14} /> {busy ? 'Uploading…' : sendNow ? 'Upload & send for approval' : 'Upload draft'}</button>
-        </div>
-      )}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#525252', width: '100%' }}>
+          <input type="checkbox" checked={sendNow} onChange={e => setSendNow(e.target.checked)} style={{ accentColor: '#0B1F3A' }} />
+          Send to the client for approval when uploaded
+        </label>
+        <input ref={fileRef} type="file" hidden aria-label="Choose proof file" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.zip,.psd,.ai" onChange={e => void upload(e.target.files?.[0])} />
+        <button type="button" className="btn-primary" disabled={busy} onClick={() => fileRef.current?.click()}><Upload size={14} /> {busy ? 'Uploading…' : sendNow ? 'Upload & send for approval' : 'Upload draft'}</button>
+      </div>
 
       {/* One-time link */}
       {created && (
         <div className="glass-card" style={{ padding: '1rem', borderColor: 'rgba(46,139,87,0.35)' }}>
           <p style={{ fontWeight: 800, color: '#256B45', fontSize: '0.85rem', marginBottom: 4 }}><Link2 size={13} style={{ display: 'inline', marginRight: 5 }} />Review link</p>
-          <p style={{ fontSize: '0.74rem', color: '#64748b', marginBottom: 8 }}>The client can review in their portal. This link is only for people without an account. For security it is shown once — if you lose it, create a new one.</p>
+          <p style={{ fontSize: '0.74rem', color: '#64748b', marginBottom: 8 }}>Send this link to the client to review and approve the design. For security it is shown once — if you lose it, create a new one.</p>
           <div style={{ display: 'flex', gap: 6 }}>
             <input className="input-field" readOnly aria-label="Review link" value={created.review_url} onFocus={e => e.currentTarget.select()} style={{ fontSize: '0.76rem' }} />
             <button type="button" className="btn-ghost" onClick={() => void copyLink()}><Clipboard size={13} /> {copied ? 'Copied' : 'Copy'}</button>
@@ -265,7 +205,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
       {!loading && proofs.length === 0 && (
         <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', border: '2px dashed rgba(226,232,240,0.9)' }}>
           <p style={{ fontWeight: 700, color: '#0B1F3A' }}>No proofs yet</p>
-          <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>{isClient ? 'The design team will share work for your review here.' : 'Upload the first version of the design to start the approval process.'}</p>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>Upload the first version of the design to start the approval process.</p>
         </div>
       )}
 
@@ -275,7 +215,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
             Changes requested on {parentNumber}
           </h3>
           <p style={{ fontSize: '0.76rem', color: '#64748b', marginBottom: 8 }}>
-            This version carries those changes out. {isClient ? 'Tick each item off as you check it.' : 'Tick each item off as you finish it.'}
+            This version carries those changes out. Tick each item off as you finish it.
           </p>
           {askedForChanges.decision_comment && (
             <p style={{ fontSize: '0.82rem', color: '#334155', fontStyle: 'italic', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 8 }}>
@@ -318,9 +258,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
             <span style={{ fontSize: '0.78rem', color: '#525252', flex: 1, minWidth: 120, overflowWrap: 'anywhere' }}>{p.file_name}{p.note ? ` — ${p.note}` : ''}</span>
             <span style={{ fontSize: '0.68rem', color: '#737373' }}>{fmt(p.created_at)}</span>
             <button type="button" className="chip" onClick={() => downloadFile(`/api/proofs/${p.id}/file`, p.file_name).catch(e => setError(e instanceof Error ? e.message : 'Download failed'))}><Download size={11} /> Download</button>
-            {!isClient && (
-              <button type="button" className="chip" onClick={() => { setSendFor(sendFor === p.id ? null : p.id); setCreated(null); }}><Send size={11} /> {p.id === latest?.id ? 'Share link' : 'Send this version'}</button>
-            )}
+            <button type="button" className="chip" onClick={() => { setSendFor(sendFor === p.id ? null : p.id); setCreated(null); }}><Send size={11} /> {p.id === latest?.id ? 'Share link' : 'Send this version'}</button>
           </div>
           {sendFor === p.id && (
             <form onSubmit={e => { e.preventDefault(); void sendForApproval(p); }} style={{ padding: '0.75rem 1rem', background: '#FAFAFA', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
@@ -336,7 +274,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
           {p.content_type?.startsWith('image/') ? (
             <div style={{ padding: '0.75rem', background: '#F1F5F9' }}>
               <PinnableImage proofId={p.id} name={p.file_name} pins={pinItems(p.id)}
-                canAdd={isClient && pending?.proof_version_id === p.id} canToggle
+                canAdd={false} canToggle
                 onAdd={(x, y, text) => addPin(p.id, x, y, text)} onToggle={pin => void togglePin(pin)} />
             </div>
           ) : (
@@ -360,7 +298,7 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
                     <strong>Version {r.proof_version ?? '?'}</strong>
                     {r.decided_by_name && <span>by {r.decided_by_name} · {fmt(r.decided_at)}</span>}
                     {r.status === 'pending' && <span style={{ color: '#737373' }}>expires {fmt(r.expires_at)}</span>}
-                    {!isClient && r.status === 'pending' && <button type="button" className="chip" style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, alignItems: 'center' }} onClick={() => void revoke(r.id)}><XCircle size={11} /> Withdraw link</button>}
+                    {r.status === 'pending' && <button type="button" className="chip" style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, alignItems: 'center' }} onClick={() => void revoke(r.id)}><XCircle size={11} /> Withdraw link</button>}
                   </div>
                   {r.decision_comment && <p style={{ marginTop: 4, fontStyle: 'italic', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>“{r.decision_comment}”</p>}
                 </li>

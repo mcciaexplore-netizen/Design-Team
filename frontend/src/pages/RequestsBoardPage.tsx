@@ -78,11 +78,10 @@ export default function RequestsBoardPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-app, #FAFAFA)', padding: '2rem 1rem 3rem' }}>
+    <div style={{ padding: '2rem 1rem 3rem' }}>
       <main style={{ maxWidth: 1040, margin: '0 auto' }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
           <div>
-            <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 44, marginBottom: 14 }} />
             <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.02em' }}>
               Design requests
             </h1>
@@ -92,7 +91,7 @@ export default function RequestsBoardPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
             <a href="/request" className="btn-primary" style={{ textDecoration: 'none' }}>Submit a new request</a>
-            <a href="/my-requests" className="login-link-btn" style={{ fontSize: '0.82rem' }}>Campaigns &amp; your requests →</a>
+            <a href="/campaigns" className="login-link-btn" style={{ fontSize: '0.82rem' }}>Campaigns &amp; posts →</a>
           </div>
         </header>
 

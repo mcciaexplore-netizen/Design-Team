@@ -224,7 +224,7 @@ def test_report_breaks_down_by_design_type_and_exports_csv(client):
 def test_source_files_may_be_larger_than_ordinary_uploads(client):
     t = make_ticket(client, "a@tata.com")
     set_status(client, t["id"], "Delivered")
-    rid = client.post("/api/cdr-requests", json={"ticket_id": t["id"]}, headers=auth(client, "a@tata.com")).json()["id"]
+    rid = client.post("/api/cdr-requests", json={"ticket_id": t["id"]}, headers=auth(client, "lead@x.com")).json()["id"]
     client.post(f"/api/cdr-requests/{rid}/approve", headers=auth(client, "lead@x.com"))
     big = b"C" * (11 * 1024 * 1024)
     ok = client.post(f"/api/cdr-requests/{rid}/upload", files={"file": ("big.cdr", big, "application/octet-stream")}, headers=auth(client, "des@x.com"))
@@ -262,6 +262,10 @@ def upload_design(client, tid, email="des@x.com", **data):
     return client.post(f"/api/tickets/{tid}/proofs", files={"file": ("design.png", PNG, "image/png")}, data=data, headers=auth(client, email))
 
 
+def review_token(review_url):
+    return review_url.rsplit("/review/", 1)[1]
+
+
 def test_uploading_a_design_sends_it_to_the_client_for_approval(client):
     t = make_ticket(client, "a@tata.com")
     r = upload_design(client, t["id"])
@@ -269,25 +273,24 @@ def test_uploading_a_design_sends_it_to_the_client_for_approval(client):
     body = r.json()
     assert body["version"] == 1 and body["approval"]["status"] == "pending" and body["approval"]["review_url"].startswith("http")
     assert db_ticket(t["id"]).status == models.TicketStatus.IN_REVIEW                  # no separate click, no comment needed
-    assert any("sent a design for your review" in n for n in notes("a@tata.com"))     # the client is told
-    feed = client.get("/api/notifications", headers=auth(client, "a@tata.com")).json()["items"]
-    assert feed[0]["type"] == "approval_requested" and feed[0]["ticket_id"] == t["id"]   # and the notification opens the request
-    cl = auth(client, "a@tata.com")
-    pending = [x for x in client.get(f"/api/tickets/{t['id']}/approval-requests", headers=cl).json() if x["status"] == "pending"]
-    assert len(pending) == 1 and pending[0]["proof_version"] == 1                      # visible in their portal
+    assert any("sent a design for your review" in n for n in notes("a@tata.com"))     # the client has no account, but is still noted
+    lead = auth(client, "lead@x.com")
+    pending = [x for x in client.get(f"/api/tickets/{t['id']}/approval-requests", headers=lead).json() if x["status"] == "pending"]
+    assert len(pending) == 1 and pending[0]["proof_version"] == 1
 
-    # They approve right there in the portal.
-    d = client.post(f"/api/approval-requests/{pending[0]['id']}/decision", json={"decision": "approve"}, headers=cl)
+    # The client has no account; they decide through the emailed review link.
+    d = client.post(f"/api/public/review/{review_token(body['approval']['review_url'])}/decision",
+                    json={"decision": "approve", "name": "Tata A"})
     assert d.status_code == 200, d.text
     assert db_ticket(t["id"]).status == models.TicketStatus.DELIVERED
 
 
 def test_client_reply_opens_the_next_version_and_its_upload_goes_out_automatically(client):
     t = make_ticket(client, "a@tata.com")
-    upload_design(client, t["id"])
-    cl = auth(client, "a@tata.com")
-    first = [x for x in client.get(f"/api/tickets/{t['id']}/approval-requests", headers=cl).json() if x["status"] == "pending"][0]
-    r = client.post(f"/api/approval-requests/{first['id']}/decision", json={"decision": "request_changes", "comment": "Make the logo bigger"}, headers=cl)
+    first = upload_design(client, t["id"]).json()
+    lead = auth(client, "lead@x.com")
+    r = client.post(f"/api/public/review/{review_token(first['approval']['review_url'])}/decision",
+                    json={"decision": "request_changes", "comment": "Make the logo bigger", "name": "Tata A"})
     assert r.status_code == 200, r.text
     v2_id = r.json()["new_ticket"]["id"]
     v2 = db_ticket(v2_id)
@@ -298,7 +301,7 @@ def test_client_reply_opens_the_next_version_and_its_upload_goes_out_automatical
     sent = upload_design(client, v2_id).json()                                                    # the redo goes on V2
     assert sent["version"] == 1 and sent["approval"]["status"] == "pending"
     assert db_ticket(v2_id).status == models.TicketStatus.IN_REVIEW
-    reqs = client.get(f"/api/tickets/{v2_id}/approval-requests", headers=cl).json()
+    reqs = client.get(f"/api/tickets/{v2_id}/approval-requests", headers=lead).json()
     assert [x["status"] for x in reqs] == ["pending"]
     assert any("sent a design for your review" in n and f"{t['ticket_number']}-V2" in n for n in notes("a@tata.com"))   # the client hears about it
     assert any("was assigned to you" in n and f"{t['ticket_number']}-V2" in n for n in notes("des@x.com"))      # and the designer gets the new ticket
@@ -308,7 +311,7 @@ def test_a_new_upload_replaces_the_open_review(client):
     t = make_ticket(client, "a@tata.com")
     upload_design(client, t["id"])
     upload_design(client, t["id"])
-    reqs = client.get(f"/api/tickets/{t['id']}/approval-requests", headers=auth(client, "a@tata.com")).json()
+    reqs = client.get(f"/api/tickets/{t['id']}/approval-requests", headers=auth(client, "lead@x.com")).json()
     assert sorted((x["proof_version"], x["status"]) for x in reqs) == [(1, "revoked"), (2, "pending")]   # only the latest is live
 
 
@@ -317,7 +320,7 @@ def test_a_draft_upload_is_not_sent(client):
     r = upload_design(client, t["id"], send_for_approval="false")
     assert r.status_code == 201 and r.json()["approval"] is None
     assert db_ticket(t["id"]).status == models.TicketStatus.ASSIGNED
-    assert client.get(f"/api/tickets/{t['id']}/approval-requests", headers=auth(client, "a@tata.com")).json() == []
+    assert client.get(f"/api/tickets/{t['id']}/approval-requests", headers=auth(client, "lead@x.com")).json() == []
     assert not any("sent a design" in n for n in notes("a@tata.com"))
 
 

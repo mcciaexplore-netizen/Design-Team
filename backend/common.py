@@ -10,7 +10,6 @@ from typing import Annotated, Optional
 import pytz
 from pydantic import StringConstraints
 from fastapi import HTTPException, Request, Response, UploadFile
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import models
@@ -23,15 +22,6 @@ Email = Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, m
 logger = logging.getLogger(__name__)
 
 
-# Anyone can get an address on these, so sharing one says nothing about belonging to the same company.
-PUBLIC_EMAIL_DOMAINS = frozenset({
-    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "yahoo.in", "ymail.com", "outlook.com", "outlook.in",
-    "hotmail.com", "live.com", "msn.com", "icloud.com", "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com",
-    "zoho.com", "zohomail.in", "zohomail.com", "rediffmail.com", "gmx.com", "gmx.net", "mail.com", "yandex.com",
-    "tutanota.com", "fastmail.com",
-} | {d.strip().lower() for d in os.getenv("EXTRA_PUBLIC_EMAIL_DOMAINS", "").split(",") if d.strip()})
-
-
 def allowed_email_domains() -> set[str]:
     """DesignDesk is for MCCIA only. ALLOWED_EMAIL_DOMAINS (comma-separated) overrides; "*" turns the rule off."""
     raw = os.getenv("ALLOWED_EMAIL_DOMAINS", "mcciapune.com")
@@ -39,21 +29,12 @@ def allowed_email_domains() -> set[str]:
 
 
 def require_allowed_email(email: str) -> None:
-    """Refuse an address outside MCCIA before it can submit a request, get a sign-in link or be given an account."""
+    """Refuse an address outside MCCIA before it can submit a request or be given an account."""
     domains = allowed_email_domains()
     if "*" in domains or email.rsplit("@", 1)[-1].strip().lower() in domains:
         return
     shown = " or ".join(f"@{d}" for d in sorted(domains))
     raise HTTPException(status_code=403, detail=f"DesignDesk is for MCCIA only. Please use your {shown} email address.")
-
-
-def match_existing_company_name(db: Session, company: str) -> Optional[str]:
-    """Case-insensitive lookup of a company already on a User or a Ticket. Returns it exactly as first
-    written, so a second person from the same company joins that record instead of a second casing of it."""
-    row = db.query(models.User.client_org).filter(func.lower(models.User.client_org) == company.lower()).first()
-    if not row:
-        row = db.query(models.Ticket.client_org).filter(func.lower(models.Ticket.client_org) == company.lower()).first()
-    return row[0] if row else None
 
 
 # ── Audit trail ──────────────────────────────────────────────────────────────
@@ -453,6 +434,13 @@ def app_url() -> str:
     url = os.getenv("PUBLIC_APP_URL") or (
         f"https://{os.environ['VERCEL_PROJECT_PRODUCTION_URL']}" if os.getenv("VERCEL_PROJECT_PRODUCTION_URL") else "")
     return (url or "http://localhost:5173").rstrip("/")
+
+
+def user_app_url() -> str:
+    """The client-facing User app (request form, board, tracking, review links): PUBLIC_USER_APP_URL, else the
+    staff app's address when both are served from one place."""
+    url = os.getenv("PUBLIC_USER_APP_URL")
+    return url.rstrip("/") if url else app_url()
 
 
 def as_utc(dt: Optional[datetime.datetime]) -> Optional[datetime.datetime]:

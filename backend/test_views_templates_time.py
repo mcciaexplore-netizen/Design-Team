@@ -24,7 +24,7 @@ def ist(y, m, d, h=0, mi=0):
 # ── Saved views ──────────────────────────────────────────────────────────────
 
 def test_saved_views_crud_and_visibility(client):
-    des, lead, cl = auth(client, "des@x.com"), auth(client, "lead@x.com"), auth(client, "a@tata.com")
+    des, lead = auth(client, "des@x.com"), auth(client, "lead@x.com")
     body = {"name": "My tickets", "filters": {"assignee": "me", "sla": "breaching_soon", "priorities": ["High", "Urgent"]}}
     r = client.post("/api/views", json=body, headers=des)
     assert r.status_code == 201 and r.json()["filters"]["sla"] == "breaching_soon"
@@ -36,7 +36,6 @@ def test_saved_views_crud_and_visibility(client):
     names = lambda h: sorted(v["name"] for v in client.get("/api/views", headers=h).json())
     assert names(des) == ["My tickets", "Team: overdue"]  # own + shared
     assert names(lead) == ["Team: overdue"]               # lead doesn't see the designer's private view
-    assert names(cl) == []                                # clients never see staff views, shared or not
 
     assert client.put(f"/api/views/{vid}", json={**body, "name": "Renamed"}, headers=lead).status_code == 404
     assert client.put(f"/api/views/{vid}", json={**body, "name": "Renamed"}, headers=des).json()["name"] == "Renamed"
@@ -97,8 +96,8 @@ def test_bulk_lead_assigns_unassigns_and_reports_failures(client):
 
 def test_bulk_validation_and_permissions(client):
     t = make_ticket(client, "a@tata.com")["id"]
-    lead, cl = auth(client, "lead@x.com"), auth(client, "a@tata.com")
-    assert client.post("/api/tickets/bulk", json={"ticket_ids": [t], "status": "Closed"}, headers=cl).status_code == 403
+    lead = auth(client, "lead@x.com")
+    assert client.post("/api/tickets/bulk", json={"ticket_ids": [t], "status": "Closed"}).status_code == 401
     assert client.post("/api/tickets/bulk", json={"ticket_ids": [t]}, headers=lead).status_code == 422  # nothing to change
     assert client.post("/api/tickets/bulk", json={"ticket_ids": [], "status": "Closed"}, headers=lead).status_code == 422
     assert client.post("/api/tickets/bulk", json={"ticket_ids": list(range(101)), "status": "Closed"}, headers=lead).status_code == 422
@@ -112,7 +111,7 @@ def test_bulk_writes_audit_entries(client):
     lead = auth(client, "lead@x.com")
     client.post("/api/tickets/bulk", json={"ticket_ids": [t], "status": "In Progress"}, headers=lead)
     trail = client.get(f"/api/tickets/{t}/audit", headers=lead).json()
-    assert [a["action"] for a in trail] == ["Created", "Accepted", "Bulk update"] and trail[2]["actor"] == "Lead"
+    assert [a["action"] for a in trail] == ["Created", "Bulk update"] and trail[1]["actor"] == "Lead"
 
 
 def test_duplicate_keeps_client_and_resets_state(client):
@@ -124,8 +123,7 @@ def test_duplicate_keeps_client_and_resets_state(client):
     copy = r.json()
     assert copy["title"] == "Original (Copy)" and copy["status"] == "New" and copy["assignee_id"] is None
     assert copy["client_org"] == "TATA" and copy["requester_id"] == src["requester_id"] and copy["ticket_number"] != src["ticket_number"]
-    assert [t["title"] for t in client.get("/api/tickets", headers=auth(client, "a@tata.com")).json()].count("Original (Copy)") == 1
-    assert client.post(f"/api/tickets/{src['id']}/duplicate", headers=auth(client, "a@tata.com")).status_code == 403
+    assert [t["title"] for t in client.get("/api/tickets", headers=lead).json()].count("Original (Copy)") == 1
     assert client.post("/api/tickets/9999/duplicate", headers=lead).status_code == 404
 
 
@@ -162,7 +160,6 @@ def test_template_crud_and_permissions(client):
     assert r.status_code == 201 and len(r.json()["items"]) == 2
     tid = r.json()["id"]
     assert [t["name"] for t in client.get("/api/templates", headers=des).json()] == ["Monthly social pack"]
-    assert client.get("/api/templates", headers=auth(client, "a@tata.com")).status_code == 403
     bad = {**PACK, "items": [{**PACK["items"][0], "design_type_id": 999}]}
     assert client.post("/api/templates", json=bad, headers=lead).status_code == 422
     assert client.post("/api/templates", json={**PACK, "items": []}, headers=lead).status_code == 422
@@ -177,10 +174,9 @@ def test_instantiate_bundle_creates_all_tickets_for_the_client(client):
     assert r.status_code == 201
     created = r.json()["created"]
     assert len(created) == 2 and len({c["ticket_number"] for c in created}) == 2
-    tickets = client.get("/api/tickets", headers=auth(client, "a@tata.com")).json()  # visible to the TATA client
+    tickets = [t for t in client.get("/api/tickets", headers=lead).json() if t["requester_id"] == 3]   # raised for the TATA client
     assert sorted(t["title"].split(" ")[0] for t in tickets) == ["TATA", "TATA"]
-    assert all(t["assignee_id"] == 2 and t["due_at"] for t in tickets)
-    assert client.get("/api/tickets", headers=auth(client, "b@acme.com")).json() == []
+    assert all(t["assignee_id"] == 2 and t["due_at"] and t["client_org"] == "TATA" for t in tickets)
     assert client.post(f"/api/templates/{tid}/instantiate", json={"assignee_id": 2}, headers=auth(client, "des@x.com")).status_code == 403
     assert client.post(f"/api/templates/{tid}/instantiate", json={"requester_id": 999}, headers=lead).status_code == 422
 
@@ -307,7 +303,6 @@ def test_manual_time_entry_rules(client, clock):
     r = client.post(f"/api/tickets/{t}/time", json={"seconds": 3600, "user_id": 2}, headers=lead)
     assert r.status_code == 201 and r.json()["user_name"] == "Designer"
     assert client.post(f"/api/tickets/{t}/time", json={"seconds": 600, "user_id": 3}, headers=lead).status_code == 422  # clients don't log time
-    assert client.post(f"/api/tickets/{t}/time", json={"seconds": 600}, headers=auth(client, "a@tata.com")).status_code == 403
     total = [x for x in client.get("/api/tickets", headers=des).json() if x["id"] == t][0]["time_spent_seconds"]
     assert total == 10800
 
@@ -416,5 +411,5 @@ def test_forecasting_endpoint_uses_real_data_with_widget_shape(client):
     row = [f for f in r.json()["forecast"] if f["designer_name"] == "Designer"][0]
     assert set(row) >= {"designer_id", "designer_name", "daily_capacity_hours", "is_overloaded_next_7_days", "overload_date", "projected_capacity_percentage"}
     assert row["is_overloaded_next_7_days"] is True and row["projected_capacity_percentage"] > 100
-    assert client.get("/api/forecasting/capacity", headers=auth(client, "a@tata.com")).status_code == 403
+    assert client.get("/api/forecasting/capacity").status_code == 401
     assert client.get("/api/workload", params={"days": 99}, headers=auth(client, "lead@x.com")).status_code == 422

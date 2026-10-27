@@ -139,15 +139,6 @@ def run_all_cron_jobs(db: Session):
         db.rollback()
         logger.exception("Google Drive reminder failed")
 
-    # 8. Client sign-in links past their expiry; a day's grace keeps recent rows for support questions.
-    try:
-        db.query(models.ClientLinkToken).filter(
-            models.ClientLinkToken.expires_at < now - datetime.timedelta(days=1)).delete(synchronize_session=False)
-        db.commit()
-    except Exception:
-        db.rollback()
-        logger.exception("Clearing expired client links failed")
-
 
 def drive_sign_in(db: Session, now: datetime.datetime) -> None:
     """A day before the sign-in ends, remind the leads to reconnect; once it has ended, stop using Drive (new uploads go

@@ -91,7 +91,7 @@ def test_changes_open_the_next_version_for_the_last_proof_submitter(client):
     t = make_ticket(client, "a@tata.com")
     upload_proof(client, t["id"])
     set_status(client, t["id"], "Delivered")
-    r = client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "Bigger logo"}, headers=auth(client, "a@tata.com"))
+    r = client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "Bigger logo"}, headers=auth(client, "lead@x.com"))
     assert r.status_code == 201, r.text
     v2 = r.json()
     assert v2["id"] != t["id"] and v2["ticket_number"] == f"{t['ticket_number']}-V2" and v2["version_number"] == 2
@@ -111,7 +111,7 @@ def test_versions_past_the_free_allowance_are_flagged_but_still_just_versions(cl
     db.commit()
     db.close()
     set_status(client, t["id"], "Delivered")
-    v2 = client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "Rework"}, headers=auth(client, "a@tata.com")).json()
+    v2 = client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "Rework"}, headers=auth(client, "lead@x.com")).json()
     assert "Extra revision" in v2["tags"]
     tickets = client.get("/api/tickets", headers=auth(client, "lead@x.com")).json()
     assert sorted(x["ticket_number"] for x in tickets) == [t["ticket_number"], f"{t['ticket_number']}-V2"]
@@ -124,14 +124,14 @@ def test_a_closed_ticket_cannot_be_reopened_through_the_api(client):
     db.query(models.Ticket).filter_by(id=t["id"]).update({"is_locked": True})
     db.commit()
     db.close()
-    r = client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "More"}, headers=auth(client, "a@tata.com"))
+    r = client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "More"}, headers=auth(client, "lead@x.com"))
     assert r.status_code == 409
 
 
 def test_client_approval_changes_go_to_the_last_submitter_on_the_next_version(client):
     t = make_ticket(client, "a@tata.com")
     upload_proof(client, t["id"])
-    proofs = client.get(f"/api/tickets/{t['id']}/proofs", headers=auth(client, "a@tata.com")).json()
+    proofs = client.get(f"/api/tickets/{t['id']}/proofs", headers=auth(client, "lead@x.com")).json()
     req = client.post(f"/api/tickets/{t['id']}/approval-requests", json={"proof_version_id": proofs[0]["id"]}, headers=auth(client, "des@x.com")).json()
     token = req["review_url"].rsplit("/", 1)[1]
     r = client.post(f"/api/public/review/{token}/decision", json={"decision": "request_changes", "name": "Rhea", "comment": "Change colours"})
@@ -203,7 +203,7 @@ def test_form_options_are_public(client):
 
 def test_cdr_flow_request_approve_upload_download(client):
     t = make_ticket(client, "a@tata.com")
-    cl, lead, des = auth(client, "a@tata.com"), auth(client, "lead@x.com"), auth(client, "des@x.com")
+    cl, lead, des = auth(client, "lead@x.com"), auth(client, "lead@x.com"), auth(client, "des@x.com")
     assert client.post("/api/cdr-requests", json={"ticket_id": t["id"]}, headers=cl).status_code == 409   # not approved yet
     set_status(client, t["id"], "Delivered")
     req = client.post("/api/cdr-requests", json={"ticket_id": t["id"]}, headers=cl)
@@ -218,7 +218,7 @@ def test_cdr_flow_request_approve_upload_download(client):
     assert client.get(f"/api/cdr-requests/{rid}/download", headers=cl).status_code == 409
     assert client.post(f"/api/cdr-requests/{rid}/upload", files={"file": ("a.cdr", b"CDRDATA", "application/octet-stream")}, headers=des).json()["status"] == "Uploaded"
 
-    assert client.get(f"/api/cdr-requests/{rid}/download", headers=auth(client, "b@acme.com")).status_code == 404
+    assert client.get(f"/api/cdr-requests/{rid}/download").status_code == 401   # no account, no download
     dl = client.get(f"/api/cdr-requests/{rid}/download", headers=cl)
     assert dl.status_code == 200 and dl.content == b"CDRDATA" and "attachment" in dl.headers["content-disposition"]
     db = TestingSessionLocal()
@@ -229,9 +229,10 @@ def test_cdr_flow_request_approve_upload_download(client):
 def test_cdr_decline(client):
     t = make_ticket(client, "a@tata.com")
     set_status(client, t["id"], "Delivered")
-    rid = client.post("/api/cdr-requests", json={"ticket_id": t["id"]}, headers=auth(client, "a@tata.com")).json()["id"]
-    assert client.post(f"/api/cdr-requests/{rid}/decline", headers=auth(client, "lead@x.com")).json()["status"] == "Declined"
-    listed = client.get(f"/api/tickets/{t['id']}/cdr-requests", headers=auth(client, "a@tata.com")).json()
+    lead = auth(client, "lead@x.com")
+    rid = client.post("/api/cdr-requests", json={"ticket_id": t["id"]}, headers=lead).json()["id"]
+    assert client.post(f"/api/cdr-requests/{rid}/decline", headers=lead).json()["status"] == "Declined"
+    listed = client.get(f"/api/tickets/{t['id']}/cdr-requests", headers=lead).json()
     assert [r["status"] for r in listed] == ["Declined"]
 
 
@@ -255,18 +256,17 @@ def test_request_form_priority_follows_the_delivery_date(client):
     assert [priority_for_days(n) for n in (0, 1, 3, 10, 30)] == ["Urgent", "Urgent", "High", "Normal", "Low"]
 
 
-def test_portal_request_uses_the_signed_in_user(client):
-    d = (datetime.date.today() + datetime.timedelta(days=5)).isoformat()
-    r = client.post("/api/requests", data={"event_name": "Open Day", "event_date": "2030-02-01", "design_requirement": "4 pages Brochure",
-                                           "delivery_date": d, "num_creatives": "1",
-                                           "details": json.dumps({"copy": "Copy provided", "language": "English"})},
-                    files={"file": ("brief.png", PNG, "image/png")}, headers=auth(client, "a@tata.com"))
+def test_public_request_waits_for_a_lead_to_accept_it(client):
+    """Clients have no account: every public-form request lands Pending Review until a lead accepts it."""
+    r = client.post("/api/public/requests", data=form())
     assert r.status_code == 201, r.text
-    t = client.get("/api/tickets", headers=auth(client, "a@tata.com")).json()
-    assert t[0]["id"] == r.json()["id"] and t[0]["client_org"] == "TATA" and t[0]["status"] == "Pending Review"
-    accepted = client.post(f"/api/tickets/{r.json()['id']}/accept", headers=auth(client, "lead@x.com"))
+    lead = auth(client, "lead@x.com")
+    pending = [t for t in client.get("/api/tickets", headers=lead).json() if t["status"] == "Pending Review"]
+    assert len(pending) == 1 and pending[0]["status"] == "Pending Review"
+    accepted = client.post(f"/api/tickets/{pending[0]['id']}/accept", headers=lead)
     assert accepted.status_code == 200 and accepted.json()["assignee"]["email"] == "des@x.com"
-    assert client.post("/api/requests", data={"event_name": "x", "event_date": "2030-02-01", "design_requirement": "Flyer (Email / Print)", "delivery_date": d}).status_code == 401
+    assert client.post(f"/api/tickets/{pending[0]['id']}/accept", headers=lead).status_code == 409   # already accepted
+    assert client.post(f"/api/tickets/{pending[0]['id']}/accept").status_code == 401                # staff only
 
 
 # ── Jira ─────────────────────────────────────────────────────────────────────

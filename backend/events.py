@@ -87,23 +87,6 @@ def notify(db: Session, user: models.User, content: str, event: str, ticket: Opt
         email_staff(db, user, content, ticket, prefs, details)
 
 
-def email_request_received(ticket: models.Ticket) -> None:
-    """Confirm a client's request by email: their ticket number and where to follow it. The request forms send their
-    own, fuller confirmation (request_form._send_confirmation); this covers a client raising a ticket any other way."""
-    from common import app_url
-    requester = ticket.requester
-    if not requester or not delivery.email_configured():
-        return
-    body = "\n".join([
-        f"Hi {requester.full_name},", "",
-        f'Thank you, we have received your design request "{ticket.title}".',
-        f"Your ticket number is {ticket.ticket_number}. Please mention it if you contact us about this request.", "",
-        f"Follow it in your DesignDesk portal: {app_url()}/portal", "",
-        "MCCIA Applied AI Studio",
-    ])
-    delivery.run_in_background(delivery.send_email, requester.email, f"Design request received: {ticket.ticket_number}", body)
-
-
 def post_slack_event(db: Session, kind: str, text: str) -> None:
     """Post to the shared Slack channel if configured and this kind of event is enabled."""
     cfg = delivery.get_integrations(db)

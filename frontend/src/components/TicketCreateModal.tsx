@@ -2,11 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, FileText, Paperclip, Plus, Trash2, X } from 'lucide-react';
 import { apiJson, authFetch } from '../api';
-import { useAuth } from '../contexts/AuthContext';
 import { useTickets, type DesignType } from '../contexts/TicketsContext';
 import FigmaEmbed from './FigmaEmbed';
-import ClientRequestForm from './ClientRequestForm';
-import type { RequestPrefill } from '../requestForm';
 import { useUploadLimits } from '../uploadLimits';
 
 
@@ -17,14 +14,12 @@ const ALLOWED = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'csv', 'doc'
 const sectionTitle: React.CSSProperties = { fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#737373', marginBottom: '0.5rem', display: 'block' };
 const fmtSize = (n: number) => (n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
-interface Props { isOpen: boolean; onClose: () => void; prefill?: RequestPrefill | null }
+interface Props { isOpen: boolean; onClose: () => void }
 
-const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
+const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const limits = useUploadLimits();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { designTypes, createTicket, addSubtask, refresh } = useTickets();
-  const isStaff = user?.role === 'Design Lead' || user?.role === 'Designer';
 
   const [typeId, setTypeId] = useState<number | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -41,7 +36,6 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
   const [dragging, setDragging] = useState(false);
-  const [blank, setBlank] = useState(false);   // "Create another" starts empty even if the dialog was opened with a prefill
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +52,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
     setBusy(false); setError(null); setFileNotes([]); setDone(null);
   }, []);
 
-  useEffect(() => { if (isOpen) { reset(); setBlank(false); setTimeout(() => titleRef.current?.focus(), 50); } }, [isOpen, reset]);
+  useEffect(() => { if (isOpen) { reset(); setTimeout(() => titleRef.current?.focus(), 50); } }, [isOpen, reset]);
 
   const dirty = !!(title || brief || link || files.length || Object.values(fields).some(Boolean));
 
@@ -66,11 +60,10 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
   closeRef.current = onClose;
   useEffect(() => {
     if (!isOpen) return;
-    // The client form keeps its own state (attached files are lost on close), so there only Cancel closes it.
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && (done || (isStaff && !dirty))) closeRef.current(); };
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && (done || !dirty)) closeRef.current(); };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [isOpen, dirty, done, isStaff]);
+  }, [isOpen, dirty, done]);
 
   /* Advisory completeness score (the server never blocks on it). */
   const score = useMemo(() => {
@@ -148,10 +141,8 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
           warnings.push(`${f.name} was not attached (${detail})`);
         }
       }
-      if (isStaff) {
-        for (const s of subtasks) {
-          try { await addSubtask(created.id, s); } catch { warnings.push(`Subtask “${s}” was not added`); }
-        }
+      for (const s of subtasks) {
+        try { await addSubtask(created.id, s); } catch { warnings.push(`Subtask “${s}” was not added`); }
       }
       await refresh();
       setDone({ id: created.id, number: created.number, warnings });
@@ -175,7 +166,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div className="icon-tile" style={{ width: 36, height: 36 }}><Plus size={16} /></div>
             <div>
-              <h2 id="new-ticket-title" style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0B1F3A', lineHeight: 1.1 }}>{isStaff ? 'New design ticket' : 'New design request'}</h2>
+              <h2 id="new-ticket-title" style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0B1F3A', lineHeight: 1.1 }}>New design ticket</h2>
               <p style={{ fontSize: '0.72rem', color: '#737373', marginTop: 1 }}>MCCIA Applied AI Studio</p>
             </div>
           </div>
@@ -194,12 +185,10 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
             )}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
               <button type="button" className="btn-primary" onClick={() => { onClose(); navigate(`/tickets/${done.id}`); }}>{done.number.includes(',') ? `Open ${done.number.split(', ')[0]}` : 'Open ticket'}</button>
-              <button type="button" className="btn-ghost" onClick={() => { reset(); setBlank(true); }}>Create another</button>
+              <button type="button" className="btn-ghost" onClick={reset}>Create another</button>
               <button type="button" className="btn-ghost" onClick={onClose}>Close</button>
             </div>
           </div>
-        ) : !isStaff ? (
-          <ClientRequestForm prefill={blank ? null : prefill} onCancel={onClose} onCreated={t => setDone({ id: t.id, number: t.number, warnings: [] })} />
         ) : (
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }} noValidate>
             <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.35rem' }}>
@@ -309,22 +298,20 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose, prefill }) => {
                 )}
               </div>
 
-              {isStaff && (
-                <div>
-                  <span style={sectionTitle}>Subtasks</span>
-                  {subtasks.map((s, i) => (
-                    <div key={`${s}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', padding: '3px 0' }}>
-                      <span style={{ flex: 1 }}>{s}</span>
-                      <button type="button" aria-label={`Remove subtask ${s}`} onClick={() => setSubtasks(subtasks.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#737373', display: 'flex' }}><Trash2 size={13} /></button>
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                    <input className="input-field" aria-label="New subtask" maxLength={200} value={newSubtask} onChange={e => setNewSubtask(e.target.value)} placeholder="Add a subtask…" style={{ fontSize: '0.8rem' }}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const t = newSubtask.trim(); if (t) { setSubtasks([...subtasks, t]); setNewSubtask(''); } } }} />
-                    <button type="button" className="btn-ghost" aria-label="Add subtask" onClick={() => { const t = newSubtask.trim(); if (t) { setSubtasks([...subtasks, t]); setNewSubtask(''); } }}><Plus size={13} /></button>
+              <div>
+                <span style={sectionTitle}>Subtasks</span>
+                {subtasks.map((s, i) => (
+                  <div key={`${s}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', padding: '3px 0' }}>
+                    <span style={{ flex: 1 }}>{s}</span>
+                    <button type="button" aria-label={`Remove subtask ${s}`} onClick={() => setSubtasks(subtasks.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#737373', display: 'flex' }}><Trash2 size={13} /></button>
                   </div>
+                ))}
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  <input className="input-field" aria-label="New subtask" maxLength={200} value={newSubtask} onChange={e => setNewSubtask(e.target.value)} placeholder="Add a subtask…" style={{ fontSize: '0.8rem' }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const t = newSubtask.trim(); if (t) { setSubtasks([...subtasks, t]); setNewSubtask(''); } } }} />
+                  <button type="button" className="btn-ghost" aria-label="Add subtask" onClick={() => { const t = newSubtask.trim(); if (t) { setSubtasks([...subtasks, t]); setNewSubtask(''); } }}><Plus size={13} /></button>
                 </div>
-              )}
+              </div>
             </div>
 
             <div style={{ padding: '0.85rem 1.5rem', borderTop: '1px solid rgba(226,232,240,0.85)', background: '#FAFAFA' }}>

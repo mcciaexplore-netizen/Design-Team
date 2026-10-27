@@ -1,9 +1,20 @@
 # Deploying DesignDesk
 
-## Everything on Vercel (one project)
+## Two Vercel projects: Admin and User
 
-`vercel.json` at the repo root builds the frontend and serves the FastAPI backend as a Python function under `/api`
-(`api/index.py`). The browser talks to the API on the same domain, so CORS settings are not needed.
+Staff and clients are now separate apps, each its own Vercel project from this same repo. Clients have no account:
+the User app is a public static site that calls the Admin project's API.
+
+| | **Admin project** (existing) | **User project** (new) |
+|---|---|---|
+| Who | Design Leads and Designers, signed in | Clients and the public, no sign-in |
+| Root Directory | repo root (empty) | `frontend` |
+| Config | `vercel.json` at the repo root | `frontend/vercel.json` |
+| Hosts | the frontend *and* the FastAPI backend under `/api` | only static files; no backend, no secrets |
+
+### Admin project
+`vercel.json` at the repo root builds the staff frontend and serves the FastAPI backend as a Python function under
+`/api` (`api/index.py`). Browser calls to the API stay on the same domain.
 
 1. In Vercel, import the GitHub repo and leave **Root Directory** empty (the repo root, *not* `frontend`). An existing
    frontend-only project can be switched: Settings > Build and Deployment > Root Directory, clear it; then remove its
@@ -11,9 +22,24 @@
 2. Storage > add a **Neon** Postgres database to the project. It sets `DATABASE_URL` / `POSTGRES_URL` (the pooled
    connection, which is what serverless needs).
 3. Environment variables: `SECRET_KEY` (required: a long random string), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (first
-   deploy only) and `PUBLIC_APP_URL` (the Vercel URL). Email and Google Drive are below; every other setting is
-   explained in `.env.example`.
+   deploy only), `PUBLIC_APP_URL` (this project's Vercel URL), `PUBLIC_USER_APP_URL` (the User project's URL, once you
+   have it — see below) and `ALLOWED_ORIGINS` (the User project's URL, so its browser requests are allowed). Email and
+   Google Drive are below; every other setting is explained in `.env.example`.
 4. Deploy. Migrations and admin/design-type seeding run automatically when the API starts.
+
+### User project
+`frontend/vercel.json` builds only the public client app (`npm run build:user`, output `dist-user`) — a static site
+with no server code and nothing secret in it.
+
+1. In Vercel, **Add New > Project**, import the same GitHub repo again, and set **Root Directory** to `frontend`.
+2. Environment variable: `VITE_API_URL` = the Admin project's URL + `/api` (e.g.
+   `https://<admin-project>.vercel.app/api`).
+3. Deploy. Then go back to the Admin project and set `PUBLIC_USER_APP_URL` and `ALLOWED_ORIGINS` to this project's
+   URL, and redeploy the Admin project so client-facing links (tracking, review, confirmation emails) point here.
+
+If you'd rather put both on your own domain, add a custom domain to each project (e.g. `design.mcciapune.com` for
+the Admin project, `requests.mcciapune.com` for the User project) and use those in `PUBLIC_APP_URL` /
+`PUBLIC_USER_APP_URL` / `ALLOWED_ORIGINS` / `VITE_API_URL` instead of the `*.vercel.app` addresses.
 
 How it works on Vercel:
 
@@ -28,8 +54,8 @@ How it works on Vercel:
   `CRON_SECRET`.
 * **No live connection.** Pages refresh every 15 seconds and show a pop-up for what changed ("DES-12 moved → In Review").
 * **Emails** are sent before the request returns, so actions that send email take a moment longer.
-* **Public requests board.** `/requests` lists every request with its title, status and dates, without signing in.
-  `PUBLIC_BOARD=off` hides it.
+* **Public requests board.** The User project's home page lists every request with its title, status and dates,
+  without signing in. `PUBLIC_BOARD=off` (set on the Admin project) hides it from the API, which empties the board.
 
 ## What `python seed.py` does on every deploy
 
@@ -39,8 +65,11 @@ How it works on Vercel:
 
 ## Accounts and passwords
 
-* The admin signs in, opens **Settings > Users**, and adds staff and clients. Each new account gets a one-time
-  temporary password which the person must replace at first sign-in.
+Only Design Leads and Designers have accounts; clients never sign in — they use the User project (the public form,
+tracking link, review link, and campaigns).
+
+* The admin signs in, opens **Settings > Users**, and adds staff. Each new account gets a one-time temporary
+  password which the person must replace at first sign-in.
 * A forgotten password: the admin uses **Reset password** on that user and shares the new temporary password privately.
   Resetting signs the user out everywhere.
 * Anyone can change their own password under **Settings > Password**.

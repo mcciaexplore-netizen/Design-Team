@@ -4,7 +4,7 @@ import os
 
 import models
 from test_auth import TestingSessionLocal, auth, client, login, make_ticket  # noqa: F401
-from test_review_flow import isolated, sent_design  # noqa: F401
+from test_review_flow import client_decides, isolated, sent_design  # noqa: F401
 from test_workflow_features import PNG, form
 
 
@@ -19,7 +19,6 @@ def count(model, **filters):
 def test_only_a_lead_can_delete_a_ticket_and_everything_it_owns_goes(client):
     tid, _ = sent_design(client)
     assert client.delete(f"/api/tickets/{tid}", headers=auth(client, "des@x.com")).status_code == 403
-    assert client.delete(f"/api/tickets/{tid}", headers=auth(client, "a@tata.com")).status_code == 403
     files_before = set(os.listdir(os.environ["UPLOAD_DIR"]))
     assert files_before
 
@@ -52,9 +51,7 @@ def test_a_file_shared_with_another_ticket_is_kept(client):
 
 def test_deleting_an_original_keeps_its_newer_version(client):
     tid, _ = sent_design(client)
-    cl = auth(client, "a@tata.com")
-    pending = client.get(f"/api/tickets/{tid}/approval-requests", headers=cl).json()[0]
-    out = client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "request_changes", "comment": "Bigger"}, headers=cl).json()
+    out = client_decides(client, tid, "request_changes", "Bigger").json()
     v2 = out["new_ticket"]["id"]
     assert client.delete(f"/api/tickets/{tid}", headers=auth(client, "lead@x.com")).status_code == 204
     assert count(models.Ticket, id=v2) == 1 and count(models.Ticket, id=tid) == 0

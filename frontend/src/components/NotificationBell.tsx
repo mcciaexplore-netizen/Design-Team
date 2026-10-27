@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AtSign, Bell, CheckCircle2, Eye, Info, MessageSquare, AlertTriangle, UserPlus } from 'lucide-react';
 import { apiJson } from '../api';
-import { useAuth } from '../contexts/AuthContext';
-import { useTickets } from '../contexts/TicketsContext';
 
 interface Item { id: number; content: string; type: string; ticket_id: number | null; is_read: boolean; created_at: string | null }
 interface Feed { unread: number; items: Item[] }
@@ -29,9 +27,6 @@ function ago(iso: string | null): string {
 
 const NotificationBell = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { refresh } = useTickets();
-  const [approval, setApproval] = useState<Record<number, { busy?: boolean; text?: string; ok?: boolean }>>({});
   const [feed, setFeed] = useState<Feed>({ unread: 0, items: [] });
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState(false);
@@ -66,21 +61,6 @@ const NotificationBell = () => {
   const open = (n: Item) => {
     void markRead(n);
     if (n.ticket_id) { setIsOpen(false); navigate(`/tickets/${n.ticket_id}`); }
-  };
-
-  /** Approve the design a notification is about without opening it. Checks it is still waiting first. */
-  const approve = async (n: Item) => {
-    const set = (v: { busy?: boolean; text?: string; ok?: boolean }) => setApproval(a => ({ ...a, [n.id]: v }));
-    set({ busy: true });
-    try {
-      const requests = await apiJson<{ id: number; status: string }[]>(`/api/tickets/${n.ticket_id}/approval-requests`);
-      const pending = requests.find(r => r.status === 'pending');
-      if (!pending) { set({ text: 'Nothing is waiting for approval on this request any more.', ok: false }); return; }
-      await apiJson(`/api/approval-requests/${pending.id}/decision`, { method: 'POST', json: { decision: 'approve' } });
-      set({ text: 'Approved. Thank you!', ok: true });
-      void markRead(n);
-      void refresh();
-    } catch (e) { set({ text: e instanceof Error ? e.message : 'Could not approve.', ok: false }); }
   };
 
   const markRead = async (n: Item) => {
@@ -140,18 +120,6 @@ const NotificationBell = () => {
                   </div>
                   {!n.is_read && <span aria-label="Unread" style={{ width: 7, height: 7, borderRadius: 99, background: '#0B1F3A', flexShrink: 0, marginTop: 6 }} />}
                 </button>
-                {n.type === 'approval_requested' && n.ticket_id && user?.role === 'Client' && (
-                  <div style={{ padding: '0 1rem 0.8rem 3.4rem', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    {!approval[n.id]?.ok && (
-                      <button type="button" className="btn-primary" disabled={approval[n.id]?.busy} onClick={() => void approve(n)}
-                        style={{ padding: '0.3rem 0.75rem', fontSize: '0.74rem', background: '#256B45', borderColor: '#256B45' }}>
-                        <CheckCircle2 size={12} /> {approval[n.id]?.busy ? 'Approving…' : 'Approve design'}
-                      </button>
-                    )}
-                    <button type="button" className="chip" onClick={() => open(n)}>Review first</button>
-                    {approval[n.id]?.text && <span role="status" style={{ fontSize: '0.74rem', fontWeight: 600, color: approval[n.id]?.ok ? '#256B45' : '#b91c1c' }}>{approval[n.id]?.text}</span>}
-                  </div>
-                )}
                 </div>
               );
             })}

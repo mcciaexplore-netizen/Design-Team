@@ -109,21 +109,6 @@ def test_estimate_reports_standard_date_rush_and_priority(client):
     db.close()
 
 
-def test_portal_request_stores_details_and_links(client):
-    d = (datetime.date.today() + datetime.timedelta(days=9)).isoformat()
-    data = {"event_name": "Summit", "event_date": "2030-02-01", "design_requirement": "Flex/Banner/Standee", "delivery_date": d,
-            "details": json.dumps({"size": "6x3 ft", "medium": "Print", "quantity": "2"}),
-            "reference_links": json.dumps(["https://www.figma.com/file/x"])}
-    r = client.post("/api/requests", data=data, files=[("files", ("a.png", PNG, "image/png"))], headers=auth(client, "a@tata.com"))
-    assert r.status_code == 201, r.text
-    db = TestingSessionLocal()
-    t = db.query(models.Ticket).get(r.json()["id"])
-    assert t.type_specific_fields["details"]["quantity"] == 2 and t.type_specific_fields["reference_links"] == ["https://www.figma.com/file/x"]
-    db.close()
-    missing = dict(data, details=json.dumps({"medium": "Print"}))
-    assert client.post("/api/requests", data=missing, headers=auth(client, "a@tata.com")).status_code == 422
-
-
 # ── One choice per channel ───────────────────────────────────────────────────
 
 def test_whatsapp_instagram_and_linkedin_are_separate_choices_with_their_own_questions(client):
@@ -210,15 +195,6 @@ def test_each_design_must_answer_its_own_required_questions(client):
     db = TestingSessionLocal()
     assert db.query(models.Ticket).count() == 0   # nothing half-created
     db.close()
-
-
-def test_portal_request_with_several_designs(client):
-    data = form(details=json.dumps({FLYER: {"size": "A5", "channel": "Email"}, INSTA: {"format": "Carousel"}}))
-    data["design_requirement"] = [FLYER, INSTA]
-    del data["name"], data["email"]
-    r = client.post("/api/requests", data=data, headers=auth(client, "a@tata.com"))
-    assert r.status_code == 201, r.text
-    assert len(r.json()["tickets"]) == 1 and r.json()["id"] == r.json()["tickets"][0]["id"]
 
 
 def test_estimate_for_several_designs_uses_the_slowest(client):

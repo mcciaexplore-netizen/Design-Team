@@ -1,5 +1,3 @@
-import re
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -54,25 +52,47 @@ def auth(client, email):
 
 
 def make_ticket(client, email, title="T"):
+    """A ticket in the workflow. For a client email (clients can't sign in) a lead raises it, then the client is
+    recorded as its requester: what a public-form request looks like once a lead has accepted it."""
+    db = TestingSessionLocal()
+    try:
+        person = db.query(models.User).filter(models.User.email == email).one()
+        is_requester, person_id, org = person.role == models.RoleEnum.REQUESTER, person.id, person.client_org
+    finally:
+        db.close()
     r = client.post(
         "/api/tickets",
         json={"title": title, "brief": "b", "design_type_id": 1, "type_specific_fields": {}},
-        headers=auth(client, email),
+        headers=auth(client, "lead@x.com" if is_requester else email),
     )
     assert r.status_code == 201, r.text
     ticket = r.json()
-    if ticket["status"] == "Pending Review":   # a client's request: most tests want it already in the workflow
-        accepted = client.post(f"/api/tickets/{ticket['id']}/accept", headers=auth(client, "lead@x.com"))
-        assert accepted.status_code == 200, accepted.text
-        ticket = accepted.json()
+    if is_requester:
+        db = TestingSessionLocal()
+        try:
+            db.query(models.Ticket).filter(models.Ticket.id == ticket["id"]).update({"requester_id": person_id, "client_org": org})
+            db.commit()
+        finally:
+            db.close()
+        ticket = {**ticket, "requester_id": person_id, "client_org": org}
     return ticket
 
 
 def test_login_success_and_role_mapping(client):
-    r = login(client, "a@tata.com")
-    assert r.status_code == 200
-    assert r.json()["user"]["role"] == "Client"
     assert login(client, "lead@x.com").json()["user"]["role"] == "Design Lead"
+    assert login(client, "des@x.com").json()["user"]["role"] == "Designer"
+
+
+def test_clients_have_no_accounts(client):
+    """A client (requester) is only a record: they can't sign in, and a token issued before this change stops working."""
+    r = login(client, "a@tata.com")
+    assert r.status_code == 401 and r.json()["detail"] == "Invalid email or password"
+    from auth import create_access_token
+    db = TestingSessionLocal()
+    old_token = create_access_token(db.query(models.User).filter(models.User.email == "a@tata.com").one())
+    db.close()
+    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {old_token}"}).status_code == 401
+    assert client.get("/api/tickets", headers={"Authorization": f"Bearer {old_token}"}).status_code == 401
 
 
 def test_login_rejects_bad_password_unknown_user_and_inactive(client):
@@ -87,32 +107,6 @@ def test_endpoints_require_token(client):
     assert client.get("/api/tickets", headers={"Authorization": "Bearer garbage"}).status_code == 401
 
 
-def test_client_only_sees_own_org_tickets(client):
-    t = make_ticket(client, "a@tata.com", "tata work")
-    make_ticket(client, "b@acme.com", "acme work")
-
-    tata_view = client.get("/api/tickets", headers=auth(client, "a@tata.com")).json()
-    assert [x["title"] for x in tata_view] == ["tata work"]
-
-    staff_view = client.get("/api/tickets", headers=auth(client, "des@x.com")).json()
-    assert len(staff_view) == 2
-
-    # Another org can't touch it, and gets 404 rather than 403 so IDs can't be probed.
-    other = auth(client, "b@acme.com")
-    assert client.get(f"/api/tickets/{t['id']}/pinpoints", headers=other).status_code == 404
-    assert client.post(f"/api/tickets/{t['id']}/revisions", json={"reason_for_change": "x"}, headers=other).status_code == 404
-
-
-def test_clients_cannot_use_staff_endpoints(client):
-    t = make_ticket(client, "a@tata.com")
-    h = auth(client, "a@tata.com")
-    assert client.get("/api/users", headers=h).status_code == 403
-    assert client.patch(f"/api/tickets/{t['id']}", json={"title": "hax"}, headers=h).status_code == 403
-    assert client.post(f"/api/tickets/{t['id']}/timer/start", headers=h).status_code == 403
-    assert client.get("/api/timesheets/export", headers=h).status_code == 403
-    assert client.get("/api/forecasting/capacity", headers=h).status_code == 403
-
-
 def test_designer_cannot_reassign_or_reprioritise_but_lead_can(client):
     t = make_ticket(client, "a@tata.com")
     d = auth(client, "des@x.com")
@@ -124,24 +118,10 @@ def test_designer_cannot_reassign_or_reprioritise_but_lead_can(client):
     assert client.get("/api/timesheets/export", headers=lead).status_code == 200
 
 
-def test_client_cannot_self_assign_on_create(client):
-    r = client.post(
-        "/api/tickets",
-        json={"title": "T", "brief": "b", "design_type_id": 1, "type_specific_fields": {}, "assignee_id": 1},
-        headers=auth(client, "a@tata.com"),
-    )
-    assert r.status_code == 201
-    # The requested assignee (the lead, id 1) is ignored outright: a client's request waits for review.
-    assert r.json()["assignee_id"] is None and r.json()["status"] == "Pending Review"
-    accepted = client.post(f"/api/tickets/{r.json()['id']}/accept", headers=auth(client, "lead@x.com"))
-    assert accepted.status_code == 200
-    # Once accepted, the system picks a designer (id 2), never the client's requested id (the lead, id 1).
-    assert accepted.json()["assignee_id"] == 2
-
-
-def test_ticket_requester_and_org_come_from_token(client):
-    t = make_ticket(client, "a@tata.com")
-    assert t["requester_id"] == 3
+def test_ticket_requester_comes_from_token(client):
+    r = client.post("/api/tickets", json={"title": "T", "brief": "b", "design_type_id": 1, "type_specific_fields": {}},
+                    headers=auth(client, "des@x.com"))
+    assert r.status_code == 201 and r.json()["requester_id"] == 2
 
 
 def test_jira_webhook_rejects_without_secret(client):
@@ -161,49 +141,9 @@ def test_live_feed_requires_a_valid_token(client):
             pass
 
 
-def test_live_feed_delivers_events_only_to_people_who_may_see_them(client):
-    tata = login(client, "a@tata.com").json()["access_token"]
-    acme = login(client, "b@acme.com").json()["access_token"]
+def test_live_feed_delivers_events_to_the_team(client):
     lead = login(client, "lead@x.com").json()["access_token"]
-    with client.websocket_connect(f"/ws/x?token={tata}") as ws_tata, \
-         client.websocket_connect(f"/ws/x?token={acme}") as ws_acme, \
-         client.websocket_connect(f"/ws/x?token={lead}") as ws_lead:
-        make_ticket(client, "a@tata.com", "Tata poster")
+    with client.websocket_connect(f"/ws/x?token={lead}") as ws_lead:
+        make_ticket(client, "des@x.com", "Poster")
         msg = ws_lead.receive_json()
-        assert msg["type"] == "ticket_created" and msg["title"] == "Tata poster" and msg["by"] == "Tata A"
-        assert ws_tata.receive_json()["ticketNumber"] == msg["ticketNumber"]
-        # The ACME client must not hear about TATA's ticket: send ACME's own, and it should be the first thing they get.
-        make_ticket(client, "b@acme.com", "Acme flyer")
-        assert ws_acme.receive_json()["title"] == "Acme flyer"
-
-
-def test_client_link_creates_scoped_client_and_exchanges_for_a_session(client, monkeypatch):
-    import delivery
-    sent = []
-    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
-    monkeypatch.setenv("PUBLIC_APP_URL", "https://app.example.com")
-    monkeypatch.setattr(delivery, "send_email", lambda to, subject, body: sent.append((to, subject, body)) or (True, "Sent"))
-
-    def link_token(sent_mail):
-        return re.search(r"https://app\.example\.com/client/(\S+)", sent_mail[0][2]).group(1)
-
-    r = client.post("/api/public/client-link", json={"email": "new@example.com", "company": "Zeta Corp Test"})
-    assert r.status_code == 200
-    assert len(sent) == 1 and sent[0][0] == "new@example.com"
-    token = link_token(sent)
-
-    sent.clear()   # a second person at the same company (any casing) joins it instead of a second record
-    r2 = client.post("/api/public/client-link", json={"email": "other@example.com", "company": "zeta corp test"})
-    assert r2.status_code == 200
-    token2 = link_token(sent)
-
-    exchanged = client.post("/api/public/client-link/exchange", json={"token": token})
-    assert exchanged.status_code == 200
-    user = exchanged.json()["user"]
-    assert user["role"] == "Client" and user["client_org"] == "Zeta Corp Test" and exchanged.json()["access_token"]
-
-    exchanged2 = client.post("/api/public/client-link/exchange", json={"token": token2})
-    assert exchanged2.json()["user"]["client_org"] == "Zeta Corp Test"   # joined, not a second casing
-
-    assert client.post("/api/public/client-link/exchange", json={"token": token}).status_code == 404   # works once
-    assert client.post("/api/public/client-link/exchange", json={"token": "nonsense"}).status_code == 404
+        assert msg["type"] == "ticket_created" and msg["title"] == "Poster" and msg["by"] == "Designer"

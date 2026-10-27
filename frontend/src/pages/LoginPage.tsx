@@ -3,7 +3,7 @@ import GridBackground from '../components/GridBackground';
 import { Eye, EyeOff, LogIn, RotateCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const FEATURES = ['Visual Board', 'SLA Tracking', 'CDR Approval', 'Design Proofing', 'Capacity Forecast', 'Client Portal'];
+const FEATURES = ['Visual Board', 'SLA Tracking', 'CDR Approval', 'Design Proofing', 'Capacity Forecast'];
 
 const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -158,19 +158,6 @@ const LoginPage: React.FC = () => {
               </p>
             )}
           </form>
-
-          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-soft)', marginTop: '1.25rem' }}>
-            This sign-in is for the design team. Requested a design? You don't need a password:{' '}
-            <a className="login-link-btn" href="/my-requests">get a sign-in link by email</a>.
-          </p>
-
-          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-soft)', marginTop: '0.75rem' }}>
-            Need a design but don't have an account? <a className="login-link-btn" href="/request">Submit a request</a>
-          </p>
-          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-soft)', marginTop: '0.5rem' }}>
-            Already requested a design? <a className="login-link-btn" href="/requests">See all requests</a>, no sign-in needed
-          </p>
-
         </div>
       </div>
     </div>

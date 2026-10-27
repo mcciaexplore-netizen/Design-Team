@@ -32,21 +32,37 @@ def sent_design(client):
     return t["id"], proof["id"]
 
 
-def pin(client, tid, proof_id, email="a@tata.com", content="Make this bigger", x="40.5", y="22"):
+def sent_design_with_link(client):
+    """Like sent_design, but returns (ticket id, the review-link token emailed with that upload)."""
+    t = make_ticket(client, "a@tata.com")
+    up = upload_design(client, t["id"]).json()
+    return t["id"], up["approval"]["review_url"].rsplit("/", 1)[1]
+
+
+def client_decides(client, tid, decision="approve", comment=None, name="Tata A"):
+    """The client's decision on the newest design, made the only way clients can: through an emailed review link."""
+    proof = client.get(f"/api/tickets/{tid}/proofs", headers=auth(client, "lead@x.com")).json()[0]
+    r = client.post(f"/api/tickets/{tid}/approval-requests", json={"proof_version_id": proof["id"]}, headers=auth(client, "des@x.com"))
+    assert r.status_code == 201, r.text
+    token = r.json()["review_url"].rsplit("/", 1)[1]
+    return client.post(f"/api/public/review/{token}/decision", json={"decision": decision, "name": name, "comment": comment})
+
+
+def pin(client, tid, proof_id, email="des@x.com", content="Make this bigger", x="40.5", y="22"):
     return client.post(f"/api/tickets/{tid}/pinpoints", json={"image_url": f"proof:{proof_id}", "x_pct": x, "y_pct": y, "content": content},
                        headers=auth(client, email))
 
 
 # ── Markup ───────────────────────────────────────────────────────────────────
 
-def test_a_client_can_mark_a_spot_on_the_design_and_it_shows_their_name(client):
+def test_the_team_can_mark_a_spot_on_the_design_and_it_shows_their_name(client):
     tid, proof = sent_design(client)
     r = pin(client, tid, proof)
     assert r.status_code == 201, r.text
-    assert r.json()["author_name"] == "Tata A" and r.json()["author_role"] == "Requester" and r.json()["is_resolved"] is False
-    seen_by_designer = client.get(f"/api/tickets/{tid}/pinpoints", headers=auth(client, "des@x.com")).json()
-    assert [(p["author_name"], p["content"]) for p in seen_by_designer] == [("Tata A", "Make this bigger")]
-    assert client.get(f"/api/tickets/{tid}/pinpoints", headers=auth(client, "b@acme.com")).status_code == 404
+    assert r.json()["author_name"] == "Designer" and r.json()["is_resolved"] is False
+    seen_by_lead = client.get(f"/api/tickets/{tid}/pinpoints", headers=auth(client, "lead@x.com")).json()
+    assert [(p["author_name"], p["content"]) for p in seen_by_lead] == [("Designer", "Make this bigger")]
+    assert client.get(f"/api/tickets/{tid}/pinpoints").status_code == 401
 
 
 def test_pins_are_validated(client):
@@ -60,19 +76,12 @@ def test_pins_are_validated(client):
     assert pin(client, tid, 999).status_code == 422
 
 
-def test_clients_can_only_mark_up_a_design_that_is_out_for_review(client):
-    t = make_ticket(client, "a@tata.com")
-    proof = upload_design(client, t["id"], send_for_approval="false").json()        # a draft: still Assigned
-    assert pin(client, t["id"], proof["id"]).status_code == 403
-    assert pin(client, t["id"], proof["id"], email="des@x.com").status_code == 201      # the designer can
-
-
-def test_either_side_can_tick_a_marked_spot_off(client):
+def test_a_marked_spot_can_be_ticked_off_and_reopened(client):
     tid, proof = sent_design(client)
     pid = pin(client, tid, proof).json()["id"]
     r = client.patch(f"/api/tickets/{tid}/pinpoints/{pid}", params={"resolved": "true"}, headers=auth(client, "des@x.com"))
-    assert r.status_code == 200 and r.json()["is_resolved"] is True and r.json()["author_name"] == "Tata A"
-    r = client.patch(f"/api/tickets/{tid}/pinpoints/{pid}", params={"resolved": "false"}, headers=auth(client, "a@tata.com"))
+    assert r.status_code == 200 and r.json()["is_resolved"] is True and r.json()["author_name"] == "Designer"
+    r = client.patch(f"/api/tickets/{tid}/pinpoints/{pid}", params={"resolved": "false"}, headers=auth(client, "lead@x.com"))
     assert r.json()["is_resolved"] is False
 
 
@@ -112,9 +121,7 @@ def test_a_review_is_reminded_once_after_a_day_then_closes_after_two(client):
 def test_no_reminder_once_the_client_has_decided_or_the_ticket_moved_on(client):
     tid, _ = sent_design(client)
     age_request(tid, 1.5)
-    cl = auth(client, "a@tata.com")
-    pending = client.get(f"/api/tickets/{tid}/approval-requests", headers=cl).json()[0]
-    client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "approve"}, headers=cl)
+    client_decides(client, tid, "approve")
     tick(client)
     assert reminders() == []
 
@@ -134,14 +141,6 @@ def test_a_resent_design_is_reminded_about_afresh(client):
     age_request(tid, 1.5)
     tick(client)
     assert len(reminders()) == 2
-
-
-def test_muting_review_notifications_silences_the_reminder_too(client):
-    client.put("/api/me/preferences", json={"muted_events": ["approval_requested"]}, headers=auth(client, "a@tata.com"))
-    tid, _ = sent_design(client)
-    age_request(tid, 1.5)
-    tick(client)
-    assert reminders() == [] and not any("sent a design" in n for n in notes("a@tata.com"))
 
 
 def test_a_second_wait_on_the_same_ticket_is_reminded_too(client):

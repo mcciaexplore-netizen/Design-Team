@@ -474,25 +474,12 @@ class RateLimitHit(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
 
-class ClientLinkToken(Base):
-    """Short-lived, single-use tokens for passwordless client access and email confirmation."""
-    __tablename__ = "client_link_tokens"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    token_hash = Column(String(64), nullable=False, unique=True, index=True)
-    purpose = Column(String(20), nullable=False, default="client")  # "client" or "confirm_request"
-    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=True)  # For confirm_request only
-    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
-    used_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-
 class Campaign(Base):
     """A client's marketing campaign: a named date range that their social posts hang off."""
     __tablename__ = "campaigns"
     id = Column(Integer, primary_key=True, index=True)
     owner_key = Column(String, nullable=False, index=True)  # client_org, or "user:<id>" for a client with no organisation
-    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)   # null: added in the open User app
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     color = Column(String, nullable=False, default="#2563eb")
@@ -506,7 +493,7 @@ class SocialPost(Base):
     __tablename__ = "social_posts"
     id = Column(Integer, primary_key=True, index=True)
     owner_key = Column(String, nullable=False, index=True)
-    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)   # null: added in the open User app
     campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=True, index=True)
     platform = Column(String, nullable=False)
     title = Column(String, nullable=False)

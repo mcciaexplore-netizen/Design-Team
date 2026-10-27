@@ -15,8 +15,7 @@ import delivery
 import events
 import models
 import ratelimit
-from auth import get_current_user
-from common import MAX_CDR_BYTES, MAX_UPLOAD_BYTES, app_url, require_allowed_email, compute_due_at, log_audit, next_ticket_number, read_upload, store_bytes
+from common import MAX_CDR_BYTES, MAX_UPLOAD_BYTES, require_allowed_email, compute_due_at, log_audit, next_ticket_number, read_upload, store_bytes
 from database import get_db
 from tracking import tracking_url
 
@@ -226,7 +225,7 @@ def _requester(db: Session, name: str, email: str) -> models.User:
 
 
 class RequestFields:
-    """The design-request fields shared by the public form and the signed-in portal form."""
+    """The design-request fields of the public request form."""
 
     def __init__(
         self,
@@ -315,8 +314,6 @@ def _new_ticket(db: Session, requester: models.User, f: RequestFields, via: str)
         type_specific_fields=fields,
         priority=priority_for(f.delivery_date),
         requester_id=requester.id,
-        # Only a signed-in request joins the company's portal: anyone can type a client's email on the public form.
-        client_org=requester.client_org if via == "portal form" else None,
         due_at=datetime.datetime.combine(f.delivery_date, datetime.time(12, 30), tzinfo=pytz.utc),  # 18:00 IST
         tags=["request-form"],
         # A Design Lead must accept the request before it enters the workflow; see tickets_api.accept_ticket.
@@ -339,7 +336,7 @@ def create_tickets_from_form(db: Session, requester: models.User, f: RequestFiel
     db.commit()
 
     db.refresh(ticket)
-    events.emit(db, "ticket_created", ticket, requester if via == "portal form" else None)
+    events.emit(db, "ticket_created", ticket, None)
     if ticket.assignee_id:
         events.emit(db, "ticket_assigned", ticket, None, {"auto": True})
     _send_confirmation(requester, [ticket], f)
@@ -361,8 +358,6 @@ def _send_confirmation(requester: models.User, tickets: list, f: "RequestFields"
         "",
         "Follow progress any time, no login needed:",
         f"{ticket.ticket_number}: {tracking_url(ticket.ticket_number)}",
-        "",
-        f"To see all your requests and campaigns, ask for a sign-in link at {app_url()}/my-requests",
     ])
     subject = f"Design request received: {ticket.ticket_number}"
     delivery.run_in_background(delivery.send_email, requester.email, subject[:150], body)
@@ -422,13 +417,3 @@ async def submit_request(
             "tickets": [{"ticket_number": t.ticket_number, "design": _label(fields, t.type_specific_fields["design_requirement"]),
                          "tracking_url": tracking_url(t.ticket_number)} for t in tickets],
             "message": "Request received. The design team has been notified."}
-
-
-@router.post("/api/requests", status_code=201)
-async def submit_portal_request(fields: RequestFields = Depends(), db: Session = Depends(get_db),
-                                user: models.User = Depends(get_current_user)):
-    """The same form for signed-in users (the portal's New Request dialog)."""
-    uploads = await fields.validated_uploads()
-    tickets = create_tickets_from_form(db, user, fields, uploads, "portal form")
-    return {"id": tickets[0].id, "ticket_number": tickets[0].ticket_number,
-            "tickets": [{"id": t.id, "ticket_number": t.ticket_number} for t in tickets]}

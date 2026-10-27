@@ -15,7 +15,7 @@ import events
 import integrations
 import models
 import schemas
-from auth import get_current_user, get_ticket_for_user, is_client, require_lead, require_staff
+from auth import get_current_user, get_ticket_for_user, require_lead, require_staff
 from common import DEFAULT_SCHEDULE, after_status_change, compute_due_at, log_audit, next_ticket_number, track_waiting
 from database import get_db
 from sla_engine import calculate_due_date
@@ -51,12 +51,7 @@ def get_tickets(db: Session = Depends(get_db), user: models.User = Depends(get_c
     query = db.query(models.Ticket).options(
         joinedload(models.Ticket.requester), joinedload(models.Ticket.assignee), joinedload(models.Ticket.design_type),
         selectinload(models.Ticket.subtasks))
-    if is_client(user):
-        if user.client_org:
-            query = query.filter(models.Ticket.client_org == user.client_org)
-        else:
-            query = query.filter(models.Ticket.requester_id == user.id)
-    elif user.role == models.RoleEnum.DESIGNER:
+    if user.role == models.RoleEnum.DESIGNER:
         # A request only a Design Lead can accept or decline; a Designer has nothing to do with it yet.
         query = query.filter(models.Ticket.status.notin_([models.TicketStatus.PENDING_REVIEW, models.TicketStatus.DECLINED]))
     return query.order_by(models.Ticket.created_at.desc()).all()
@@ -70,11 +65,6 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), r
         raise HTTPException(status_code=422, detail="Unknown design type")
 
     data = ticket.model_dump()
-    if is_client(requester):
-        # Clients can request work but not plan it.
-        data.pop("assignee_id", None)
-        data.pop("estimate_hours", None)
-        data.pop("workflow_stage_id", None)
     _check_refs(db, data)
 
     db_ticket = models.Ticket(
@@ -84,10 +74,7 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), r
         client_org=requester.client_org,
         due_at=compute_due_at(db, design_type, ticket.priority),
     )
-    if is_client(requester):
-        # A Design Lead must accept the request before it enters the workflow; see accept_ticket below.
-        db_ticket.status = models.TicketStatus.PENDING_REVIEW
-    elif not db_ticket.assignee_id:
+    if not db_ticket.assignee_id:
         designer = capacity_engine.suggest_assignee(db, design_type.id)
         if designer:
             db_ticket.assignee_id = designer.id
@@ -101,8 +88,6 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), r
     events.emit(db, "ticket_created", db_ticket, requester)
     if db_ticket.assignee_id:
         events.emit(db, "ticket_assigned", db_ticket, requester, {"auto": True})
-    if is_client(requester):
-        events.email_request_received(db_ticket)
 
     return db_ticket
 

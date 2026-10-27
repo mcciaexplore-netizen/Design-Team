@@ -6,7 +6,7 @@ import pytz
 import approvals
 import models
 from test_auth import TestingSessionLocal, auth, client, make_ticket  # noqa: F401
-from test_review_flow import isolated, sent_design  # noqa: F401  (upload dir + inline delivery)
+from test_review_flow import client_decides, isolated, sent_design  # noqa: F401  (upload dir + inline delivery)
 from test_workflow_features import db_ticket, set_status
 
 IST = pytz.timezone("Asia/Kolkata")
@@ -20,7 +20,7 @@ def update_ticket(tid, **values):
 
 
 def ask_for_changes(client, tid):
-    return client.post(f"/api/tickets/{tid}/revisions", json={"reason_for_change": "Bigger logo"}, headers=auth(client, "a@tata.com"))
+    return client.post(f"/api/tickets/{tid}/revisions", json={"reason_for_change": "Bigger logo"}, headers=auth(client, "lead@x.com"))
 
 
 def event_in(hours):
@@ -74,13 +74,9 @@ def test_review_page_refuses_changes_after_the_cut_off_but_still_allows_approval
     tid, _ = sent_design(client)
     fields, _ = event_in(3)
     update_ticket(tid, type_specific_fields=fields)
-    cl = auth(client, "a@tata.com")
-    pending = client.get(f"/api/tickets/{tid}/approval-requests", headers=cl).json()[0]
-    r = client.post(f"/api/approval-requests/{pending['id']}/decision",
-                    json={"decision": "request_changes", "comment": "Change the colour"}, headers=cl)
+    r = client_decides(client, tid, "request_changes", "Change the colour")
     assert r.status_code == 409 and "12 hours" in r.json()["detail"]
-    ok = client.post(f"/api/approval-requests/{pending['id']}/decision", json={"decision": "approve"}, headers=cl)
-    assert ok.status_code == 200
+    assert client_decides(client, tid, "approve").status_code == 200
 
 
 def test_a_late_delivery_can_still_be_corrected(client):

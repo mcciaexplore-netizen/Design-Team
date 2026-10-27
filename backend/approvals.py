@@ -15,8 +15,8 @@ import events
 import revision_engine
 import models
 import ratelimit
-from auth import get_current_user, get_ticket_for_user, is_client, require_staff
-from common import app_url, as_utc, ensure_changes_allowed, load_bytes, mark_delivered, stored_file_response, log_audit, read_upload, store_bytes
+from auth import get_current_user, get_ticket_for_user, require_staff
+from common import as_utc, user_app_url, ensure_changes_allowed, load_bytes, mark_delivered, stored_file_response, log_audit, read_upload, store_bytes
 from database import get_db
 
 router = APIRouter(tags=["approvals"])
@@ -63,7 +63,6 @@ def _email_review(ticket: models.Ticket, version: int, link: str) -> Optional[st
         f"Hi {ticket.requester.full_name},", "",
         done, "",
         "Open it, then approve it or tell us what to change:", link, "",
-        "You can also review it any time from your DesignDesk portal.", "",
         "MCCIA Applied AI Studio",
     ])
     delivery.run_in_background(delivery.send_email, ticket.requester.email,
@@ -73,7 +72,7 @@ def _email_review(ticket: models.Ticket, version: int, link: str) -> Optional[st
 
 def _open_review(db: Session, ticket: models.Ticket, proof: models.ProofVersion, user: models.User, ttl_hours: int):
     """Put a proof in front of the client: supersede any open request, move the ticket to In Review and return
-    (request, one-time review link). The client reviews it in their portal; the link is for people without an account."""
+    (request, one-time review link). Clients have no account: the link is how they review it."""
     db.query(models.ApprovalRequest).filter(
         models.ApprovalRequest.ticket_id == ticket.id, models.ApprovalRequest.status == "pending").update({"status": "revoked"})
     token = secrets.token_urlsafe(32)
@@ -84,7 +83,7 @@ def _open_review(db: Session, ticket: models.Ticket, proof: models.ProofVersion,
         ticket.status = models.TicketStatus.IN_REVIEW
     db.flush()
     log_audit(db, ticket.id, user, "Sent for approval", {"proof_version": proof.version, "expires_in_hours": ttl_hours})
-    return req, f"{app_url()}/review/{token}"
+    return req, f"{user_app_url()}/review/{token}"
 
 
 @router.post("/api/tickets/{ticket_id}/proofs", status_code=201)
@@ -369,23 +368,6 @@ def public_review_decision(token: str, body: Decision, request: Request, db: Ses
     return _apply_decision(db, _load_request(db, token), body, "via review link")
 
 
-class PortalDecision(BaseModel):
-    decision: Literal["approve", "request_changes"]
-    comment: Optional[str] = Field(default=None, max_length=2000)
-
-
-@router.post("/api/approval-requests/{request_id}/decision")
-def portal_decision(request_id: int, body: PortalDecision, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    """A signed-in client approves or requests changes from the portal. Staff cannot decide on a client's behalf."""
-    if user.role != models.RoleEnum.REQUESTER:
-        raise HTTPException(status_code=403, detail="Only the client can approve or request changes")
-    req = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.id == request_id).first()
-    if not req:
-        raise HTTPException(status_code=404, detail="Request not found")
-    get_ticket_for_user(db, req.ticket_id, user)  # 404 for other organisations' requests
-    return _apply_decision(db, req, Decision(decision=body.decision, name=user.full_name, comment=body.comment), "signed in")
-
-
 # ── Audit trail ──────────────────────────────────────────────────────────────
 
 @router.get("/api/tickets/{ticket_id}/audit")
@@ -402,33 +384,3 @@ def ticket_audit(ticket_id: int, db: Session = Depends(get_db), user: models.Use
         "details": r.details if is_staff else {},  # Internal field-level details stay staff-only
         "timestamp": as_utc(r.timestamp).isoformat() if r.timestamp else None,
     } for r in rows]
-
-
-# ── Client dashboard ─────────────────────────────────────────────────────────
-
-@router.get("/api/portal/overview")
-def portal_overview(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
-    """Per request the client can see: its newest design, an open review (with when it closes) and when it was
-    delivered. One call for the whole dashboard instead of one per request."""
-    q = db.query(models.Ticket.id, models.Ticket.delivered_at)
-    if is_client(user):   # the same rule as the ticket list
-        q = q.filter(models.Ticket.client_org == user.client_org) if user.client_org else q.filter(models.Ticket.requester_id == user.id)
-    rows = q.order_by(models.Ticket.created_at.desc()).limit(300).all()
-    ids = [r.id for r in rows] or [0]
-
-    latest: dict[int, models.ProofVersion] = {}
-    for p in db.query(models.ProofVersion).filter(models.ProofVersion.ticket_id.in_(ids)).order_by(models.ProofVersion.version):
-        latest[p.ticket_id] = p   # ordered by version, so the last one wins
-    reviews = {r.ticket_id: r for r in db.query(models.ApprovalRequest).filter(
-        models.ApprovalRequest.ticket_id.in_(ids), models.ApprovalRequest.status == "pending")}
-
-    out = {}
-    for r in rows:
-        p, review = latest.get(r.id), reviews.get(r.id)
-        out[str(r.id)] = {
-            "latest_proof": {"id": p.id, "version": p.version, "file_name": p.file_name, "content_type": p.content_type} if p else None,
-            "review": {"id": review.id, "expires_at": as_utc(review.expires_at).isoformat()}
-                      if review and as_utc(review.expires_at) > _now() else None,
-            "delivered_at": as_utc(r.delivered_at).isoformat() if r.delivered_at else None,
-        }
-    return out

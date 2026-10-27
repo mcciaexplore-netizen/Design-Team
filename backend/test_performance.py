@@ -46,12 +46,6 @@ def test_the_ticket_list_costs_the_same_number_of_queries_however_many_tickets_t
     assert all(len(t["subtasks"]) == 3 for t in many.json())   # eager loading still returns the subtasks
 
 
-def test_clients_get_the_same_cheap_list(client):
-    add_tickets(40)
-    r, queries = count_queries(lambda: client.get("/api/tickets", headers=auth(client, "a@tata.com")))
-    assert r.status_code == 200 and len(r.json()) == 40 and queries <= 10
-
-
 def test_large_json_is_compressed_but_downloads_are_not(client):
     add_tickets(40)
     headers = auth(client, "lead@x.com")

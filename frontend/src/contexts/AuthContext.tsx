@@ -19,8 +19,7 @@ interface AuthContextType {
   isAuthenticated:    boolean;
   isLoading:          boolean;
   login:              (email: string, password: string) => Promise<void>;
-  exchangeClientLink: (token: string) => Promise<void>;
-  logout:             () => void;
+  logout:            () => void;
   changePassword:     (currentPassword: string, newPassword: string) => Promise<void>;
   error:              string | null;
 }
@@ -59,24 +58,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(TOKEN_KEY, data.access_token);
     localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
     setUser(authUser);
-  };
-
-  /** A client never has a password: opening their emailed link exchanges it, once, for a normal session. */
-  const exchangeClientLink = async (token: string) => {
-    setError(null);
-    let res: Response;
-    try {
-      res = await fetch(`${API_BASE}/api/public/client-link/exchange`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-        signal: AbortSignal.timeout(60000),
-      });
-    } catch {
-      throw new Error('Cannot reach the server. It may be waking up (free hosting can take about a minute), or the backend may be down.');
-    }
-    if (!res.ok) throw new Error('This link is not valid or has expired. Ask for a new one.');
-    startSession(await res.json());
   };
 
   const login = async (email: string, password: string) => {
@@ -130,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [logout]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, exchangeClientLink, logout, changePassword, error }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, changePassword, error }}>
       {children}
     </AuthContext.Provider>
   );

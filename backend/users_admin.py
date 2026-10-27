@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])
 
-UiRole = Literal["Design Lead", "Designer", "Client"]
+# Accounts are for the design team only; clients have none (they use the open User app).
+UiRole = Literal["Design Lead", "Designer"]
 _ROLE_TO_ENUM = {
     "Design Lead": models.RoleEnum.DESIGN_LEAD,
     "Designer": models.RoleEnum.DESIGNER,
-    "Client": models.RoleEnum.REQUESTER,
 }
 _LEAD_ROLES = (models.RoleEnum.DESIGN_LEAD, models.RoleEnum.ADMIN)
 
@@ -64,7 +64,6 @@ class CreateUser(BaseModel):
     full_name: str = Field(min_length=2, max_length=80)
     email: Email
     role: UiRole
-    client_org: Optional[str] = Field(default=None, max_length=80)
 
 
 @router.post("", status_code=201)
@@ -73,17 +72,11 @@ def create_user(body: CreateUser, db: Session = Depends(get_db), lead: models.Us
     require_allowed_email(email)
     if db.query(models.User).filter(func.lower(models.User.email) == email).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
-    org = " ".join((body.client_org or "").split()) or None
-    if body.role == "Client" and not org:
-        raise HTTPException(status_code=422, detail="Clients need a company name.")
-    if body.role != "Client":
-        org = None
     temp = generate_temp_password()
     user = models.User(
         email=email,
         full_name=" ".join(body.full_name.split()),
         role=_ROLE_TO_ENUM[body.role],
-        client_org=org,
         hashed_password=hash_password(temp),
         must_change_password=True,
     )
@@ -99,7 +92,6 @@ class UpdateUser(BaseModel):
     full_name: Optional[str] = Field(default=None, min_length=2, max_length=80)
     email: Optional[Email] = None
     role: Optional[UiRole] = None
-    client_org: Optional[str] = Field(default=None, max_length=80)
     is_active: Optional[bool] = None
 
 
@@ -118,18 +110,10 @@ def update_user(user_id: int, body: UpdateUser, db: Session = Depends(get_db), l
     if loses_lead and _active_leads(db) <= 1:
         raise HTTPException(status_code=400, detail="At least one active Design Lead is required.")
 
-    # Clients are scoped by company, so one without a company would see nothing (or the wrong tickets).
-    new_org = user.client_org
-    if new_role == models.RoleEnum.REQUESTER:
-        if body.client_org is not None:
-            new_org = " ".join(body.client_org.split()) or None
-        if not new_org:
-            raise HTTPException(status_code=422, detail="Clients need a company name.")
-
     new_email = body.email.strip().lower() if body.email else user.email
     if new_email != user.email:
         require_allowed_email(new_email)
-        taken =db.query(models.User).filter(func.lower(models.User.email) == new_email, models.User.id != user.id).first()
+        taken = db.query(models.User).filter(func.lower(models.User.email) == new_email, models.User.id != user.id).first()
         if taken:
             raise HTTPException(status_code=409, detail="An account with this email already exists.")
         user.email = new_email   # they sign in with it from now on; tickets and emails follow the account
@@ -142,11 +126,7 @@ def update_user(user_id: int, body: UpdateUser, db: Session = Depends(get_db), l
         # Keep ADMIN rows as they are unless the role genuinely changes.
         user.role = new_role
         changes.append(f"role to {body.role}")
-        if new_role != models.RoleEnum.REQUESTER:
-            user.client_org = None
-    if new_role == models.RoleEnum.REQUESTER and new_org != user.client_org:
-        user.client_org = new_org
-        changes.append("company")
+        user.client_org = None
     if body.is_active is not None and new_active != user.is_active:
         user.is_active = new_active
         changes.append("activated" if new_active else "deactivated")

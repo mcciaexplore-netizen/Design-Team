@@ -61,12 +61,10 @@ def test_proof_versions_increment_and_are_scoped(client):
     assert upload_proof(client, t["id"]).json()["version"] == 1
     v2 = upload_proof(client, t["id"], note="Round 2").json()
     assert v2["version"] == 2 and v2["note"] == "Round 2"
-    assert [p["version"] for p in client.get(f"/api/tickets/{t['id']}/proofs", headers=auth(client, "a@tata.com")).json()] == [2, 1]
-    assert upload_proof(client, t["id"], email="a@tata.com").status_code == 403           # clients can't upload proofs
-    assert client.get(f"/api/tickets/{t['id']}/proofs", headers=auth(client, "b@acme.com")).status_code == 404
-    f = client.get(f"/api/proofs/{v2['id']}/file", headers=auth(client, "a@tata.com"))
+    assert [p["version"] for p in client.get(f"/api/tickets/{t['id']}/proofs", headers=auth(client, "lead@x.com")).json()] == [2, 1]
+    f = client.get(f"/api/proofs/{v2['id']}/file", headers=auth(client, "des@x.com"))
     assert f.content == PNG and f.headers["x-content-type-options"] == "nosniff"
-    assert client.get(f"/api/proofs/{v2['id']}/file", headers=auth(client, "b@acme.com")).status_code == 404
+    assert client.get(f"/api/proofs/{v2['id']}/file").status_code == 401
     assert upload_proof(client, t["id"], data=b"nope", name="x.exe").status_code == 415
 
 
@@ -79,7 +77,7 @@ def test_request_returns_link_once_and_stores_only_a_hash(client):
     row = db.query(models.ApprovalRequest).filter_by(id=req["id"]).first()
     assert row.token_hash == hashlib.sha256(token.encode()).hexdigest() and token not in str(row.__dict__)
     db.close()
-    listing = client.get(f"/api/tickets/{t['id']}/approval-requests", headers=auth(client, "a@tata.com")).json()
+    listing = client.get(f"/api/tickets/{t['id']}/approval-requests", headers=auth(client, "lead@x.com")).json()
     # Uploading already sent the design for review; the manual request superseded that first one.
     assert sorted(x["status"] for x in listing) == ["pending", "revoked"] and all("review_url" not in x for x in listing) and token not in str(listing)
     ticket = [x for x in client.get("/api/tickets", headers=auth(client, "lead@x.com")).json() if x["id"] == t["id"]][0]
@@ -93,7 +91,6 @@ def test_request_validation_and_permissions(client):
     des = auth(client, "des@x.com")
     assert client.post(f"/api/tickets/{t['id']}/approval-requests", json={"proof_version_id": foreign["id"]}, headers=des).status_code == 422
     mine = upload_proof(client, t["id"]).json()
-    assert client.post(f"/api/tickets/{t['id']}/approval-requests", json={"proof_version_id": mine["id"]}, headers=auth(client, "a@tata.com")).status_code == 403
     assert client.post(f"/api/tickets/{t['id']}/approval-requests", json={"proof_version_id": mine["id"], "ttl_hours": 0}, headers=des).status_code == 422
     assert client.post(f"/api/tickets/{t['id']}/approval-requests", json={"proof_version_id": mine["id"], "ttl_hours": 9999}, headers=des).status_code == 422
 
@@ -109,7 +106,6 @@ def test_new_request_supersedes_old_link(client):
 
 def test_staff_can_revoke(client):
     t, _, req, token = setup_review(client)
-    assert client.post(f"/api/approval-requests/{req['id']}/revoke", headers=auth(client, "a@tata.com")).status_code == 403
     assert client.post(f"/api/approval-requests/{req['id']}/revoke", headers=auth(client, "des@x.com")).status_code == 200
     assert decide(client, token).status_code == 409
     assert client.post(f"/api/approval-requests/{req['id']}/revoke", headers=auth(client, "des@x.com")).status_code == 409
@@ -218,36 +214,23 @@ def test_review_file_is_served_only_while_the_link_is_live_or_just_decided(clien
     assert client.get(file_url).status_code == 410
 
 
-# ── Portal decisions (signed-in clients) ─────────────────────────────────────
-
-def test_signed_in_client_can_approve_from_portal(client):
-    t, _, req, token = setup_review(client)
-    other, staff, cl = auth(client, "b@acme.com"), auth(client, "des@x.com"), auth(client, "a@tata.com")
-    assert client.post(f"/api/approval-requests/{req['id']}/decision", json={"decision": "approve"}, headers=staff).status_code == 403
-    assert client.post(f"/api/approval-requests/{req['id']}/decision", json={"decision": "approve"}, headers=other).status_code == 404
-    assert client.post(f"/api/approval-requests/{req['id']}/decision", json={"decision": "request_changes"}, headers=cl).status_code == 422
-    r = client.post(f"/api/approval-requests/{req['id']}/decision", json={"decision": "approve", "comment": "Great"}, headers=cl)
-    assert r.status_code == 200 and r.json()["status"] == "approved"
-    trail = client.get(f"/api/tickets/{t['id']}/audit", headers=auth(client, "lead@x.com")).json()
-    assert trail[-1]["actor"] == "Tata A (signed in)"
-    assert decide(client, token).status_code == 409                       # the emailed link is now spent too
-    assert client.post(f"/api/approval-requests/{req['id']}/decision", json={"decision": "approve"}, headers=cl).status_code == 409
+def test_the_portal_decision_endpoint_is_gone(client):
+    """Clients have no accounts: they decide through the emailed review link only."""
+    _, _, req, _ = setup_review(client)
+    r = client.post(f"/api/approval-requests/{req['id']}/decision", json={"decision": "approve"}, headers=auth(client, "lead@x.com"))
+    assert r.status_code in (404, 405)
 
 
 # ── Audit trail ──────────────────────────────────────────────────────────────
 
-def test_audit_trail_is_ordered_scoped_and_hides_internals_from_clients(client):
+def test_audit_trail_is_ordered_and_needs_a_sign_in(client):
     t = make_ticket(client, "a@tata.com")
-    lead, des, cl = auth(client, "lead@x.com"), auth(client, "des@x.com"), auth(client, "a@tata.com")
+    lead, des = auth(client, "lead@x.com"), auth(client, "des@x.com")
     client.patch(f"/api/tickets/{t['id']}", json={"status": "In Progress", "assignee_id": 2}, headers=lead)
     client.post(f"/api/tickets/{t['id']}/time", json={"seconds": 600}, headers=des)
     staff_view = client.get(f"/api/tickets/{t['id']}/audit", headers=lead).json()
-    assert [a["action"] for a in staff_view] == ["Created", "Accepted", "Updated", "Logged time"]
-    assert staff_view[2]["details"]["status"] == {"from": "Assigned", "to": "In Progress"}
-    client_view = client.get(f"/api/tickets/{t['id']}/audit", headers=cl).json()
-    assert [a["action"] for a in client_view] == ["Created", "Accepted", "Updated", "Logged time"]
-    assert all(a["details"] == {} for a in client_view)
-    assert client.get(f"/api/tickets/{t['id']}/audit", headers=auth(client, "b@acme.com")).status_code == 404
+    assert [a["action"] for a in staff_view] == ["Created", "Updated", "Logged time"]
+    assert staff_view[1]["details"]["status"] == {"from": "Assigned", "to": "In Progress"}
     assert client.get(f"/api/tickets/{t['id']}/audit").status_code == 401
 
 
@@ -310,9 +293,9 @@ def test_client_filter_and_range(client, report_data):
 
 
 def test_reports_are_lead_only(client, report_data):
-    for h in (auth(client, "des@x.com"), auth(client, "a@tata.com")):
-        for path in ("/api/reports/summary", "/api/reports/export.csv", "/api/reports/export.pdf", "/api/reports/clients"):
-            assert client.get(path, headers=h).status_code == 403
+    h = auth(client, "des@x.com")
+    for path in ("/api/reports/summary", "/api/reports/export.csv", "/api/reports/export.pdf", "/api/reports/clients"):
+        assert client.get(path, headers=h).status_code == 403
     assert client.get("/api/reports/summary").status_code == 401
 
 

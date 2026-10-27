@@ -77,6 +77,7 @@ export async function publicJson<T>(path: string, init: RequestInit & { json?: u
     throw new ApiError('Cannot reach the server. Check your connection.', 0);
   }
   if (!res.ok) throw new ApiError(await errorMessage(res), res.status);
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 

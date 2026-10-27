@@ -18,7 +18,6 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { da
 export default function CdrPanel({ ticket }: { ticket: Ticket }) {
   const limits = useUploadLimits();
   const { user } = useAuth();
-  const isClient = user?.role === 'Client';
   const isLead = user?.role === 'Design Lead';
   const [requests, setRequests] = useState<CdrRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +86,7 @@ export default function CdrPanel({ ticket }: { ticket: Ticket }) {
                 <button type="button" className="btn-ghost" disabled={busy} onClick={() => void act(() => post(`/api/cdr-requests/${r.id}/decline`), 'Could not decline.')}>Decline</button>
               </>
             )}
-            {!isClient && r.status === 'Approved' && (
+            {r.status === 'Approved' && (
               <button type="button" className="btn-primary" disabled={busy} onClick={() => { uploadFor.current = r.id; fileRef.current?.click(); }}>
                 <Upload size={14} /> Upload file
               </button>

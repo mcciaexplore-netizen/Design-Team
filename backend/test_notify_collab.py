@@ -81,10 +81,9 @@ def test_new_ticket_notifies_leads_and_posts_to_slack_when_enabled(client, monke
     calls = []
     monkeypatch.setattr(delivery.httpx, "post", fake_post(200, "ok", calls))
     client.put("/api/settings/integrations", json={"slack_webhook": SLACK_URL}, headers=auth(client, "lead@x.com"))
-    make_ticket(client, "a@tata.com", "Poster <!channel> & more")
+    make_ticket(client, "des@x.com", "Poster <!channel> & more")
     assert any("Poster" in n for n in notes_for("lead@x.com"))
-    # designers are not told about every new ticket, only the one the system assigns to them
-    assert notes_for("des@x.com") == ["DF-0001 — Poster <!channel> & more was assigned to you"]
+    assert notes_for("des@x.com") == []   # the designer raised it (and got it) themselves: nothing to tell them
     text = calls[-1][1]["text"]
     assert "&lt;!channel&gt;" in text and "<!channel>" not in text  # user text can't ping the channel
 
@@ -125,7 +124,7 @@ def test_muted_event_and_disabled_in_app_suppress_notifications(client):
 
 
 def test_notifications_api_list_and_mark_read(client):
-    make_ticket(client, "a@tata.com", "Needs attention")
+    make_ticket(client, "des@x.com", "Needs attention")
     lead = auth(client, "lead@x.com")
     data = client.get("/api/notifications", headers=lead).json()
     assert data["unread"] >= 1 and data["items"][0]["is_read"] is False
@@ -156,37 +155,36 @@ def upload(client, tid, email, name="mock.png", data=PNG, **form):
 
 def test_attachment_upload_download_roundtrip_with_safe_headers(client):
     t = make_ticket(client, "a@tata.com")
-    r = upload(client, t["id"], "a@tata.com")
+    r = upload(client, t["id"], "lead@x.com")
     assert r.status_code == 201 and r.json()["file_name"] == "mock.png" and r.json()["size_bytes"] == len(PNG)
     got = client.get(f"/api/attachments/{r.json()['id']}/download", headers=auth(client, "des@x.com"))
     assert got.content == PNG
     assert got.headers["x-content-type-options"] == "nosniff" and "sandbox" in got.headers["content-security-policy"]
-    assert len(client.get(f"/api/tickets/{t['id']}/attachments", headers=auth(client, "a@tata.com")).json()) == 1
+    assert len(client.get(f"/api/tickets/{t['id']}/attachments", headers=auth(client, "des@x.com")).json()) == 1
 
 
 def test_attachment_validation(client, monkeypatch):
     t = make_ticket(client, "a@tata.com")
-    assert upload(client, t["id"], "a@tata.com", "evil.exe", b"MZ").status_code == 415
-    assert upload(client, t["id"], "a@tata.com", "logo.svg", b"<svg onload=alert(1)>").status_code == 415
-    assert upload(client, t["id"], "a@tata.com", "fake.png", b"not a png at all").status_code == 415
-    assert upload(client, t["id"], "a@tata.com", "empty.png", b"").status_code in (400, 415)
+    assert upload(client, t["id"], "lead@x.com", "evil.exe", b"MZ").status_code == 415
+    assert upload(client, t["id"], "lead@x.com", "logo.svg", b"<svg onload=alert(1)>").status_code == 415
+    assert upload(client, t["id"], "lead@x.com", "fake.png", b"not a png at all").status_code == 415
+    assert upload(client, t["id"], "lead@x.com", "empty.png", b"").status_code in (400, 415)
     monkeypatch.setattr(common, "MAX_UPLOAD_BYTES", 16)
-    assert upload(client, t["id"], "a@tata.com", "big.png", PNG).status_code == 413
+    assert upload(client, t["id"], "lead@x.com", "big.png", PNG).status_code == 413
 
 
 def test_attachment_path_traversal_in_filename_is_neutralised(client):
     t = make_ticket(client, "a@tata.com")
-    r = upload(client, t["id"], "a@tata.com", "../../etc/passwd.png", PNG)
+    r = upload(client, t["id"], "lead@x.com", "../../etc/passwd.png", PNG)
     assert r.status_code == 201 and "/" not in r.json()["file_name"] and ".." not in r.json()["file_name"].replace("passwd", "")
 
 
 def test_attachment_access_is_scoped_and_delete_rules(client):
     t = make_ticket(client, "a@tata.com")
-    att = upload(client, t["id"], "a@tata.com").json()
-    assert client.get(f"/api/attachments/{att['id']}/download", headers=auth(client, "b@acme.com")).status_code == 404
-    assert upload(client, t["id"], "b@acme.com").status_code == 404
+    att = upload(client, t["id"], "lead@x.com").json()
+    assert client.get(f"/api/attachments/{att['id']}/download").status_code == 401
     assert client.delete(f"/api/attachments/{att['id']}", headers=auth(client, "des@x.com")).status_code == 403
-    assert client.delete(f"/api/attachments/{att['id']}", headers=auth(client, "a@tata.com")).status_code == 204
+    assert client.delete(f"/api/attachments/{att['id']}", headers=auth(client, "lead@x.com")).status_code == 204
     assert client.get(f"/api/attachments/{att['id']}/download", headers=auth(client, "lead@x.com")).status_code == 404
 
 
@@ -200,7 +198,7 @@ def test_figma_preview_and_ticket_validation(client):
                 "https://www.figma.com.evil.io/design/AbCdEfGh12345/x"):
         assert client.get("/api/figma/preview", params={"url": bad}, headers=h).json()["valid"] is False
     body = {"title": "T", "brief": "b", "design_type_id": 1, "type_specific_fields": {}}
-    r = client.post("/api/tickets", json={**body, "figma_url": "javascript:alert(1)"}, headers=auth(client, "a@tata.com"))
+    r = client.post("/api/tickets", json={**body, "figma_url": "javascript:alert(1)"}, headers=h)
     assert r.status_code == 422
-    r = client.post("/api/tickets", json={**body, "figma_url": "https://www.figma.com/file/AbCdEfGh12345/Thing"}, headers=auth(client, "a@tata.com"))
+    r = client.post("/api/tickets", json={**body, "figma_url": "https://www.figma.com/file/AbCdEfGh12345/Thing"}, headers=h)
     assert r.status_code == 201 and r.json()["figma_url"].startswith("https://www.figma.com/")

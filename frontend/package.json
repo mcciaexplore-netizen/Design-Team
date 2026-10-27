@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:user": "vite --mode user",
     "build": "tsc -b && vite build",
+    "build:user": "tsc -b && vite build --mode user",
     "lint": "oxlint",
     "preview": "vite preview",
     "test:e2e": "playwright test"

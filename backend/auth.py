@@ -101,7 +101,8 @@ def _user_from_token(token: str, db: Session) -> models.User:
     if payload.get("purpose"):
         raise credentials_error  # a password-reset link is not a session
     user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user or not user.is_active:
+    # Clients have no accounts: a requester is only a record, so even a token issued earlier no longer works.
+    if not user or not user.is_active or user.role == models.RoleEnum.REQUESTER:
         raise credentials_error
     if not hmac.compare_digest(str(payload.get("pwf", "")), _password_fingerprint(user)):
         raise credentials_error  # password changed since this token was issued
@@ -207,7 +208,7 @@ def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Ses
     user = db.query(models.User).filter(models.User.email == email).first()
     hashed = user.hashed_password if user else _DUMMY_HASH
     password_ok = pwd_context.verify(form.password, hashed)
-    if not user or not password_ok or not user.is_active:
+    if not user or not password_ok or not user.is_active or user.role == models.RoleEnum.REQUESTER:
         # Record failure on both keys
         ratelimit.record(db, ip_key)
         ratelimit.record(db, email_key)
@@ -271,7 +272,7 @@ def forgot_password(body: ForgotPasswordRequest, request: Request, db: Session =
     ratelimit.check(db, f"forgot-ip:{ratelimit.client_ip(request)}", 10, 3600)
     ratelimit.check(db, f"forgot-email:{email}", 3, 3600)
     user = db.query(models.User).filter(models.User.email == email).first()
-    if user and user.is_active:
+    if user and user.is_active and user.role != models.RoleEnum.REQUESTER:   # clients have no password to reset
         link = f"{app_url()}/reset-password?token={create_reset_token(user)}"
         delivery.run_in_background(delivery.send_email, user.email, "Reset your MCCIA DesignDesk password", (
             f"Hi {user.full_name},\n\n"

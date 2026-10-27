@@ -1,5 +1,3 @@
-import type { Ticket } from './types';
-
 /* Shared pieces of the design request form: types, validation, the request body, and what is remembered on this device. */
 
 export interface Question { id: string; label: string; type: 'text' | 'select' | 'multiselect' | 'number'; options: string[]; required: boolean }
@@ -214,49 +212,6 @@ function isBlank(v: RequestValues): boolean {
     && v.content === '' && v.num_creatives === base.num_creatives
     && Object.values(v.details).every(answers => Object.values(answers ?? {}).every(a => (Array.isArray(a) ? a.length === 0 : !a)))
     && v.links.every(l => !l);
-}
-
-/** Tickets made before the channels were split carry the old bundled names; map them to today's choices. */
-function currentRequirement(old: string, details: Answers): { requirement: string; details: Answers } {
-  if (old === 'Flyer (Email/Whatsapp)') {
-    return details.channel === 'WhatsApp' ? { requirement: 'WhatsApp creative', details: {} } : { requirement: 'Flyer (Email / Print)', details };
-  }
-  if (old === 'Social Media Post (Insta, LinkedIn, Twitter)') {
-    const first = Array.isArray(details.platforms) ? details.platforms[0] : '';
-    return { requirement: first === 'LinkedIn' ? 'LinkedIn post' : first === 'Twitter' ? 'Twitter / X post' : 'Instagram post', details: {} };
-  }
-  if (old === 'Directory') return { requirement: 'Book', details };   // renamed
-  return { requirement: old, details };
-}
-
-/** Answers for "Request again": the earlier request's content, without its dates. One request can cover several
- *  designs; newer tickets store `design_requirements` (every design chosen) and `details` grouped by design.
- *  Older tickets have only one design, with flat `details` for it. */
-export function prefillFromTicket(t: Ticket): RequestPrefill {
-  const f = t.type_specific_fields ?? {};
-  const text = (x: unknown) => (typeof x === 'string' ? x : '');
-  if (!f.event_name) return { event_name: t.title, content: t.description ?? '' };   // older ticket: no form fields saved
-  const notes = text(f.content) || (t.description ?? '').split('\nContent / notes:\n')[1] || '';
-  const rawDetails = (f.details && typeof f.details === 'object' ? f.details : {}) as Record<string, unknown>;
-  const chosen = Array.isArray(f.design_requirements) ? f.design_requirements.map(String)
-    : text(f.design_requirement) ? [text(f.design_requirement)] : [];
-  const grouped = Array.isArray(f.design_requirements);   // only newer tickets store it this way
-
-  const design_requirements: string[] = [];
-  const details: Record<string, Answers> = {};
-  for (const old of chosen) {
-    const answersIn: Answers = {};
-    const source = (grouped ? rawDetails[old] : rawDetails) as Record<string, unknown> | undefined;
-    for (const [k, v] of Object.entries(source ?? {})) answersIn[k] = Array.isArray(v) ? v.map(String) : String(v);
-    const now = currentRequirement(old, answersIn);
-    if (!design_requirements.includes(now.requirement)) design_requirements.push(now.requirement);
-    details[now.requirement] = now.details;
-  }
-  return {
-    event_name: text(f.event_name), department: text(f.department), design_requirements, other_details: text(f.other_details),
-    num_creatives: String(f.number_of_creatives ?? 1), content: notes, details,
-    links: Array.isArray(f.reference_links) ? f.reference_links.map(String) : [],
-  };
 }
 
 export const requestLabel = { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: 6 } as const;
