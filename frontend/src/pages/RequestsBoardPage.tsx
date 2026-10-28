@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, Clock, Eye, Link2, PackageCheck, Search, Workflow } from 'lucide-react';
 import { publicJson } from '../api';
 
@@ -19,9 +19,7 @@ function readParams() {
   return { q: p.get('q') ?? '', show: (show === 'finished' || show === 'all' ? show : 'active') as Show };
 }
 
-/**
- * Every request and where it stands, without signing in. Only status and dates are shown, nothing personal.
- */
+/** Every request and where it stands, without signing in. */
 export default function RequestsBoardPage() {
   const [data, setData] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +39,6 @@ export default function RequestsBoardPage() {
     return () => clearInterval(timer);
   }, [load]);
 
-  // Keep the view in the address, so it can be bookmarked or shared.
   useEffect(() => {
     const p = new URLSearchParams();
     if (q) p.set('q', q);
@@ -78,90 +75,95 @@ export default function RequestsBoardPage() {
   };
 
   return (
-    <div style={{ padding: '2rem 1rem 3rem' }}>
-      <main style={{ maxWidth: 1040, margin: '0 auto' }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
+    <div className="board-page">
+      <div className="board-hero">
+        <div className="board-hero-inner">
           <div>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.02em' }}>
-              Design requests
-            </h1>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)', marginTop: 4 }}>
-              Every request to the design team and where it stands. No sign-in needed.
-            </p>
+            <h1 className="board-hero-title">Design requests</h1>
+            <p className="board-hero-sub">Every request to the design team and where it stands. No sign-in needed.</p>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-            <a href="/request" className="btn-primary" style={{ textDecoration: 'none' }}>Submit a new request</a>
-            <a href="/campaigns" className="login-link-btn" style={{ fontSize: '0.82rem' }}>Campaigns &amp; posts →</a>
+          <div className="board-hero-cta">
+            <a href="/campaigns" className="board-campaigns-link">Campaigns &amp; posts →</a>
           </div>
-        </header>
+        </div>
+      </div>
 
+      <div className="board-body">
         {error && !data && (
-          <div className="glass-card" style={{ padding: '1.25rem' }}>
-            <p role="alert" style={{ color: 'var(--danger-text)', fontWeight: 600 }}>{error}</p>
+          <div className="board-error-card">
+            <p role="alert">{error}</p>
             <button type="button" className="btn-ghost" style={{ marginTop: 10 }} onClick={load}>Try again</button>
           </div>
         )}
-        {!data && !error && <p role="status" style={{ color: 'var(--text-hint)' }}>Loading…</p>}
+
+        {!data && !error && (
+          <div className="board-loading">
+            <div className="user-spinner" aria-hidden="true" />
+            <p role="status">Loading requests…</p>
+          </div>
+        )}
 
         {data && (<>
-          <section aria-label="Summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
-            <Tile icon={Workflow} label="In progress" value={stats.active} />
-            <Tile icon={Eye} label="Waiting for approval" value={stats.review} />
-            <Tile icon={Clock} label="Due in the next 7 days" value={stats.dueSoon} />
-            <Tile icon={PackageCheck} label={`Finished, last ${data.finished_days} days`} value={stats.delivered} />
+          <section aria-label="Summary" className="board-stats">
+            <StatTile icon={Workflow}     label="In progress"         value={stats.active}    gradient="linear-gradient(135deg,#0B1F3A 0%,#1E3A5F 100%)" />
+            <StatTile icon={Eye}          label="Awaiting approval"   value={stats.review}    gradient="linear-gradient(135deg,#d97706 0%,#f59e0b 100%)" />
+            <StatTile icon={Clock}        label="Due in 7 days"       value={stats.dueSoon}   gradient="linear-gradient(135deg,#7C3AED 0%,#a855f7 100%)" />
+            <StatTile icon={PackageCheck} label={`Finished · last ${data.finished_days}d`} value={stats.delivered} gradient="linear-gradient(135deg,#256B45 0%,#2E8B57 100%)" />
           </section>
 
-          <section aria-label="Filters" className="glass-card" style={{ padding: '0.9rem 1rem', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 20 }}>
-            <label style={{ position: 'relative', flex: '1 1 220px' }}>
+          <section aria-label="Filters" className="board-filters">
+            <label className="board-search-wrap">
               <span className="sr-only">Search requests</span>
-              <Search size={15} aria-hidden="true" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-hint)' }} />
-              <input type="search" className="input-field" style={{ width: '100%', paddingLeft: 32 }} placeholder="Search by title or number"
+              <Search size={15} aria-hidden="true" className="board-search-icon" />
+              <input type="search" className="board-search-input" placeholder="Search by title or number…"
                 value={q} onChange={e => set({ q: e.target.value })} />
             </label>
-            <div role="group" aria-label="Show" style={{ display: 'flex', gap: 4, background: '#F1F5F9', borderRadius: 10, padding: 3 }}>
+            <div role="group" aria-label="Show" className="board-toggle-group">
               {(['active', 'finished', 'all'] as Show[]).map(s => (
-                <button key={s} type="button" aria-pressed={show === s} onClick={() => set({ show: s })}
-                  style={{ border: 0, borderRadius: 8, padding: '0.4rem 0.8rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
-                           background: show === s ? 'white' : 'transparent', color: show === s ? 'var(--brand)' : 'var(--text-soft)',
-                           boxShadow: show === s ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                <button key={s} type="button" aria-pressed={show === s}
+                  className={`board-toggle-btn${show === s ? ' active' : ''}`}
+                  onClick={() => set({ show: s })}>
                   {s === 'active' ? 'In progress' : s === 'finished' ? 'Finished' : 'All'}
                 </button>
               ))}
             </div>
-            <button type="button" className="btn-ghost" onClick={copyLink} title="Copy a link to exactly this view" style={{ gap: 6 }}>
-              <Link2 size={14} aria-hidden="true" /> <span role="status">{copied ? 'Link copied' : 'Copy link'}</span>
+            <button type="button" className="btn-ghost board-copy-btn" onClick={copyLink} title="Copy a link to this view">
+              <Link2 size={14} aria-hidden="true" />
+              <span role="status">{copied ? '✓ Copied' : 'Copy link'}</span>
             </button>
           </section>
 
           {visible.length === 0 && (
-            <p className="glass-card" style={{ padding: '1.5rem', color: 'var(--text-soft)', textAlign: 'center' }}>
-              {q ? 'No requests match your search.' : show === 'finished' ? 'Nothing finished yet.' : 'No requests in progress right now.'}
-            </p>
+            <div className="board-empty">
+              <p>{q
+                ? 'No requests match your search.'
+                : show === 'finished' ? 'Nothing finished yet.' : 'No requests in progress right now.'}</p>
+            </div>
           )}
 
           {visible.length > 0 && (
-            <ul aria-label="Requests" style={{ listStyle: 'none', padding: 0, margin: '0 0 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
+            <ul aria-label="Requests" className="board-cards-grid">
               {visible.map(r => <RequestCard key={r.ticket_number} r={r} steps={data.steps} now={loadedAt} />)}
             </ul>
           )}
 
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-hint)', marginTop: 8 }}>
+          <p className="board-refresh-note">
             Updated {new Date(loadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, refreshes every minute.
-            {error && <span role="alert" style={{ color: 'var(--danger-text)' }}> Last refresh failed: {error}</span>}
+            {error && <span role="alert" style={{ color: 'var(--danger-text)', marginLeft: 6 }}>Last refresh failed: {error}</span>}
           </p>
         </>)}
-      </main>
+      </div>
     </div>
   );
 }
 
-function Tile({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: number }) {
+function StatTile({ icon: Icon, label, value, gradient }: { icon: typeof Clock; label: string; value: number; gradient: string }) {
   return (
-    <div className="glass-card" style={{ padding: '1rem 1.1rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div className="icon-tile" aria-hidden="true"><Icon size={18} /></div>
+    <div className="stat-tile" style={{ background: gradient }}>
+      <div className="stat-tile-icon" aria-hidden="true"><Icon size={20} /></div>
       <div>
-        <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-strong)', lineHeight: 1.1 }}>{value}</p>
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-soft)', fontWeight: 600 }}>{label}</p>
+        <p className="stat-tile-value">{value}</p>
+        <p className="stat-tile-label">{label}</p>
       </div>
     </div>
   );
@@ -169,28 +171,46 @@ function Tile({ icon: Icon, label, value }: { icon: typeof Clock; label: string;
 
 function RequestCard({ r, steps, now }: { r: BoardRequest; steps: string[]; now: number }) {
   const late = !r.finished && r.due_at !== null && new Date(r.due_at).getTime() < now;
-  const tone = r.finished ? ['rgba(46,139,87,0.12)', '#047857']
-    : r.status === 'In Review' ? ['rgba(245,158,11,0.15)', '#92400e']
-    : ['rgba(11,31,58,0.08)', '#0B1F3A'];
+  const pct = steps.length ? Math.round(((r.current_step + 1) / steps.length) * 100) : 0;
+
+  const badge = r.finished
+    ? { bg: 'rgba(37,107,69,0.12)', color: '#256B45' }
+    : r.status === 'In Review'
+    ? { bg: 'rgba(217,119,6,0.12)', color: '#92400e' }
+    : { bg: 'rgba(11,31,58,0.08)', color: '#0B1F3A' };
+
   return (
-    <li className="glass-card" style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--text-hint)' }}>
+    <li className="request-card">
+      <div className="request-card-top">
+        <span className="request-card-number">
           {r.ticket_number}{r.design_type ? ` · ${r.design_type}` : ''}
         </span>
-        <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: 99, background: tone[0], color: tone[1], whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-          {r.finished && <Check size={11} aria-hidden="true" />}{r.status}
+        <span className="request-card-badge" style={{ background: badge.bg, color: badge.color }}>
+          {r.finished && <Check size={10} aria-hidden="true" />}
+          {r.status}
         </span>
       </div>
-      <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-strong)', lineHeight: 1.35 }}>{r.title}</h3>
-      <div role="img" aria-label={`Step ${r.current_step + 1} of ${steps.length}: ${steps[r.current_step]}`} style={{ display: 'flex', gap: 4 }}>
-        {steps.map((s, i) => (
-          <span key={s} title={s} style={{ flex: 1, height: 5, borderRadius: 99, background: i <= r.current_step ? (r.finished ? '#2E8B57' : '#0B1F3A') : '#E2E8F0' }} />
-        ))}
+
+      <h3 className="request-card-title">{r.title}</h3>
+
+      <div
+        role="img"
+        aria-label={`Step ${r.current_step + 1} of ${steps.length}: ${steps[r.current_step] ?? ''}`}
+        className="request-card-progress-track"
+      >
+        <div className="request-card-progress-fill"
+          style={{ width: `${pct}%`, background: r.finished ? 'var(--green)' : 'var(--brand)' }} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginTop: 'auto', fontSize: '0.8rem' }}>
+      <p className="request-card-step-label">
+        {steps[r.current_step] ?? ''} &mdash; step {r.current_step + 1}/{steps.length}
+      </p>
+
+      <div className="request-card-footer">
         <span style={{ color: late ? 'var(--danger-text)' : 'var(--text-soft)', fontWeight: late ? 700 : 500 }}>
-          {r.finished ? `Delivered ${day(r.delivered_at ?? r.due_at)}` : !r.due_at ? 'No date yet' : `${late ? 'Was expected' : 'Expected by'} ${day(r.due_at)}`}
+          {r.finished
+            ? `Delivered ${day(r.delivered_at ?? r.due_at)}`
+            : !r.due_at ? 'No date yet'
+            : `${late ? 'Was expected' : 'Expected by'} ${day(r.due_at)}`}
         </span>
       </div>
     </li>
