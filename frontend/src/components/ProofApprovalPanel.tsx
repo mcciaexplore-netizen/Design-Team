@@ -314,6 +314,6 @@ export default function ProofApprovalPanel({ ticket }: { ticket: Ticket }) {
 /** What happened when a design went out for review: emailed (and to whom), or not, so the link must be shared by hand. */
 function sentText(version: number, emailedTo: string | null): string {
   return emailedTo
-    ? `Version ${version} was sent for approval. The review link was emailed to ${emailedTo}, and it is in their portal.`
-    : `Version ${version} was sent for approval and is in the client's portal. Email isn't set up, so copy the review link below and send it to them.`;
+    ? `Version ${version} was sent for approval. The review link was emailed to ${emailedTo}.`
+    : `Version ${version} was sent for approval. Email isn't set up, so copy the review link below and send it to them.`;
 }

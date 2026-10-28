@@ -296,7 +296,7 @@ def add_client_change(ticket_id: int, body: ClientChange, db: Session = Depends(
 
 @router.post("/api/tickets/{ticket_id}/duplicate", response_model=schemas.TicketResponse, status_code=status.HTTP_201_CREATED)
 def duplicate_ticket(ticket_id: int, db: Session = Depends(get_db), user: models.User = Depends(require_staff)):
-    """Copy a ticket as a fresh New ticket. It stays with the same client, so their portal still shows it."""
+    """Copy a ticket as a fresh New ticket, for the same client's organisation."""
     src = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
     if not src:
         raise HTTPException(status_code=404, detail="Ticket not found")

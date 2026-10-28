@@ -5,14 +5,13 @@ import { ACCOUNTS, API, token } from './helpers';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
 
 test('a client approves a proof through the review link without signing in, and the ticket is delivered', async ({ page, request }) => {
-  const client = await token(request, ACCOUNTS.client);
   const designer = await token(request, ACCOUNTS.designer);
   const lead = await token(request, ACCOUNTS.lead);
   const as = (t: string) => ({ Authorization: `Bearer ${t}` });
 
-  const types = await (await request.get(`${API}/api/design-types`, { headers: as(client) })).json();
+  const types = await (await request.get(`${API}/api/design-types`, { headers: as(lead) })).json();
   const created = await request.post(`${API}/api/tickets`, {
-    headers: as(client),
+    headers: as(lead),
     data: { title: 'E2E approval poster', brief: 'Please design a poster', design_type_id: types[0].id, type_specific_fields: {} },
   });
   expect(created.status()).toBe(201);

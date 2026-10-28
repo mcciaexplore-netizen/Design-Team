@@ -1,8 +1,9 @@
 import { defineConfig } from '@playwright/test';
 
 /**
- * Browser tests. They start their own throwaway API (port 8765, temp database) and the Vite dev server (port 5199),
- * so they never touch your development data.
+ * Browser tests. They start their own throwaway API (port 8765, temp database), the Admin app's Vite dev server
+ * (port 5199, baseURL for relative page.goto calls) and the public User app's dev server (port 5200, see
+ * USER_BASE in helpers.ts) -- so they never touch your development data.
  *
  *   npm run test:e2e
  *
@@ -33,6 +34,13 @@ export default defineConfig({
     {
       command: 'npm run dev -- --host 127.0.0.1 --port 5199 --strictPort',
       url: 'http://127.0.0.1:5199',
+      timeout: 120_000,
+      reuseExistingServer: false,
+      env: { VITE_API_URL: 'http://127.0.0.1:8765' },
+    },
+    {
+      command: 'npm run dev:user -- --host 127.0.0.1 --port 5200 --strictPort',
+      url: 'http://127.0.0.1:5200',
       timeout: 120_000,
       reuseExistingServer: false,
       env: { VITE_API_URL: 'http://127.0.0.1:8765' },

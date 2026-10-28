@@ -15,8 +15,10 @@ const env = {
   SECRET_KEY: 'e2e-only-secret-key-not-for-production-use',
   BCRYPT_ROUNDS: '4',
   ALLOWED_EMAIL_DOMAINS: '*',   // the e2e fixtures use made-up client domains
-  ALLOWED_ORIGINS: 'http://127.0.0.1:5199',
+  // Two dev servers call this API cross-origin: the Admin app on 5199, the public User app on 5200.
+  ALLOWED_ORIGINS: 'http://127.0.0.1:5199,http://127.0.0.1:5200',
   PUBLIC_APP_URL: 'http://127.0.0.1:5199',
+  PUBLIC_USER_APP_URL: 'http://127.0.0.1:5200',
   UPLOAD_DIR: join(tmpdir(), 'dd-e2e-uploads'),
 };
 

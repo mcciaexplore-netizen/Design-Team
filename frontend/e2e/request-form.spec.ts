@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ACCOUNTS, API, dateInDays, login, token } from './helpers';
+import { ACCOUNTS, API, USER_BASE, dateInDays, token } from './helpers';
+
+// The public request form, tracking page and board all live in the User app now (no sign-in, no account).
+// "New Request" from a signed-in account, and "Request again" on a finished ticket, were client-portal-only
+// features with no replacement; staff create tickets instead via the "New Ticket" button in the Admin app.
 
 // A tiny valid PNG, so image thumbnails and the server's file check both accept it.
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
@@ -16,7 +20,7 @@ async function only(page: Page, name: string) {
 }
 
 test('anyone can submit the public request form, get a ticket and follow it on the tracking page', async ({ page, request }) => {
-  await page.goto('/request');
+  await page.goto(`${USER_BASE}/request`);
   await expect(page.getByRole('heading', { name: /Request for Creative/ })).toBeVisible();
 
   await page.getByLabel('Name *', { exact: true }).fill('Meera Joshi');
@@ -52,12 +56,18 @@ test('anyone can submit the public request form, get a ticket and follow it on t
   await expect(page.getByRole('listitem').filter({ hasText: 'Request received' })).toBeVisible();
   await expect(page.getByText('meera.e2e@example.com')).toHaveCount(0);
 
-  // Auto-assigned, Urgent (due tomorrow), with both files, the per-type answers and the link stored.
+  // Urgent (due tomorrow), with both files, the per-type answers and the link stored -- and waiting for a
+  // Design Lead to accept it before it is assigned and enters the workflow.
   const lead = await token(request, ACCOUNTS.lead);
   const headers = { Authorization: `Bearer ${lead}` };
   const tickets = await (await request.get(`${API}/api/tickets`, { headers })).json();
-  const t = tickets.find((x: { ticket_number: string }) => x.ticket_number === number);
-  expect(t.priority).toBe('Urgent');
+  const pending = tickets.find((x: { ticket_number: string }) => x.ticket_number === number);
+  expect(pending.priority).toBe('Urgent');
+  expect(pending.status).toBe('Pending Review');
+  expect(pending.assignee).toBeNull();
+
+  // Once accepted, it is auto-assigned.
+  const t = await (await request.post(`${API}/api/tickets/${pending.id}/accept`, { headers })).json();
   expect(t.status).toBe('Assigned');
   expect(t.assignee).not.toBeNull();
   expect(t.type_specific_fields.details).toEqual({ size: 'A5', channel: 'Print' });
@@ -67,7 +77,7 @@ test('anyone can submit the public request form, get a ticket and follow it on t
   expect(atts.map((a: { file_name: string }) => a.file_name).sort()).toEqual(['one.png', 'two.png']);
 
   // The next visit remembers who submitted, and the draft is gone.
-  await page.goto('/request');
+  await page.goto(`${USER_BASE}/request`);
   await expect(page.getByLabel('Name *', { exact: true })).toHaveValue('Meera Joshi');
   await expect(page.getByLabel('Email *')).toHaveValue('meera.e2e@example.com');
   await expect(page.getByText('Draft restored')).toHaveCount(0);
@@ -78,7 +88,7 @@ test('anyone can submit the public request form, get a ticket and follow it on t
 });
 
 test('mistakes are shown beside each field, with a summary whose links jump to the field', async ({ page }) => {
-  await page.goto('/request');
+  await page.goto(`${USER_BASE}/request`);
   await page.getByRole('button', { name: 'Submit request' }).click();
 
   const summary = page.getByRole('alert');
@@ -112,27 +122,29 @@ test('mistakes are shown beside each field, with a summary whose links jump to t
 });
 
 test('each design type asks its own questions', async ({ page }) => {
-  await page.goto('/request');
+  await page.goto(`${USER_BASE}/request`);
   await only(page, FLYER);
   await expect(page.getByLabel('Size *', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Where will it be shared? *')).toBeVisible();
+  await expect(page.getByLabel('Language')).toBeVisible();   // optional on every type: no asterisk
 
-  // WhatsApp, Instagram and LinkedIn are separate choices, each with its own formats.
+  // WhatsApp, Instagram and LinkedIn are separate choices, each with its own optional questions.
   await only(page, 'WhatsApp creative');
   await expect(page.getByLabel('Where will it be shared? *')).toHaveCount(0);
-  await expect(page.getByLabel('Format details')).toBeVisible();
   await expect(page.getByLabel('Message or call-to-action to show on it')).toBeVisible();
 
   await only(page, 'Instagram post');
-  await expect(page.getByLabel('Format details')).toBeVisible();
   await expect(page.getByLabel('Number of slides (for a carousel)')).toBeVisible();
+  await expect(page.getByLabel('Account or people to tag')).toBeVisible();
   await expect(page.getByLabel('Message or call-to-action to show on it')).toHaveCount(0);
 
   await only(page, 'LinkedIn post');
-  await expect(page.getByLabel('Format details')).toBeVisible();
+  await expect(page.getByLabel('Number of slides (for a carousel)')).toBeVisible();
+  await expect(page.getByLabel('Page or people to tag')).toBeVisible();
 
   await only(page, 'Twitter / X post');
-  await expect(page.getByLabel('Format details')).toBeVisible();
+  await expect(page.getByLabel('Language')).toBeVisible();   // its only question
+  await expect(page.getByLabel('Number of slides (for a carousel)')).toHaveCount(0);
   await expect(page.getByRole('checkbox', { name: /Insta, LinkedIn/ })).toHaveCount(0);   // the old bundled choice is gone
 
   await only(page, 'Flex/Banner/Standee');
@@ -150,18 +162,18 @@ test('each design type asks its own questions', async ({ page }) => {
 
   await only(page, '4 pages Brochure');
   await expect(page.getByLabel('Copy *', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Language *')).toBeVisible();
+  await expect(page.getByLabel('Language')).toBeVisible();
 
   await only(page, 'Photo/Video/Reel');
   await expect(page.getByLabel('Duration (if video or reel)')).toBeVisible();
   await expect(page.getByLabel('Shoot date and location')).toBeVisible();
 
   await only(page, 'Other');
-  await expect(page.getByRole('group', { name: /Details for/ })).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Details for Other' }).getByLabel('Language')).toBeVisible();   // its only question
 });
 
 test('several files can be added, previewed and removed, and bad files are rejected one by one', async ({ page }) => {
-  await page.goto('/request');
+  await page.goto(`${USER_BASE}/request`);
   const picker = page.getByLabel(/Attach files/);
   await picker.setInputFiles([png('a.png'), png('b.png'), { name: 'virus.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') }]);
 
@@ -185,21 +197,20 @@ test('several files can be added, previewed and removed, and bad files are rejec
 });
 
 test('a date earlier than the usual turnaround shows a warning', async ({ page }) => {
-  await page.goto('/request');
+  await page.goto(`${USER_BASE}/request`);
   await box(page, 'Book').check();
-  await expect(page.getByText('earlier than usual')).toHaveCount(0);
-  await expect(page.getByText('Standard turnaround')).toHaveCount(0);   // only the warning is ever shown
+  await expect(page.getByText('earlier than the standard turnaround')).toHaveCount(0);
 
   const tomorrow = dateInDays(1);
   await page.getByLabel('Expected delivery date *').fill(tomorrow);
-  await expect(page.getByText(/earlier than usual\. This will be marked Urgent and may not be possible\./)).toBeVisible();
+  await expect(page.getByText('earlier than the standard turnaround')).toBeVisible();
 
   await page.getByLabel('Expected delivery date *').fill(dateInDays(90));
-  await expect(page.getByText('earlier than usual')).toHaveCount(0);
+  await expect(page.getByText('earlier than the standard turnaround')).toHaveCount(0);
 });
 
 test('a half-filled form is saved as a draft, restored on the next visit and can be discarded', async ({ page }) => {
-  await page.goto('/request');
+  await page.goto(`${USER_BASE}/request`);
   await page.getByLabel('Event name *').fill('Draft Festival');
   await box(page, 'Flex/Banner/Standee').check();
   await page.getByLabel('Size (width x height) *').fill('8x4 ft');
@@ -223,121 +234,12 @@ test('a half-filled form is saved as a draft, restored on the next visit and can
 });
 
 test('an invalid tracking link says so', async ({ page }) => {
-  await page.goto('/track/DF-0001.notavalidsignature00000');
+  await page.goto(`${USER_BASE}/track/DF-0001.notavalidsignature00000`);
   await expect(page.getByRole('alert')).toContainText('not valid');
 });
 
-test('a client creates a request from the New Request dialog and the lead sees it assigned', async ({ page, browser }) => {
-  await login(page, ACCOUNTS.client);
-  await page.getByRole('button', { name: 'New Request' }).first().click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByText('Priority and the designer are set automatically')).toBeVisible();
-  await expect(dialog.getByText(/Requesting as/)).toContainText('·');          // name · organisation
-  await expect(dialog.getByLabel('Email *')).toHaveCount(0);                    // a signed-in client is never asked who they are
-
-  // Half-fill and cancel: the draft comes back when the dialog is reopened.
-  await dialog.getByLabel('Event name *').fill('Client Dialog Workshop');
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
-  await page.getByRole('button', { name: 'New Request' }).first().click();
-  await expect(dialog.getByRole('status').filter({ hasText: 'Draft restored' })).toBeVisible();
-  await expect(dialog.getByLabel('Event name *')).toHaveValue('Client Dialog Workshop');
-
-  // Required questions are checked in the dialog too.
-  await dialog.getByLabel('Event / Workshop date *').fill(dateInDays(20));
-  await box(dialog, '2 pages Brochure').check();
-  await dialog.getByLabel('Expected delivery date *').fill(dateInDays(6));
-  await dialog.getByRole('button', { name: 'Submit request' }).click();
-  await expect(dialog.getByRole('alert')).toContainText('Please fix 2 things');
-  await dialog.getByLabel('Copy *', { exact: true }).selectOption('Needs writing');
-  await dialog.getByLabel('Language *').fill('Marathi');
-  await dialog.getByRole('button', { name: 'Submit request' }).click();
-
-  await expect(dialog.getByRole('heading', { name: /created/ })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Close' }).last().click();
-  await expect(page.getByText('Client Dialog Workshop').first()).toBeVisible();
-
-  const leadPage = await (await browser.newContext()).newPage();
-  await login(leadPage, ACCOUNTS.lead);
-  await expect(leadPage.getByText('Client Dialog Workshop').first()).toBeVisible();
-
-  // The draft was cleared by the successful submit.
-  await page.getByRole('button', { name: 'New Request' }).first().click();
-  await expect(dialog.getByText('Draft restored')).toHaveCount(0);
-});
-
-test('a finished request can be requested again from the portal and from the ticket page', async ({ page, request }) => {
-  const client = await token(request, ACCOUNTS.client);
-  const lead = await token(request, ACCOUNTS.lead);
-  const created = await request.post(`${API}/api/requests`, {
-    headers: { Authorization: `Bearer ${client}` },
-    multipart: {
-      event_name: 'Again Fest', event_date: dateInDays(40), design_requirement: 'Flex/Banner/Standee', delivery_date: dateInDays(30),
-      num_creatives: '3', content: 'Keep the gold border.',
-      details: JSON.stringify({ size: '6x3 ft', medium: 'Print', quantity: '2' }),
-      reference_links: JSON.stringify(['https://www.figma.com/file/again']),
-    },
-  });
-  expect(created.status()).toBe(201);
-  const { id } = await created.json();
-  const done = await request.patch(`${API}/api/tickets/${id}`, { headers: { Authorization: `Bearer ${lead}` }, data: { status: 'Delivered' } });
-  expect(done.ok()).toBeTruthy();
-
-  await login(page, ACCOUNTS.client);
-  const dialog = page.getByRole('dialog');
-  const expectPrefilled = async () => {
-    await expect(dialog.getByLabel('Event name *')).toHaveValue('Again Fest');
-    await expect(box(page, 'Flex/Banner/Standee')).toBeChecked();
-    await expect(dialog.getByLabel('Size (width x height) *')).toHaveValue('6x3 ft');
-    await expect(dialog.getByLabel('Print or digital? *')).toHaveValue('Print');
-    await expect(dialog.getByLabel('Quantity')).toHaveValue('2');
-    await expect(dialog.getByLabel('No. of creatives required')).toHaveValue('3');
-    await expect(dialog.getByLabel('Share content for the design creatives')).toHaveValue('Keep the gold border.');
-    await expect(dialog.getByLabel('Reference link 1')).toHaveValue('https://www.figma.com/file/again');
-    await expect(dialog.getByLabel('Event / Workshop date *')).toHaveValue('');   // dates are left for the new request
-    await expect(dialog.getByLabel('Expected delivery date *')).toHaveValue('');
-  };
-
-  // From the portal.
-  await page.getByRole('button', { name: /^Request again: Again Fest/ }).click();
-  await expectPrefilled();
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
-
-  // From the ticket page.
-  await page.goto(`/tickets/${id}`);
-  await page.getByRole('button', { name: 'Request again' }).click();
-  await expectPrefilled();
-});
-
-test('"Request again" on a ticket made before the channels were split lands on the right new choice', async ({ page, request }) => {
-  const client = await token(request, ACCOUNTS.client);
-  const lead = await token(request, ACCOUNTS.lead);
-  const types = await (await request.get(`${API}/api/design-types`, { headers: { Authorization: `Bearer ${client}` } })).json();
-  const old = async (title: string, design_requirement: string, details: object) => {
-    const made = await (await request.post(`${API}/api/tickets`, {
-      headers: { Authorization: `Bearer ${client}` },
-      data: { title, brief: 'older ticket', design_type_id: types[0].id,
-              type_specific_fields: { event_name: title, design_requirement, number_of_creatives: 1, details } },
-    })).json();
-    await request.patch(`${API}/api/tickets/${made.id}`, { headers: { Authorization: `Bearer ${lead}` }, data: { status: 'Delivered' } });
-  };
-  await old('Legacy WhatsApp flyer', 'Flyer (Email/Whatsapp)', { size: 'A4', channel: 'WhatsApp' });
-  await old('Legacy email flyer', 'Flyer (Email/Whatsapp)', { size: 'A5', channel: 'Email' });
-  await old('Legacy LinkedIn post', 'Social Media Post (Insta, LinkedIn, Twitter)', { platforms: ['LinkedIn', 'Instagram'] });
-
-  await login(page, ACCOUNTS.client);
-  const dialog = page.getByRole('dialog');
-  const again = async (title: string, requirement: string) => {
-    await page.getByRole('button', { name: new RegExp(`^Request again: ${title}`) }).click();
-    await expect(box(page, requirement)).toBeChecked();
-    await dialog.getByRole('button', { name: 'Cancel' }).click();
-  };
-  await again('Legacy WhatsApp flyer', 'WhatsApp creative');
-  await again('Legacy email flyer', FLYER);
-  await again('Legacy LinkedIn post', 'LinkedIn post');
-});
-
-test('ticking several designs makes one ticket per design, each with its own questions', async ({ page }) => {
-  await page.goto('/request');
+test('ticking several designs makes one ticket covering all of them, each with its own questions', async ({ page, request }) => {
+  await page.goto(`${USER_BASE}/request`);
   await page.getByLabel('Name *', { exact: true }).fill('Ravi Kulkarni');
   await page.getByLabel('Email *').fill('ravi.e2e@example.com');
   await page.getByLabel('Event name *').fill('E2E Expo');
@@ -353,10 +255,17 @@ test('ticking several designs makes one ticket per design, each with its own que
   await expect(page.getByRole('alert')).toContainText(`${FLYER}: Choose an option for “Size”`);   // each design's own required question
 
   await flyer.getByLabel('Size *', { exact: true }).selectOption('A4');
-  await insta.getByLabel('Format details').fill('Story (9:16)');   // optional, but kept when given
+  await insta.getByLabel('Account or people to tag').fill('@mccia_pune');   // optional, but kept when given
   await page.getByRole('button', { name: 'Submit request' }).click();
   const done = page.getByRole('status').filter({ hasText: 'Request received' });
-  await expect(done).toContainText('split into 2 tickets');
-  await expect(done.getByRole('listitem')).toHaveCount(2);
-  await expect(done.getByRole('listitem').nth(1)).toContainText('Instagram post');
+  await expect(done).toContainText('Your ticket number is');
+
+  // Both designs land on a single ticket, with each one's own answers kept separately.
+  const lead = await token(request, ACCOUNTS.lead);
+  const tickets = await (await request.get(`${API}/api/tickets`, { headers: { Authorization: `Bearer ${lead}` } })).json();
+  const t = tickets.find((x: { title: string }) => x.title.startsWith('E2E Expo'));
+  expect(t.title).toContain('+1 more');
+  expect(t.type_specific_fields.design_requirements).toEqual([FLYER, 'Instagram post']);
+  expect(t.type_specific_fields.details[FLYER]).toMatchObject({ size: 'A4', channel: 'Email' });
+  expect(t.type_specific_fields.details['Instagram post']).toMatchObject({ tag: '@mccia_pune' });
 });

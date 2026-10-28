@@ -4,15 +4,14 @@ import { ACCOUNTS, API, login, token } from './helpers';
 test('two accounts with the same name get separate columns, and a ticket sits under the right one', async ({ page, request }) => {
   const as = (t: string) => ({ Authorization: `Bearer ${t}` });
   const lead = await token(request, ACCOUNTS.lead);
-  const client = await token(request, ACCOUNTS.client);
 
   // A second designer who happens to share a name with Alice Fernandez.
   const twin = await request.post(`${API}/api/admin/users`, { headers: as(lead), data: { full_name: 'Alice Fernandez', email: 'alice.twin@mccia.in', role: 'Designer' } });
   expect(twin.status()).toBe(201);
   const twinId = (await twin.json()).user.id as number;
 
-  const types = await (await request.get(`${API}/api/design-types`, { headers: as(client) })).json();
-  const made = await (await request.post(`${API}/api/tickets`, { headers: as(client), data: { title: 'E2E twin ticket', brief: 'x', design_type_id: types[0].id, type_specific_fields: {} } })).json();
+  const types = await (await request.get(`${API}/api/design-types`, { headers: as(lead) })).json();
+  const made = await (await request.post(`${API}/api/tickets`, { headers: as(lead), data: { title: 'E2E twin ticket', brief: 'x', design_type_id: types[0].id, type_specific_fields: {} } })).json();
   const assigned = await request.patch(`${API}/api/tickets/${made.id}`, { headers: as(lead), data: { assignee_id: twinId } });
   expect(assigned.ok()).toBeTruthy();
 
@@ -30,10 +29,10 @@ test('two accounts with the same name get separate columns, and a ticket sits un
 });
 
 test('clicking a card on the board opens the full ticket page', async ({ page, request }) => {
-  const client = await token(request, ACCOUNTS.client);
-  const types = await (await request.get(`${API}/api/design-types`, { headers: { Authorization: `Bearer ${client}` } })).json();
+  const lead = await token(request, ACCOUNTS.lead);
+  const types = await (await request.get(`${API}/api/design-types`, { headers: { Authorization: `Bearer ${lead}` } })).json();
   const made = await (await request.post(`${API}/api/tickets`, {
-    headers: { Authorization: `Bearer ${client}` }, data: { title: 'E2E full page ticket', brief: 'x', design_type_id: types[0].id, type_specific_fields: {} },
+    headers: { Authorization: `Bearer ${lead}` }, data: { title: 'E2E full page ticket', brief: 'x', design_type_id: types[0].id, type_specific_fields: {} },
   })).json();
 
   await login(page, ACCOUNTS.lead);

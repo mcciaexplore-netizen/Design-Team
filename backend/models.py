@@ -129,7 +129,7 @@ class Ticket(Base):
 
     requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     requester = relationship("User", foreign_keys=[requester_id])
-    client_org = Column(String, nullable=True, index=True) # Copied from requester; drives client portal access
+    client_org = Column(String, nullable=True, index=True) # Copied from requester; groups a client's tickets
 
 
     assignee_id = Column(Integer, ForeignKey("users.id"), nullable=True)
