@@ -24,7 +24,7 @@ export function ErrorSummary({ form }: { form: RequestForm }) {
   if (form.summary.length === 0) return null;
   const n = form.summary.length;
   return (
-    <div role="alert" style={{ border: '1px solid rgba(225,29,72,0.3)', background: 'rgba(225,29,72,0.06)', borderRadius: 10, padding: '0.7rem 0.9rem' }}>
+    <div role="alert" style={{ border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', borderRadius: 10, padding: '0.7rem 0.9rem' }}>
       <strong style={{ fontSize: '0.85rem', color: '#991b1b' }}>Please fix {n} {n === 1 ? 'thing' : 'things'} before sending</strong>
       <ul style={{ margin: '6px 0 0', paddingLeft: '1.1rem', fontSize: '0.82rem' }}>
         {form.summary.map(({ key, message }) => (
@@ -62,7 +62,7 @@ export function IdentityFields({ form, idPrefix }: { form: RequestForm; idPrefix
 export function DraftBanner({ form }: { form: RequestForm }) {
   if (!form.restored) return null;
   return (
-    <p role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', color: '#525252', background: '#FAFAFA', border: '1px solid rgba(226,232,240,0.9)', borderRadius: 10, padding: '0.5rem 0.8rem' }}>
+    <p role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', color: '#525252', background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.9)', borderRadius: 10, padding: '0.5rem 0.8rem' }}>
       <span style={{ flex: 1 }}>Draft restored</span> ·
       <button type="button" className="chip" onClick={form.discardDraft}>Discard</button>
     </p>

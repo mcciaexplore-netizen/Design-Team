@@ -74,7 +74,7 @@ export default function PendingReviewPanel({ tickets, onAccept, onDecline, onBul
                   <p
                     onClick={() => setPeekTicket(t)}
                     title="Click to preview details"
-                    style={{ fontSize: '0.88rem', fontWeight: 700, overflowWrap: 'anywhere', margin: 0, cursor: 'pointer', color: '#0B1F3A' }}>
+                    style={{ fontSize: '0.88rem', fontWeight: 700, overflowWrap: 'anywhere', margin: 0, cursor: 'pointer', color: '#003F8A' }}>
                     {t.title}
                   </p>
                   <p style={{ fontSize: '0.76rem', color: '#737373', marginTop: 2 }}>
@@ -165,31 +165,31 @@ export default function PendingReviewPanel({ tickets, onAccept, onDecline, onBul
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <span style={{ fontSize: '0.74rem', fontFamily: 'monospace', fontWeight: 700, color: '#737373' }}>{peekTicket.number} · {peekTicket.design_type || 'Design'}</span>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0B1F3A', marginTop: 2 }}>{peekTicket.title}</h3>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#003F8A', marginTop: 2 }}>{peekTicket.title}</h3>
               </div>
               <button type="button" className="chip" onClick={() => setPeekTicket(null)} aria-label="Close drawer">
                 <X size={16} />
               </button>
             </div>
 
-            <div style={{ background: '#FAFAFA', padding: '0.85rem 1rem', borderRadius: 10, border: '1px solid #E2E8F0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
+            <div style={{ background: '#F8FAFC', padding: '0.85rem 1rem', borderRadius: 10, border: '1px solid #E2E8F0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
               <div>
                 <p style={{ fontSize: '0.7rem', color: '#737373', fontWeight: 600 }}>Requester</p>
-                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0B1F3A' }}>{peekTicket.requester_name || 'Client'}</p>
+                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#003F8A' }}>{peekTicket.requester_name || 'Client'}</p>
               </div>
               <div>
                 <p style={{ fontSize: '0.7rem', color: '#737373', fontWeight: 600 }}>Organisation</p>
-                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0B1F3A' }}>{peekTicket.client_org || '—'}</p>
+                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#003F8A' }}>{peekTicket.client_org || '—'}</p>
               </div>
               <div>
                 <p style={{ fontSize: '0.7rem', color: '#737373', fontWeight: 600 }}>Needed by</p>
-                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0B1F3A' }}>{peekTicket.due_at ? new Date(peekTicket.due_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Flexible'}</p>
+                <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#003F8A' }}>{peekTicket.due_at ? new Date(peekTicket.due_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Flexible'}</p>
               </div>
             </div>
 
             <div>
               <h4 style={{ fontSize: '0.76rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#737373', marginBottom: 6 }}>Brief / Requirements</h4>
-              <div style={{ background: '#FAFAFA', padding: '1rem', borderRadius: 10, fontSize: '0.88rem', color: '#334155', whiteSpace: 'pre-wrap', lineHeight: 1.6, border: '1px solid #E2E8F0' }}>
+              <div style={{ background: '#F8FAFC', padding: '1rem', borderRadius: 10, fontSize: '0.88rem', color: '#334155', whiteSpace: 'pre-wrap', lineHeight: 1.6, border: '1px solid #E2E8F0' }}>
                 {peekTicket.description || 'No description provided.'}
               </div>
             </div>
@@ -201,7 +201,7 @@ export default function PendingReviewPanel({ tickets, onAccept, onDecline, onBul
                   {Object.entries(peekTicket.type_specific_fields).map(([k, v]) => (
                     <div key={k} style={{ padding: '0.6rem 0.8rem', background: '#F1F5F9', borderRadius: 8 }}>
                       <p style={{ fontSize: '0.68rem', color: '#737373', textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</p>
-                      <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0B1F3A', marginTop: 2 }}>{String(v)}</p>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#003F8A', marginTop: 2 }}>{String(v)}</p>
                     </div>
                   ))}
                 </div>

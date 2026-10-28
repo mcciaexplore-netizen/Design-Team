@@ -53,7 +53,7 @@ export default function AttachmentsPanel({ ticketId }: { ticketId: string }) {
   return (
     <div className="glass-card" style={{ padding: '1.25rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Paperclip size={14} aria-hidden="true" style={{ color: '#0B1F3A' }} />
+        <Paperclip size={14} aria-hidden="true" style={{ color: '#003F8A' }} />
         <h3 className="section-label">Files{files?.length ? ` (${files.length})` : ''}</h3>
         <button type="button" className="btn-ghost" style={{ marginLeft: 'auto', gap: 5, padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}
           disabled={busy} onClick={() => picker.current?.click()}>
@@ -68,7 +68,7 @@ export default function AttachmentsPanel({ ticketId }: { ticketId: string }) {
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {files.map(a => (
             <li key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.45rem 0.6rem', borderRadius: 8, border: '1px solid rgba(226,232,240,0.85)', fontSize: '0.8rem' }}>
-              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, color: '#0B1F3A' }} title={a.file_name}>{a.file_name}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, color: '#003F8A' }} title={a.file_name}>{a.file_name}</span>
               <span style={{ color: '#737373', whiteSpace: 'nowrap' }}>{size(a.size_bytes)}</span>
               <button type="button" className="chip" aria-label={`Download ${a.file_name}`}
                 onClick={() => void act(() => downloadFile(`/api/attachments/${a.id}/download`, a.file_name), 'Download failed.')}>

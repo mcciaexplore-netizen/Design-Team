@@ -126,7 +126,7 @@ const MyTasksPage = () => {
     .sort((a, b) => dueMs(a) - dueMs(b) || (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9));
   const blocked = mine.filter(t => t.status === 'Waiting on Requester').length;
   const tiles: [string, number, string][] = [
-    ['Open tasks', mine.length, '#0B1F3A'],
+    ['Open tasks', mine.length, '#003F8A'],
     ['Due in 24 hours', mine.filter(t => bucketOf(t, now) === 'today').length, '#B45309'],
     ['Overdue', mine.filter(t => bucketOf(t, now) === 'overdue').length, '#B91C1C'],
     ['With the client for review', mine.filter(t => t.status === 'In Review').length, '#047857'],
@@ -163,7 +163,7 @@ const MyTasksPage = () => {
 
       {/* Focus Mode / Next Up Hero Banner */}
       {mine.length > 0 && (
-        <section aria-label="Focus Mode" className="glass-card" style={{ marginBottom: '1.25rem', padding: '1.25rem', border: '1px solid rgba(11,31,58,0.25)', background: 'linear-gradient(135deg, rgba(11,31,58,0.06), rgba(11,31,58,0.01))', borderRadius: 12 }}>
+        <section aria-label="Focus Mode" className="glass-card" style={{ marginBottom: '1.25rem', padding: '1.25rem', border: '1px solid rgba(0,63,138,0.25)', background: 'linear-gradient(135deg, rgba(0,63,138,0.06), rgba(0,63,138,0.01))', borderRadius: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--brand)' }}>
               <Sparkles size={14} /> Focus Mode · Next Up
@@ -175,7 +175,7 @@ const MyTasksPage = () => {
               <p style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: '#737373', fontWeight: 700 }}>
                 {mine[0].number}{mine[0].client_org ? ` · ${mine[0].client_org}` : ''}
               </p>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0B1F3A', marginTop: 2, marginBottom: 4 }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#003F8A', marginTop: 2, marginBottom: 4 }}>
                 {mine[0].title}
               </h2>
               <p style={{ fontSize: '0.84rem', color: '#525252', maxWidth: 640 }}>
@@ -193,13 +193,13 @@ const MyTasksPage = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '1.25rem', alignItems: 'start' }}>
       <div style={{ minWidth: 0 }}>
-      <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#0B1F3A', marginBottom: 10 }}>My queue</h2>
+      <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#003F8A', marginBottom: 10 }}>My queue</h2>
       {error && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{error} <button type="button" className="chip" onClick={() => void refresh()}>Retry</button></p>}
       {loading && tickets.length === 0 && <p role="status" style={{ color: '#737373' }}>Loading your tasks…</p>}
 
       {!loading && mine.length === 0 && (
         <div className="glass-card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
-          <CheckCircle2 size={28} style={{ color: '#256B45', margin: '0 auto 0.75rem' }} />
+          <CheckCircle2 size={28} style={{ color: '#059669', margin: '0 auto 0.75rem' }} />
           <h3 style={{ fontWeight: 700 }}>You're all caught up</h3>
           <p style={{ fontSize: '0.85rem', color: '#737373', marginTop: 6 }}>
             Nothing is assigned to you. <Link to="/" style={{ color: 'var(--brand)', fontWeight: 700 }}>Pick something up from the Visual Board →</Link>
@@ -223,7 +223,7 @@ const MyTasksPage = () => {
                     style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0.85rem 1.1rem', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: 200 }}>
                       <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.06em' }}>{t.number}{t.client_org ? ` · ${t.client_org}` : ''}</div>
-                      <Link to={`/tickets/${t.id}`} style={{ textDecoration: 'none', color: '#0B1F3A' }}>
+                      <Link to={`/tickets/${t.id}`} style={{ textDecoration: 'none', color: '#003F8A' }}>
                         <div style={{ fontSize: '0.92rem', fontWeight: 600, overflowWrap: 'anywhere' }}>{t.title}</div>
                       </Link>
                       <div style={{ marginTop: 4 }}>
@@ -272,8 +272,8 @@ function EmailCard() {
   return (
     <section className="glass-card" style={{ padding: '1rem 1.25rem' }} aria-labelledby="email-card-h">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <Mail size={15} aria-hidden="true" style={{ color: '#0B1F3A' }} />
-        <h2 id="email-card-h" style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0B1F3A' }}>Email</h2>
+        <Mail size={15} aria-hidden="true" style={{ color: '#003F8A' }} />
+        <h2 id="email-card-h" style={{ fontSize: '0.95rem', fontWeight: 800, color: '#003F8A' }}>Email</h2>
         <span className={prefs.email_available && prefs.email_enabled ? 'badge-green' : 'badge-red'} style={{ marginLeft: 'auto' }}>
           {!prefs.email_available ? 'Not set up' : prefs.email_enabled ? 'On' : 'Off'}
         </span>
@@ -284,7 +284,7 @@ function EmailCard() {
       </p>
       {!prefs.email_available && <p style={{ fontSize: '0.76rem', color: '#92400E', marginTop: 6 }}>Email isn't connected yet: your Design Lead sets it up (Zoho Mail). You still get every update in the bell.</p>}
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', marginTop: 10, cursor: 'pointer' }}>
-        <input type="checkbox" checked={prefs.email_enabled} onChange={e => toggle(e.target.checked)} style={{ accentColor: '#0B1F3A' }} />
+        <input type="checkbox" checked={prefs.email_enabled} onChange={e => toggle(e.target.checked)} style={{ accentColor: '#003F8A' }} />
         Email me about my work
       </label>
       {error && <p role="alert" style={{ fontSize: '0.78rem', color: '#B91C1C', marginTop: 6 }}>{error}</p>}

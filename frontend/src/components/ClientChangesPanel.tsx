@@ -47,7 +47,7 @@ export default function ClientChangesPanel({ ticket }: { ticket: Ticket }) {
         <ol style={{ listStyle: 'none', padding: 0, margin: '0 0 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {changes.map((c, i) => (
             <li key={`${c.at}-${i}`} style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '0.6rem 0.75rem' }}>
-              <p style={{ fontSize: '0.85rem', color: '#0B1F3A', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.55 }}>{c.text}</p>
+              <p style={{ fontSize: '0.85rem', color: '#003F8A', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.55 }}>{c.text}</p>
               <p style={{ fontSize: '0.72rem', color: '#737373', marginTop: 4 }}>Added by {c.by} · {when(c.at)}</p>
             </li>
           ))}

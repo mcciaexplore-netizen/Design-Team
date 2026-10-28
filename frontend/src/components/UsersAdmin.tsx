@@ -20,7 +20,7 @@ function TempPasswordCard({ issued, title, onClose }: { issued: Issued; title: s
     catch { /* clipboard blocked: the password is selectable on screen */ }
   };
   return (
-    <div role="status" className="glass-card" style={{ padding: '1.1rem 1.25rem', borderColor: 'rgba(46,139,87,0.4)', background: 'rgba(46,139,87,0.06)' }}>
+    <div role="status" className="glass-card" style={{ padding: '1.1rem 1.25rem', borderColor: 'rgba(16,185,129,0.4)', background: 'rgba(16,185,129,0.06)' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-strong)' }}>{title}</p>
@@ -185,7 +185,7 @@ They can never sign in again and are taken off the team list. If they have past 
                     <p style={{ fontSize: '0.78rem', color: 'var(--text-soft)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}{u.client_org ? ` · ${u.client_org}` : ''}</p>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span className="badge-green" style={{ background: u.role === 'Design Lead' ? 'rgba(11,31,58,0.08)' : undefined, color: u.role === 'Design Lead' ? 'var(--text-strong)' : undefined }}>{u.role}</span>
+                    <span className="badge-green" style={{ background: u.role === 'Design Lead' ? 'rgba(0,63,138,0.08)' : undefined, color: u.role === 'Design Lead' ? 'var(--text-strong)' : undefined }}>{u.role}</span>
                     {!u.is_active && <span className="badge-red">Deactivated</span>}
                     {u.must_change_password && u.is_active && <span className="badge-red" title="Has not yet replaced the temporary password">Temp password</span>}
                   </div>

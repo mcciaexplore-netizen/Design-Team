@@ -50,10 +50,10 @@ export const DONE_STATUSES = ['Delivered', 'Closed', 'Closed without approval', 
 export const PRIORITIES = ['Urgent', 'High', 'Normal', 'Low'];
 
 export const PRIORITY_STYLE: Record<string, React.CSSProperties> = {
-  Urgent: { background: 'rgba(225,29,72,0.07)',  borderColor: 'rgba(225,29,72,0.22)',  color: '#EF4444' },
+  Urgent: { background: 'rgba(239,68,68,0.07)',  borderColor: 'rgba(239,68,68,0.22)',  color: '#EF4444' },
   High:   { background: 'rgba(249,115,22,0.07)', borderColor: 'rgba(249,115,22,0.22)', color: '#f97316' },
   Normal: { background: 'white' },
-  Low:    { background: 'rgba(46,139,87,0.05)', borderColor: 'rgba(46,139,87,0.2)',  color: '#256B45' },
+  Low:    { background: 'rgba(16,185,129,0.05)', borderColor: 'rgba(16,185,129,0.2)',  color: '#059669' },
 };
 
 export const DEFAULT_WIP_LIMITS: Record<string, number> = {

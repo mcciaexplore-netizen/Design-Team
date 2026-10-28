@@ -54,8 +54,8 @@ export default function ActivityFeed({ mine = false, title, limit = 15 }: { mine
   return (
     <section className="glass-card" style={{ padding: '1.1rem 1.25rem' }} aria-labelledby={`feed-${mine ? 'mine' : 'all'}`}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Activity size={15} aria-hidden="true" style={{ color: '#0B1F3A' }} />
-        <h2 id={`feed-${mine ? 'mine' : 'all'}`} style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0B1F3A' }}>{title}</h2>
+        <Activity size={15} aria-hidden="true" style={{ color: '#003F8A' }} />
+        <h2 id={`feed-${mine ? 'mine' : 'all'}`} style={{ fontSize: '0.95rem', fontWeight: 800, color: '#003F8A' }}>{title}</h2>
         {fresh.size > 0 && <span role="status" style={{ fontSize: '0.7rem', fontWeight: 800, color: 'white', background: '#DC2626', borderRadius: 99, padding: '0.1rem 0.5rem' }}>{fresh.size} new</span>}
         <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: '#737373' }}>Live · updates every 15 s</span>
       </div>
@@ -71,7 +71,7 @@ export default function ActivityFeed({ mine = false, title, limit = 15 }: { mine
                                                              background: fresh.has(e.id) ? 'rgba(220,38,38,0.06)' : 'transparent', border: `1px solid ${fresh.has(e.id) ? 'rgba(220,38,38,0.25)' : 'transparent'}` }}>
                 <span style={{ fontSize: '0.66rem', fontWeight: 800, background: bg, color: fg, borderRadius: 6, padding: '0.15rem 0.45rem', whiteSpace: 'nowrap', marginTop: 2 }}>{LABEL[e.kind]}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: '0.83rem', color: '#0B1F3A', overflowWrap: 'anywhere' }}>
+                  <span style={{ display: 'block', fontSize: '0.83rem', color: '#003F8A', overflowWrap: 'anywhere' }}>
                     <strong>{e.ticket_number}</strong> {e.title}: {e.text}
                   </span>
                   <span style={{ fontSize: '0.72rem', color: '#737373' }}>{e.by} · {ago(e.at, now)}</span>

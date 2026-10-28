@@ -135,7 +135,7 @@ export default function LibraryPage() {
           {[{ id: null as number | null, name: 'All files', items: folders.reduce((n, f) => n + f.items, 0) }, ...folders].map(f => (
             <button key={f.id ?? 'all'} type="button" onClick={() => setFolderId(f.id)} aria-current={folderId === f.id ? 'page' : undefined}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.5rem 0.6rem', borderRadius: 8, border: 'none', cursor: 'pointer', textAlign: 'left',
-                       background: folderId === f.id ? 'rgba(11,31,58,0.08)' : 'transparent', color: folderId === f.id ? '#0B1F3A' : '#0B1F3A',
+                       background: folderId === f.id ? 'rgba(0,63,138,0.08)' : 'transparent', color: folderId === f.id ? '#003F8A' : '#003F8A',
                        fontWeight: folderId === f.id ? 700 : 500, fontSize: '0.85rem' }}>
               <FolderOpen size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
@@ -148,7 +148,7 @@ export default function LibraryPage() {
 
       <section style={{ minWidth: 0 }} aria-label="Files">
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0B1F3A', marginRight: 'auto' }}>{current?.name ?? 'All files'}</h2>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#003F8A', marginRight: 'auto' }}>{current?.name ?? 'All files'}</h2>
           {current && (<>
             <button type="button" className="chip" onClick={renameFolder} disabled={busy}><Pencil size={11} aria-hidden="true" /> Rename</button>
             <button type="button" className="chip" onClick={deleteFolder} disabled={busy} style={{ color: '#B91C1C' }}><Trash2 size={11} aria-hidden="true" /> Delete folder</button>
@@ -180,7 +180,7 @@ export default function LibraryPage() {
               <Preview item={item} />
               <div style={{ padding: '0.75rem 0.85rem', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                  <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0B1F3A', flex: 1, overflowWrap: 'anywhere' }}>{item.name}</h3>
+                  <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#003F8A', flex: 1, overflowWrap: 'anywhere' }}>{item.name}</h3>
                   {item.is_approved_final && <span title="Approved final" style={{ color: '#047857' }}><CheckCircle2 size={15} aria-label="Approved final" /></span>}
                 </div>
                 <p style={{ fontSize: '0.72rem', color: '#737373' }}>
@@ -210,7 +210,7 @@ export default function LibraryPage() {
           <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {history.versions.map(v => (
               <li key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.5rem 0.6rem', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 8, fontSize: '0.8rem' }}>
-                <strong style={{ color: '#0B1F3A' }}>v{v.version}</strong>
+                <strong style={{ color: '#003F8A' }}>v{v.version}</strong>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   {v.file_name} · {size(v.size_bytes)}<br />
                   <span style={{ color: '#737373' }}>{v.uploaded_by} · {day(v.uploaded_at)}{v.note ? ` · ${v.note}` : ''}</span>

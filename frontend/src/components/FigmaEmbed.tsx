@@ -10,8 +10,8 @@ const FigmaEmbed: React.FC<FigmaEmbedProps> = ({ url }) => {
     return (
       <div style={{
         padding:      '1.25rem',
-        background:   'rgba(11,31,58,0.03)',
-        border:       '1px dashed rgba(11,31,58,0.15)',
+        background:   'rgba(0,63,138,0.03)',
+        border:       '1px dashed rgba(0,63,138,0.15)',
         borderRadius: 'var(--radius-md)',
         textAlign:    'center',
         color: '#737373',
@@ -19,7 +19,7 @@ const FigmaEmbed: React.FC<FigmaEmbedProps> = ({ url }) => {
         fontFamily:   'var(--font-body)',
         display:      'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
       }}>
-        <Link2 size={16} style={{ color: 'rgba(11,31,58,0.3)' }} />
+        <Link2 size={16} style={{ color: 'rgba(0,63,138,0.3)' }} />
         No Figma link provided.
       </div>
     );
@@ -30,7 +30,7 @@ const FigmaEmbed: React.FC<FigmaEmbedProps> = ({ url }) => {
   try { const u = new URL(url); host = u.protocol === 'https:' ? u.hostname : ''; } catch { /* invalid */ }
   if (host !== 'www.figma.com' && host !== 'figma.com') {
     return (
-      <div role="alert" style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.82rem', border: '1px dashed rgba(225,29,72,0.3)', borderRadius: 'var(--radius-md)' }}>
+      <div role="alert" style={{ padding: '1rem', color: '#b91c1c', fontSize: '0.82rem', border: '1px dashed rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)' }}>
         This link is not a valid Figma link, so it can't be previewed.
       </div>
     );

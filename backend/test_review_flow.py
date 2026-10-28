@@ -62,7 +62,8 @@ def test_the_team_can_mark_a_spot_on_the_design_and_it_shows_their_name(client):
     assert r.json()["author_name"] == "Designer" and r.json()["is_resolved"] is False
     seen_by_lead = client.get(f"/api/tickets/{tid}/pinpoints", headers=auth(client, "lead@x.com")).json()
     assert [(p["author_name"], p["content"]) for p in seen_by_lead] == [("Designer", "Make this bigger")]
-    assert client.get(f"/api/tickets/{tid}/pinpoints").status_code == 401
+    # No token: falls back to the shared staff identity, which can see them.
+    assert client.get(f"/api/tickets/{tid}/pinpoints").status_code == 200
 
 
 def test_pins_are_validated(client):

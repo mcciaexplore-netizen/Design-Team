@@ -182,7 +182,8 @@ def test_attachment_path_traversal_in_filename_is_neutralised(client):
 def test_attachment_access_is_scoped_and_delete_rules(client):
     t = make_ticket(client, "a@tata.com")
     att = upload(client, t["id"], "lead@x.com").json()
-    assert client.get(f"/api/attachments/{att['id']}/download").status_code == 401
+    # No token: falls back to the shared staff identity, which can download it.
+    assert client.get(f"/api/attachments/{att['id']}/download").status_code == 200
     assert client.delete(f"/api/attachments/{att['id']}", headers=auth(client, "des@x.com")).status_code == 403
     assert client.delete(f"/api/attachments/{att['id']}", headers=auth(client, "lead@x.com")).status_code == 204
     assert client.get(f"/api/attachments/{att['id']}/download", headers=auth(client, "lead@x.com")).status_code == 404

@@ -57,7 +57,9 @@ TOKEN_TTL = datetime.timedelta(hours=int(os.getenv("TOKEN_TTL_HOURS", "12")))
 
 # bcrypt cost is 12 by default; the test suite lowers it (BCRYPT_ROUNDS) because every login hashes.
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=int(os.getenv("BCRYPT_ROUNDS", "12")))
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
+# auto_error=False: there is no login page any more, so a request with no Authorization header is normal,
+# not an error. get_current_user below falls back to a shared staff identity in that case.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=False)
 
 STAFF_ROLES = (models.RoleEnum.DESIGNER, models.RoleEnum.DESIGN_LEAD, models.RoleEnum.ADMIN)
 LEAD_ROLES = (models.RoleEnum.DESIGN_LEAD, models.RoleEnum.ADMIN)
@@ -109,19 +111,30 @@ def _user_from_token(token: str, db: Session) -> models.User:
     return user
 
 
-# A user holding a temporary password may only change it (and read who they are) until they do.
-_ALLOWED_WHILE_MUST_CHANGE = ("/api/auth/change-password", "/api/auth/me")
+def _default_staff_user(db: Session) -> models.User:
+    """There is no login any more: every request is treated as the same shared staff identity, picked by
+    role seniority (Admin, then Design Lead, then Designer) among active accounts."""
+    for role in (models.RoleEnum.ADMIN, models.RoleEnum.DESIGN_LEAD, models.RoleEnum.DESIGNER):
+        user = (
+            db.query(models.User)
+            .filter(models.User.role == role, models.User.is_active.is_(True))
+            .order_by(models.User.id)
+            .first()
+        )
+        if user:
+            return user
+    raise HTTPException(status_code=500, detail="No staff account exists yet. Seed one (ADMIN_EMAIL/ADMIN_PASSWORD) and restart.")
 
 
-def get_current_user(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
-    user = _user_from_token(token, db)
-    # On Vercel the app is mounted under /api, so the full path carries that prefix (root_path); compare without it.
-    path, root = request.url.path, request.scope.get("root_path", "")
-    if root and path.startswith(root):
-        path = path[len(root):]
-    if user.must_change_password and path not in _ALLOWED_WHILE_MUST_CHANGE:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You must change your temporary password first.")
-    return user
+def get_current_user(token: str | None = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
+    """No login is required: a still-valid legacy session token is honoured if present, but everyone else
+    (the normal case now) is resolved to the shared default staff identity."""
+    if token:
+        try:
+            return _user_from_token(token, db)
+        except HTTPException:
+            pass
+    return _default_staff_user(db)
 
 
 def require_roles(*roles: models.RoleEnum):
@@ -160,10 +173,13 @@ def get_ticket_for_user(db: Session, ticket_id: int, user: models.User) -> model
 
 async def authenticate_websocket(websocket: WebSocket, db: Session) -> models.User | None:
     token = websocket.query_params.get("token")
-    if not token:
-        return None
+    if token:
+        try:
+            return _user_from_token(token, db)
+        except HTTPException:
+            pass
     try:
-        return _user_from_token(token, db)
+        return _default_staff_user(db)
     except HTTPException:
         return None
 

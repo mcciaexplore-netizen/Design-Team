@@ -84,15 +84,16 @@ def test_login_success_and_role_mapping(client):
 
 
 def test_clients_have_no_accounts(client):
-    """A client (requester) is only a record: they can't sign in, and a token issued before this change stops working."""
+    """A client (requester) is only a record: they can't sign in, and a token issued before this change doesn't
+    grant client-level access either — there is no login any more, so it falls back to the shared staff identity."""
     r = login(client, "a@tata.com")
     assert r.status_code == 401 and r.json()["detail"] == "Invalid email or password"
     from auth import create_access_token
     db = TestingSessionLocal()
     old_token = create_access_token(db.query(models.User).filter(models.User.email == "a@tata.com").one())
     db.close()
-    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {old_token}"}).status_code == 401
-    assert client.get("/api/tickets", headers={"Authorization": f"Bearer {old_token}"}).status_code == 401
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {old_token}"})
+    assert me.status_code == 200 and me.json()["email"] != "a@tata.com"
 
 
 def test_login_rejects_bad_password_unknown_user_and_inactive(client):
@@ -101,10 +102,11 @@ def test_login_rejects_bad_password_unknown_user_and_inactive(client):
     assert login(client, "off@x.com").status_code == 401
 
 
-def test_endpoints_require_token(client):
-    assert client.get("/api/tickets").status_code == 401
-    assert client.get("/api/users").status_code == 401
-    assert client.get("/api/tickets", headers={"Authorization": "Bearer garbage"}).status_code == 401
+def test_endpoints_work_without_a_token(client):
+    """There is no login: every request (no header, or a garbage one) is resolved to the shared staff identity."""
+    assert client.get("/api/tickets").status_code == 200
+    assert client.get("/api/users").status_code == 200
+    assert client.get("/api/tickets", headers={"Authorization": "Bearer garbage"}).status_code == 200
 
 
 def test_designer_cannot_reassign_or_reprioritise_but_lead_can(client):
@@ -131,14 +133,12 @@ def test_jira_webhook_rejects_without_secret(client):
 
 # ── Live event feed ──────────────────────────────────────────────────────────
 
-def test_live_feed_requires_a_valid_token(client):
-    from starlette.websockets import WebSocketDisconnect
-    with pytest.raises(WebSocketDisconnect):
-        with client.websocket_connect("/ws/anyone"):
-            pass
-    with pytest.raises(WebSocketDisconnect):
-        with client.websocket_connect("/ws/anyone?token=garbage"):
-            pass
+def test_live_feed_works_without_a_token(client):
+    """There is no login: the live feed accepts a connection with no token, or a garbage one, as the shared staff identity."""
+    with client.websocket_connect("/ws/anyone"):
+        pass
+    with client.websocket_connect("/ws/anyone?token=garbage"):
+        pass
 
 
 def test_live_feed_delivers_events_to_the_team(client):

@@ -5,7 +5,7 @@ const SPEED = 0.4;     // px per frame, diagonal
 const TRAIL = 6;       // cells the hover highlight leaves behind
 
 /** A drifting square grid that fills its (positioned) parent; the cell under the pointer lights up and fades out. */
-export default function GridBackground({ stroke = 'rgba(11,31,58,0.04)', fill = 'rgba(11,31,58,0.06)' }: { stroke?: string; fill?: string }) {
+export default function GridBackground({ stroke = 'rgba(0,63,138,0.04)', fill = 'rgba(0,63,138,0.06)' }: { stroke?: string; fill?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {

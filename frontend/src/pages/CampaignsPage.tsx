@@ -8,7 +8,7 @@ interface Campaign { id: number; name: string; description: string | null; color
 interface Post { id: number; campaign_id: number | null; platform: string; title: string; post_url: string | null; post_date: string; status: 'Planned' | 'Posted'; notes: string | null; has_image: boolean }
 
 const PLATFORMS = ['Instagram', 'Facebook', 'LinkedIn', 'WhatsApp', 'X', 'YouTube', 'Other'];
-const COLORS = ['#1E3A5F', '#EF4444', '#256B45', '#d97706', '#7C3AED', '#0891b2'];
+const COLORS = ['#0056B3', '#EF4444', '#059669', '#d97706', '#8B5CF6', '#0891b2'];
 const DAY = 86_400_000;
 const PX_PER_DAY = 16;
 const LABEL_W = 170;
@@ -66,7 +66,7 @@ function Timeline({ campaigns, posts }: { campaigns: Campaign[]; posts: Post[] }
         </div>
         {rows.map(r => (
           <div key={r.key} style={{ display: 'flex', height: 46, borderBottom: '1px solid #F1F5F9', alignItems: 'center' }}>
-            <div style={{ width: LABEL_W, flexShrink: 0, position: 'sticky', left: 0, background: 'white', zIndex: 2, padding: '0 12px', fontSize: '0.8rem', fontWeight: 700, color: '#0B1F3A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.label}>{r.label}</div>
+            <div style={{ width: LABEL_W, flexShrink: 0, position: 'sticky', left: 0, background: 'white', zIndex: 2, padding: '0 12px', fontSize: '0.8rem', fontWeight: 700, color: '#003F8A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.label}>{r.label}</div>
             <div style={{ position: 'relative', flex: 1, height: '100%' }}>
               {r.bar && (
                 <div title={`${r.bar.name}: ${fmt(r.bar.start_date)} to ${fmt(r.bar.end_date)}`}
@@ -166,7 +166,7 @@ const CampaignsPage = () => {
     <div style={{ maxWidth: 980, margin: '0 auto', padding: '0.5rem 0 3rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
         <div>
-          <h1 style={{ fontSize: 'clamp(1.3rem,3vw,1.7rem)', fontFamily: 'var(--font-body)', fontWeight: 800, color: '#0B1F3A' }}>Campaigns and posts</h1>
+          <h1 style={{ fontSize: 'clamp(1.3rem,3vw,1.7rem)', fontFamily: 'var(--font-body)', fontWeight: 800, color: '#003F8A' }}>Campaigns and posts</h1>
           <p style={{ fontSize: '0.85rem', color: '#737373', marginTop: 4 }}>
             Plan campaigns and keep a record of the posts MCCIA publishes. Anyone here can add or change them.
           </p>
@@ -187,7 +187,7 @@ const CampaignsPage = () => {
           <Field label="Colour">
             <div style={{ display: 'flex', gap: 6 }}>
               {COLORS.map(c => <button key={c} type="button" aria-label={`Colour ${c}`} aria-pressed={cDraft.color === c} onClick={() => setCDraft({ ...cDraft, color: c })}
-                style={{ width: 24, height: 24, borderRadius: 99, background: c, border: cDraft.color === c ? '3px solid #0B1F3A' : '2px solid white', boxShadow: '0 0 0 1px #cbd5e1', cursor: 'pointer' }} />)}
+                style={{ width: 24, height: 24, borderRadius: 99, background: c, border: cDraft.color === c ? '3px solid #003F8A' : '2px solid white', boxShadow: '0 0 0 1px #cbd5e1', cursor: 'pointer' }} />)}
             </div>
           </Field>
           <div style={{ gridColumn: '1 / -1' }}><Field label="Notes (optional)"><textarea className="input-field" maxLength={1000} rows={2} value={cDraft.description} onChange={e => setCDraft({ ...cDraft, description: e.target.value })} style={{ width: '100%' }} /></Field></div>
@@ -232,7 +232,7 @@ const CampaignsPage = () => {
       <div role="group" aria-label="View" style={{ display: 'inline-flex', border: '1px solid rgba(226,232,240,0.9)', borderRadius: 10, background: 'white', marginBottom: 12 }}>
         {([['timeline', 'Timeline'], ['posts', `Posts (${posts.length})`]] as const).map(([k, label]) => (
           <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}
-            style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer', background: tab === k ? '#0B1F3A' : 'transparent', color: tab === k ? 'white' : '#64748b', borderRadius: 9 }}>{label}</button>
+            style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, border: 'none', cursor: 'pointer', background: tab === k ? '#003F8A' : 'transparent', color: tab === k ? 'white' : '#64748b', borderRadius: 9 }}>{label}</button>
         ))}
       </div>
 
@@ -248,7 +248,7 @@ const CampaignsPage = () => {
                   {campaigns.map(c => (
                     <li key={c.id} className={`glass-card collapsible${removing === `/api/public/campaigns/${c.id}` ? ' removing' : ''}`} style={{ padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderLeft: `4px solid ${c.color}` }}>
                       <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                        <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0B1F3A' }}>{c.name}</p>
+                        <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#003F8A' }}>{c.name}</p>
                         <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{fmt(c.start_date)} to {fmt(c.end_date)} · {c.post_count} post{c.post_count === 1 ? '' : 's'}{c.description ? ` · ${c.description}` : ''}</p>
                       </div>
                       <button type="button" className="chip" onClick={() => newPost(String(c.id))}>Log a post</button>
@@ -281,7 +281,7 @@ const CampaignsPage = () => {
                     <li key={p.id} className={`glass-card collapsible${removing === `/api/public/social-posts/${p.id}` ? ' removing' : ''}`} style={{ padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', borderLeft: `4px solid ${c?.color ?? '#cbd5e1'}` }}>
                       {p.has_image && <PostImage id={p.id} title={p.title} version={loadedAt} />}
                       <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-                        <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0B1F3A', overflowWrap: 'anywhere' }}>{p.title}</p>
+                        <p style={{ fontWeight: 800, fontSize: '0.9rem', color: '#003F8A', overflowWrap: 'anywhere' }}>{p.title}</p>
                         <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{p.platform} · {fmt(p.post_date)} · {p.status}{c ? ` · ${c.name}` : ''}{p.notes ? ` · ${p.notes}` : ''}</p>
                       </div>
                       {p.post_url && <a href={p.post_url} target="_blank" rel="noopener noreferrer" className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>View post <ExternalLink size={11} aria-hidden="true" /></a>}

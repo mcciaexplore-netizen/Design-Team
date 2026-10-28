@@ -73,8 +73,8 @@ export default function PinnableImage({ proofId, name, pins, canAdd, canToggle, 
           <img ref={img} src={url} alt={`Design: ${name}`} onClick={onClick} onKeyDown={onKey}
             role={canAdd ? 'button' : undefined} tabIndex={canAdd ? 0 : undefined} aria-label={canAdd ? `Design: ${name}. Click to mark a spot that needs changing.` : undefined}
             style={{ display: 'block', maxWidth: '100%', maxHeight: 420, objectFit: 'contain', cursor: canAdd ? 'crosshair' : 'default' }} />
-          {pins.map((p, i) => marker(i + 1, p.x, p.y, p.resolved ? '#256B45' : '#dc2626'))}
-          {draft && marker(pins.length + 1, draft.x, draft.y, '#1E3A5F', true)}
+          {pins.map((p, i) => marker(i + 1, p.x, p.y, p.resolved ? '#059669' : '#dc2626'))}
+          {draft && marker(pins.length + 1, draft.x, draft.y, '#0056B3', true)}
         </div>
       </div>
       {canAdd && !draft && <p style={{ fontSize: '0.74rem', color: '#64748b', textAlign: 'center', marginTop: 6 }}>Click the design to mark a spot that needs changing.</p>}
@@ -97,13 +97,13 @@ export default function PinnableImage({ proofId, name, pins, canAdd, canToggle, 
         <ol aria-label="Marked spots" style={{ listStyle: 'none', margin: '10px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {pins.map((p, i) => (
             <li key={p.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: '0.8rem', color: '#334155' }}>
-              <span aria-hidden="true" style={{ width: 20, height: 20, borderRadius: 99, flexShrink: 0, background: p.resolved ? '#256B45' : '#dc2626', color: 'white', fontSize: '0.68rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+              <span aria-hidden="true" style={{ width: 20, height: 20, borderRadius: 99, flexShrink: 0, background: p.resolved ? '#059669' : '#dc2626', color: 'white', fontSize: '0.68rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
               <span style={{ flex: 1, overflowWrap: 'anywhere', textDecoration: p.resolved ? 'line-through' : 'none', color: p.resolved ? '#94a3b8' : undefined }}>
                 <strong>{p.author}:</strong> {p.content}
               </span>
               {canToggle && (
                 <label style={{ display: 'inline-flex', gap: 4, alignItems: 'center', fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap' }}>
-                  <input type="checkbox" checked={p.resolved} onChange={() => onToggle(p)} aria-label={`Spot ${i + 1} is done`} style={{ accentColor: '#256B45' }} /> Done
+                  <input type="checkbox" checked={p.resolved} onChange={() => onToggle(p)} aria-label={`Spot ${i + 1} is done`} style={{ accentColor: '#059669' }} /> Done
                 </label>
               )}
             </li>

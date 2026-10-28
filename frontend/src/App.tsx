@@ -3,15 +3,12 @@ import KanbanBoard from './components/KanbanBoard';
 import NotificationBell from './components/NotificationBell';
 import TicketCreateModal from './components/TicketCreateModal';
 import CommandPalette from './components/CommandPalette';
-import LoginPage from './pages/LoginPage';
 // Pages other than the first screen load on demand, so nobody downloads the calendar library until it opens.
 const TicketDetailPage = lazy(() => import('./pages/TicketDetailPage'));
-const ForcePasswordChangePage = lazy(() => import('./pages/ForcePasswordChangePage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
 const WorkloadPage = lazy(() => import('./pages/WorkloadPage'));
 const LibraryPage = lazy(() => import('./pages/LibraryPage'));
-const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 
 const PageLoading = () => <p role="status" style={{ color: 'var(--text-hint)', padding: '1rem' }}>Loading…</p>;
@@ -21,7 +18,7 @@ import { ToastContainer, useToast } from './components/Toast';
 import { useState, useEffect, useCallback, useRef, lazy, Suspense, type ReactNode } from 'react';
 import { useTicketSocket } from './hooks/useTicketSocket';
 import {
-  LayoutDashboard, Plus, Zap, LogOut, Search,
+  LayoutDashboard, Plus, Zap, Search,
   ChevronRight, Settings, ListChecks, CalendarDays, Library, type LucideIcon,
 } from 'lucide-react';
 
@@ -66,7 +63,7 @@ function titleFor(pathname: string): string {
 
 function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
   const location  = useLocation();
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
   const role = user?.role;
 
   return (
@@ -115,7 +112,7 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
 
       <div className="app-user-area">
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--brand-soft)', border: '1px solid rgba(11,31,58,0.1)', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.625rem 0.75rem', borderRadius: 10, background: 'var(--brand-soft)', border: '1px solid rgba(0,63,138,0.1)', marginBottom: 8 }}>
             <div style={{ width: 32, height: 32, borderRadius: '99px', background: user.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800, color: 'white', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
               {user.initials}
             </div>
@@ -125,16 +122,9 @@ function Sidebar({ onNewTicket }: { onNewTicket: () => void }) {
             </div>
           </div>
         )}
-        <button
-          type="button"
-          onClick={logout}
-          className="app-nav-link app-signout"
-        >
-          <LogOut size={14} /> Sign out
-        </button>
       </div>
 
-      <div className="app-brand-footer mt-3 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(11,31,58,0.03)', border: '1px solid rgba(11,31,58,0.07)' }}>
+      <div className="app-brand-footer mt-3 px-3 py-2.5 rounded-lg" style={{ background: 'rgba(0,63,138,0.03)', border: '1px solid rgba(0,63,138,0.07)' }}>
         <div className="flex items-center gap-2">
           <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Zap size={13} color="white" />
@@ -287,19 +277,11 @@ function App() {
   );
 }
 
-/** The admin app: the design team only. Clients use the separate User app, with no account. */
+/** The admin app: no login. Every visitor is resolved to the same shared staff identity by the backend. */
 function AppContent() {
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const location = useLocation();
-
-  if (location.pathname === '/forgot-password' || location.pathname === '/reset-password') {
-    return <Suspense fallback={<PageLoading />}><PasswordResetPage /></Suspense>;
-  }
+  const { isLoading } = useAuth();
 
   if (isLoading) return <FullScreenLoading text="Loading MCCIA Studio…" />;
-  if (!isAuthenticated) return <LoginPage />;
-
-  if (user?.mustChangePassword) return <Suspense fallback={<PageLoading />}><ForcePasswordChangePage /></Suspense>;
 
   return (
     <TicketsProvider>
@@ -310,7 +292,7 @@ function AppContent() {
 
 function FullScreenLoading({ text }: { text: string }) {
   return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0B1F3A' }}>
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#003F8A' }}>
       <div style={{ textAlign: 'center', color: 'white' }}>
         <div className="app-spinner" role="status" aria-label="Loading" />
         <p style={{ fontSize: '0.9rem', fontFamily: 'var(--font-body)', opacity: 0.7, marginTop: 14 }}>{text}</p>

@@ -16,10 +16,10 @@ interface ToastItemProps {
 }
 
 const TOAST_CFG: Record<ToastType, { icon: any; color: string; bg: string; border: string }> = {
-  success: { icon: CheckCircle2, color: '#256B45', bg: 'rgba(46,139,87,0.1)',  border: 'rgba(46,139,87,0.25)' },
+  success: { icon: CheckCircle2, color: '#059669', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.25)' },
   warning: { icon: AlertTriangle,color: '#C2410C', bg: 'rgba(249,115,22,0.1)',  border: 'rgba(249,115,22,0.25)' },
-  error:   { icon: AlertTriangle,color: '#B91C1C', bg: 'rgba(225,29,72,0.1)',   border: 'rgba(225,29,72,0.25)'  },
-  info:    { icon: Info,         color: '#0B1F3A', bg: 'rgba(11,31,58,0.08)',   border: 'rgba(11,31,58,0.2)'   },
+  error:   { icon: AlertTriangle,color: '#B91C1C', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)'  },
+  info:    { icon: Info,         color: '#003F8A', bg: 'rgba(0,63,138,0.08)',   border: 'rgba(0,63,138,0.2)'   },
 };
 
 function ToastItem({ toast, onRemove }: ToastItemProps) {
@@ -48,7 +48,7 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
       <div style={{ color: cfg.color, flexShrink: 0 }}>
         <Icon size={16} />
       </div>
-      <p style={{ flex: 1, fontSize: '0.82rem', fontWeight: 600, color: '#0B1F3A', fontFamily: 'var(--font-body)' }}>
+      <p style={{ flex: 1, fontSize: '0.82rem', fontWeight: 600, color: '#003F8A', fontFamily: 'var(--font-body)' }}>
         {toast.message}
       </p>
       <button

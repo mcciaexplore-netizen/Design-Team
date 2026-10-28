@@ -241,7 +241,7 @@ const KanbanBoard = () => {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
       {error && (
-        <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(225,29,72,0.06)', border: '1px solid rgba(225,29,72,0.2)', color: '#b91c1c', borderRadius: 10, padding: '0.5rem 0.875rem', marginBottom: '0.75rem', fontSize: '0.8rem' }}>
+        <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: '#b91c1c', borderRadius: 10, padding: '0.5rem 0.875rem', marginBottom: '0.75rem', fontSize: '0.8rem' }}>
           {error}
           <button type="button" className="btn-ghost" style={{ padding: '0.25rem 0.7rem', fontSize: '0.75rem', marginLeft: 'auto' }} onClick={() => void refresh()}>Retry</button>
         </div>
@@ -333,7 +333,7 @@ const KanbanBoard = () => {
         </select>
 
         {filtersActive && (
-          <button type="button" onClick={() => chooseView('q:all')} className="chip" style={{ color: '#B91C1C', borderColor: 'rgba(225,29,72,0.2)', background: 'rgba(225,29,72,0.05)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button type="button" onClick={() => chooseView('q:all')} className="chip" style={{ color: '#B91C1C', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.05)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <X size={11} /> Clear filters
           </button>
         )}

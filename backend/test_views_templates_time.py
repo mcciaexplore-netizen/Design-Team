@@ -97,7 +97,8 @@ def test_bulk_lead_assigns_unassigns_and_reports_failures(client):
 def test_bulk_validation_and_permissions(client):
     t = make_ticket(client, "a@tata.com")["id"]
     lead = auth(client, "lead@x.com")
-    assert client.post("/api/tickets/bulk", json={"ticket_ids": [t], "status": "Closed"}).status_code == 401
+    # No token: falls back to the shared staff identity, which is allowed.
+    assert client.post("/api/tickets/bulk", json={"ticket_ids": [t], "status": "Closed"}).status_code == 200
     assert client.post("/api/tickets/bulk", json={"ticket_ids": [t]}, headers=lead).status_code == 422  # nothing to change
     assert client.post("/api/tickets/bulk", json={"ticket_ids": [], "status": "Closed"}, headers=lead).status_code == 422
     assert client.post("/api/tickets/bulk", json={"ticket_ids": list(range(101)), "status": "Closed"}, headers=lead).status_code == 422
@@ -411,5 +412,6 @@ def test_forecasting_endpoint_uses_real_data_with_widget_shape(client):
     row = [f for f in r.json()["forecast"] if f["designer_name"] == "Designer"][0]
     assert set(row) >= {"designer_id", "designer_name", "daily_capacity_hours", "is_overloaded_next_7_days", "overload_date", "projected_capacity_percentage"}
     assert row["is_overloaded_next_7_days"] is True and row["projected_capacity_percentage"] > 100
-    assert client.get("/api/forecasting/capacity").status_code == 401
+    # No token: falls back to the shared staff identity, which is allowed.
+    assert client.get("/api/forecasting/capacity").status_code == 200
     assert client.get("/api/workload", params={"days": 99}, headers=auth(client, "lead@x.com")).status_code == 422

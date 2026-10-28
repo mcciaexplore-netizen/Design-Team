@@ -155,18 +155,18 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const scoreColor = score >= 90 ? '#256B45' : score >= 60 ? '#d97706' : '#dc2626';
+  const scoreColor = score >= 90 ? '#059669' : score >= 60 ? '#d97706' : '#dc2626';
 
   return (
     <div className="animate-fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
       <div role="dialog" aria-modal="true" aria-labelledby="new-ticket-title" className="animate-fade-in-up"
-        style={{ background: 'rgba(255,255,255,0.98)', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 'var(--radius-lg)', boxShadow: '0 30px 80px rgba(11,31,58,0.12)', width: '100%', maxWidth: 680, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        style={{ background: 'rgba(255,255,255,0.98)', border: '1px solid rgba(226,232,240,0.85)', borderRadius: 'var(--radius-lg)', boxShadow: '0 30px 80px rgba(0,63,138,0.12)', width: '100%', maxWidth: 680, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.1rem 1.5rem', borderBottom: '1px solid rgba(226,232,240,0.85)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div className="icon-tile" style={{ width: 36, height: 36 }}><Plus size={16} /></div>
             <div>
-              <h2 id="new-ticket-title" style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: '#0B1F3A', lineHeight: 1.1 }}>New design ticket</h2>
+              <h2 id="new-ticket-title" style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'var(--font-body)', color: '#003F8A', lineHeight: 1.1 }}>New design ticket</h2>
               <p style={{ fontSize: '0.72rem', color: '#737373', marginTop: 1 }}>MCCIA Applied AI Studio</p>
             </div>
           </div>
@@ -176,7 +176,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
         {done ? (
           <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center' }} role="status">
             <CheckCircle2 size={44} style={{ color: '#047857', margin: '0 auto 12px' }} />
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0B1F3A' }}>{done.number} created</h3>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#003F8A' }}>{done.number} created</h3>
             <p style={{ fontSize: '0.85rem', color: '#737373', marginTop: 6 }}>The design team has been notified. You'll be told when it moves forward.</p>
             {done.warnings.length > 0 && (
               <ul style={{ margin: '14px auto 0', maxWidth: 440, textAlign: 'left', fontSize: '0.78rem', color: '#92400e', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '0.6rem 1rem 0.6rem 1.6rem' }}>
@@ -202,9 +202,9 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     {designTypes.map(d => {
                       const on = d.id === type?.id;
                       return (
-                        <label key={d.id} style={{ cursor: 'pointer', padding: '0.7rem 0.8rem', borderRadius: 10, border: `1.5px solid ${on ? '#0B1F3A' : 'rgba(226,232,240,0.9)'}`, background: on ? 'var(--brand-soft)' : 'white' }}>
+                        <label key={d.id} style={{ cursor: 'pointer', padding: '0.7rem 0.8rem', borderRadius: 10, border: `1.5px solid ${on ? '#003F8A' : 'rgba(226,232,240,0.9)'}`, background: on ? 'var(--brand-soft)' : 'white' }}>
                           <input type="radio" name="design-type" className="sr-only" checked={on} onChange={() => { setTypeId(d.id); setFields({}); }} style={{ position: 'absolute', opacity: 0 }} />
-                          <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: on ? '#0B1F3A' : '#0B1F3A' }}>{d.name}</span>
+                          <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: on ? '#003F8A' : '#003F8A' }}>{d.name}</span>
                           <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b' }}>Typical turnaround {d.default_sla_hours} working hours</span>
                         </label>
                       );
@@ -257,7 +257,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   <input id="nt-link" type="url" className="input-field" value={link} onChange={e => { setLink(e.target.value); setLinkInfo(null); setShowPreview(false); }} onBlur={() => void checkLink()} placeholder="https://www.figma.com/design/…" />
                   {linkInfo?.valid && <button type="button" className="btn-ghost" onClick={() => setShowPreview(s => !s)}>{showPreview ? 'Hide' : 'Preview'}</button>}
                 </div>
-                {linkInfo?.valid && <p style={{ fontSize: '0.72rem', color: '#256B45', marginTop: 4 }}>Figma file detected: “{linkInfo.name}”.</p>}
+                {linkInfo?.valid && <p style={{ fontSize: '0.72rem', color: '#059669', marginTop: 4 }}>Figma file detected: “{linkInfo.name}”.</p>}
                 {showPreview && linkInfo?.valid && <FigmaEmbed url={link.trim()} />}
               </div>
 
@@ -266,7 +266,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                   {[...PRESET_TAGS, ...tags.filter(t => !PRESET_TAGS.includes(t))].map(t => (
                     <button key={t} type="button" aria-pressed={tags.includes(t)} onClick={() => toggleTag(t)} className="chip"
-                      style={tags.includes(t) ? { background: 'var(--brand-soft)', borderColor: '#0B1F3A', color: '#0B1F3A' } : undefined}>{t}</button>
+                      style={tags.includes(t) ? { background: 'var(--brand-soft)', borderColor: '#003F8A', color: '#003F8A' } : undefined}>{t}</button>
                   ))}
                   <input className="input-field" aria-label="Add a custom tag" value={customTag} maxLength={30} placeholder="+ custom tag" onChange={e => setCustomTag(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomTag(); } }} style={{ width: 130, padding: '0.25rem 0.6rem', fontSize: '0.75rem' }} />
@@ -278,7 +278,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 <div
                   onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
                   onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
-                  style={{ border: `2px dashed ${dragging ? '#0B1F3A' : 'rgba(203,213,225,0.9)'}`, background: dragging ? 'var(--brand-soft)' : '#FAFAFA', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>
+                  style={{ border: `2px dashed ${dragging ? '#003F8A' : 'rgba(203,213,225,0.9)'}`, background: dragging ? 'var(--brand-soft)' : '#F8FAFC', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>
                   <input ref={fileRef} type="file" multiple hidden aria-label="Choose files" onChange={e => { if (e.target.files) addFiles(e.target.files); if (fileRef.current) fileRef.current.value = ''; }} />
                   <p style={{ fontSize: '0.8rem', color: '#64748b' }}>
                     Drag files here or <button type="button" className="chip" onClick={() => fileRef.current?.click()}><Paperclip size={11} /> browse</button>
@@ -314,7 +314,7 @@ const TicketCreateModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            <div style={{ padding: '0.85rem 1.5rem', borderTop: '1px solid rgba(226,232,240,0.85)', background: '#FAFAFA' }}>
+            <div style={{ padding: '0.85rem 1.5rem', borderTop: '1px solid rgba(226,232,240,0.85)', background: '#F8FAFC' }}>
               {error && <p role="alert" style={{ fontSize: '0.8rem', color: '#b91c1c', marginBottom: 8 }}>{error}</p>}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 190 }} title="A fuller brief means fewer questions and revisions">

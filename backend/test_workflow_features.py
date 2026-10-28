@@ -218,11 +218,12 @@ def test_cdr_flow_request_approve_upload_download(client):
     assert client.get(f"/api/cdr-requests/{rid}/download", headers=cl).status_code == 409
     assert client.post(f"/api/cdr-requests/{rid}/upload", files={"file": ("a.cdr", b"CDRDATA", "application/octet-stream")}, headers=des).json()["status"] == "Uploaded"
 
-    assert client.get(f"/api/cdr-requests/{rid}/download").status_code == 401   # no account, no download
+    # No token: falls back to the shared staff identity, which can download it (and this still gets logged).
+    assert client.get(f"/api/cdr-requests/{rid}/download").status_code == 200
     dl = client.get(f"/api/cdr-requests/{rid}/download", headers=cl)
     assert dl.status_code == 200 and dl.content == b"CDRDATA" and "attachment" in dl.headers["content-disposition"]
     db = TestingSessionLocal()
-    assert db.query(models.CdrDownloadLog).count() == 1
+    assert db.query(models.CdrDownloadLog).count() == 2
     db.close()
 
 
@@ -266,7 +267,8 @@ def test_public_request_waits_for_a_lead_to_accept_it(client):
     accepted = client.post(f"/api/tickets/{pending[0]['id']}/accept", headers=lead)
     assert accepted.status_code == 200 and accepted.json()["assignee"]["email"] == "des@x.com"
     assert client.post(f"/api/tickets/{pending[0]['id']}/accept", headers=lead).status_code == 409   # already accepted
-    assert client.post(f"/api/tickets/{pending[0]['id']}/accept").status_code == 401                # staff only
+    # No token: falls back to the shared staff identity (the same Lead who already accepted it above).
+    assert client.post(f"/api/tickets/{pending[0]['id']}/accept").status_code == 409
 
 
 # ── Jira ─────────────────────────────────────────────────────────────────────

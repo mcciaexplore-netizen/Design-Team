@@ -53,7 +53,8 @@ def test_only_leads_can_manage_users(client):
     h = login(client, "des@x.com")
     assert client.get("/api/admin/users", headers=h).status_code == 403
     assert client.post("/api/admin/users", headers=h, json={"full_name": "Zed Zed", "email": "z@x.com", "role": "Designer"}).status_code == 403
-    assert client.get("/api/admin/users").status_code == 401
+    # No token: there is no login, so this resolves to the shared default staff identity (the seeded Lead here).
+    assert client.get("/api/admin/users").status_code == 200
 
 
 def test_lead_creates_staff_with_temp_password_that_must_be_changed(client):
@@ -68,13 +69,13 @@ def test_lead_creates_staff_with_temp_password_that_must_be_changed(client):
     # Duplicate email (case-insensitive)
     assert client.post("/api/admin/users", headers=lead, json={"full_name": "Dup Dup", "email": "NEW@x.com", "role": "Designer"}).status_code == 409
 
-    # Logs in with the temp password but is locked to changing it
+    # Logs in with the temp password. There is no login gate any more, so nothing blocks using the app before
+    # changing it; the change-password endpoint itself still works if something calls it directly.
     login_res = client.post("/api/auth/token", data={"username": "new@x.com", "password": temp}).json()
     assert login_res["user"]["must_change_password"] is True
     h = {"Authorization": f"Bearer {login_res['access_token']}"}
     assert client.get("/api/auth/me", headers=h).status_code == 200
-    blocked = client.get("/api/tickets", headers=h)
-    assert blocked.status_code == 403 and "change your temporary password" in blocked.json()["detail"]
+    assert client.get("/api/tickets", headers=h).status_code == 200
 
     # Wrong current password / too short / same as current are rejected
     assert client.post("/api/auth/change-password", headers=h, json={"current_password": "nope", "new_password": "brand-new-pw1"}).status_code == 400
@@ -83,8 +84,9 @@ def test_lead_creates_staff_with_temp_password_that_must_be_changed(client):
 
     done = client.post("/api/auth/change-password", headers=h, json={"current_password": temp, "new_password": "brand-new-pw1"})
     assert done.status_code == 200 and done.json()["user"]["must_change_password"] is False
-    # Old token is dead, new one works everywhere
-    assert client.get("/api/auth/me", headers=h).status_code == 401
+    # The old token is no longer valid for this user, but there is no login: it just falls back to the shared
+    # default staff identity instead of failing.
+    assert client.get("/api/auth/me", headers=h).status_code == 200
     h2 = {"Authorization": f"Bearer {done.json()['access_token']}"}
     assert client.get("/api/tickets", headers=h2).status_code == 200
     assert client.post("/api/auth/token", data={"username": "new@x.com", "password": temp}).status_code == 401
@@ -106,7 +108,8 @@ def test_reset_password_signs_out_old_sessions(client):
     r = client.post(f"/api/admin/users/{uid}/reset-password", headers=lead)
     assert r.status_code == 200
     temp = r.json()["temporary_password"]
-    assert client.get("/api/auth/me", headers=des_headers).status_code == 401  # old session revoked
+    # The old token no longer identifies as that designer; with no login it falls back to the shared staff identity.
+    assert client.get("/api/auth/me", headers=des_headers).status_code == 200
     assert client.post("/api/auth/token", data={"username": "des@x.com", "password": "secret-pw"}).status_code == 401
     res = client.post("/api/auth/token", data={"username": "des@x.com", "password": temp}).json()
     assert res["user"]["must_change_password"] is True
@@ -119,7 +122,8 @@ def test_deactivate_and_reactivate(client):
     uid = user_id(client, lead, "des@x.com")
     r = client.patch(f"/api/admin/users/{uid}", headers=lead, json={"is_active": False})
     assert r.status_code == 200 and r.json()["is_active"] is False
-    assert client.get("/api/auth/me", headers=des).status_code == 401
+    # Deactivating them doesn't revoke API access: with no login, every request falls back to the shared staff identity.
+    assert client.get("/api/auth/me", headers=des).status_code == 200
     assert client.post("/api/auth/token", data={"username": "des@x.com", "password": "secret-pw"}).status_code == 401
     assert client.patch(f"/api/admin/users/{uid}", headers=lead, json={"is_active": True}).json()["is_active"] is True
     login(client, "des@x.com")

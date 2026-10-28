@@ -105,10 +105,10 @@ export default function RequestsBoardPage() {
 
         {data && (<>
           <section aria-label="Summary" className="board-stats">
-            <StatTile icon={Workflow}     label="In progress"         value={stats.active}    gradient="linear-gradient(135deg,#0B1F3A 0%,#1E3A5F 100%)" />
+            <StatTile icon={Workflow}     label="In progress"         value={stats.active}    gradient="linear-gradient(135deg,#003F8A 0%,#0056B3 100%)" />
             <StatTile icon={Eye}          label="Awaiting approval"   value={stats.review}    gradient="linear-gradient(135deg,#d97706 0%,#f59e0b 100%)" />
-            <StatTile icon={Clock}        label="Due in 7 days"       value={stats.dueSoon}   gradient="linear-gradient(135deg,#7C3AED 0%,#a855f7 100%)" />
-            <StatTile icon={PackageCheck} label={`Finished · last ${data.finished_days}d`} value={stats.delivered} gradient="linear-gradient(135deg,#256B45 0%,#2E8B57 100%)" />
+            <StatTile icon={Clock}        label="Due in 7 days"       value={stats.dueSoon}   gradient="linear-gradient(135deg,#8B5CF6 0%,#a855f7 100%)" />
+            <StatTile icon={PackageCheck} label={`Finished · last ${data.finished_days}d`} value={stats.delivered} gradient="linear-gradient(135deg,#059669 0%,#10B981 100%)" />
           </section>
 
           <section aria-label="Filters" className="board-filters">
@@ -174,10 +174,10 @@ function RequestCard({ r, steps, now }: { r: BoardRequest; steps: string[]; now:
   const pct = steps.length ? Math.round(((r.current_step + 1) / steps.length) * 100) : 0;
 
   const badge = r.finished
-    ? { bg: 'rgba(37,107,69,0.12)', color: '#256B45' }
+    ? { bg: 'rgba(5,150,105,0.12)', color: '#059669' }
     : r.status === 'In Review'
     ? { bg: 'rgba(217,119,6,0.12)', color: '#92400e' }
-    : { bg: 'rgba(11,31,58,0.08)', color: '#0B1F3A' };
+    : { bg: 'rgba(0,63,138,0.08)', color: '#003F8A' };
 
   return (
     <li className="request-card">

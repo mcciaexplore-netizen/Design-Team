@@ -61,7 +61,7 @@ function RequestFormBody({ options }: { options: RequestFormOptions }) {
   if (done) {
     return (
       <div className="glass-card" role="status" style={{ padding: '2rem', textAlign: 'center' }}>
-        <CheckCircle2 size={36} color="#256B45" style={{ margin: '0 auto 10px' }} />
+        <CheckCircle2 size={36} color="#059669" style={{ margin: '0 auto 10px' }} />
         <h2 style={{ fontWeight: 800, marginBottom: 6 }}>Request received</h2>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-soft)' }}>
           {done.tickets[0] && <>Your ticket number is <strong>{done.tickets[0].ticket_number}</strong>. </>}The design team has been notified and will be in touch.

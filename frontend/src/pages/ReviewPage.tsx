@@ -14,7 +14,7 @@ interface Review {
   proof: { version: number; file_name: string; content_type: string | null; note: string | null } | null;
 }
 
-const BLUE = '#0B1F3A';
+const BLUE = '#003F8A';
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '';
 const MAX = 2000;
@@ -35,7 +35,7 @@ const labelStyle: CSSProperties = { display: 'block', fontSize: 14, fontWeight: 
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#FAFAFA', color: '#0f172a', overflowX: 'hidden' }}>
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0f172a', overflowX: 'hidden' }}>
       <header style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '10px 16px' }}>
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
           <img src="/mccia_logo.png" alt="MCCIA Applied AI Studio" style={{ height: 40, maxWidth: '100%', objectFit: 'contain' }} />
@@ -166,7 +166,7 @@ export default function ReviewPage() {
       const ok = done === 'approved';
       return (
         <div role="status" style={{ textAlign: 'center', padding: '8px 0' }}>
-          <div style={{ color: ok ? '#2E8B57' : '#f59e0b' }} aria-hidden="true">{ok ? <CheckCircle2 size={44} /> : <MessageSquare size={44} />}</div>
+          <div style={{ color: ok ? '#10B981' : '#f59e0b' }} aria-hidden="true">{ok ? <CheckCircle2 size={44} /> : <MessageSquare size={44} />}</div>
           <h2 style={{ fontFamily: 'var(--font-body)', fontSize: 20, margin: '8px 0' }}>{ok ? 'Thanks — approved' : "Thanks — we've sent your feedback to the design team"}</h2>
           <p style={{ color: '#525252', margin: 0 }}>You can now close this page.</p>
         </div>
@@ -265,7 +265,7 @@ export default function ReviewPage() {
               <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 12, padding: 16 }}>
                 <p style={{ margin: '0 0 12px', color: '#065f46', fontWeight: 600 }}>Approve version {proof?.version ?? ''}? This tells the team the design is final.</p>
                 <div style={{ display: 'grid', gap: 10 }}>
-                  <button type="button" disabled={submitting} onClick={() => void submit('approve')} style={{ ...btn, background: '#256B45', color: '#fff', opacity: submitting ? 0.7 : 1 }}>
+                  <button type="button" disabled={submitting} onClick={() => void submit('approve')} style={{ ...btn, background: '#059669', color: '#fff', opacity: submitting ? 0.7 : 1 }}>
                     {submitting ? <Loader2 size={18} style={{ animation: 'app-spin 1s linear infinite' }} aria-hidden="true" /> : <CheckCircle2 size={18} aria-hidden="true" />} Yes, approve
                   </button>
                   <button type="button" disabled={submitting} onClick={() => setMode('none')} style={{ ...btn, background: '#fff', color: '#0f172a', borderColor: '#94a3b8' }}>Cancel</button>
@@ -273,7 +273,7 @@ export default function ReviewPage() {
               </div>
             ) : (
               <div style={{ display: 'grid', gap: 10 }}>
-                <button type="button" disabled={submitting} onClick={() => { setFormErr(''); if (!name.trim()) { setFormErr('Please enter your name.'); return; } setMode('approve'); }} style={{ ...btn, background: '#256B45', color: '#fff' }}>
+                <button type="button" disabled={submitting} onClick={() => { setFormErr(''); if (!name.trim()) { setFormErr('Please enter your name.'); return; } setMode('approve'); }} style={{ ...btn, background: '#059669', color: '#fff' }}>
                   <CheckCircle2 size={18} aria-hidden="true" /> Approve this design
                 </button>
                 {mode === 'changes' ? (
