@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { API_BASE, TOKEN_KEY, apiJson } from '../api';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiJson } from '../api';
 
 /* ─── Types ───────────────────────────────── */
 export type UserRole = 'Design Lead' | 'Designer' | 'Client';
@@ -11,107 +11,65 @@ export interface AuthUser {
   role:   UserRole;
   initials: string;
   color:  string;
-  mustChangePassword: boolean;
 }
 
 interface AuthContextType {
-  user:               AuthUser | null;
-  isAuthenticated:    boolean;
-  isLoading:          boolean;
-  login:              (email: string, password: string) => Promise<void>;
-  logout:            () => void;
-  changePassword:     (currentPassword: string, newPassword: string) => Promise<void>;
-  error:              string | null;
+  user:      AuthUser | null;
+  isLoading: boolean;
+  error:     string | null;
+  retry:     () => void;
 }
 
 /* ─── Context ─────────────────────────────── */
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const SESSION_KEY = 'mccia_auth_user';
+const RETRY_DELAYS_MS = [500, 1500, 3000];   // a few quick retries ride out a cold serverless start
 
+/** There is no login: the backend resolves every request to one shared staff identity. This just fetches
+ *  who that is, retrying a few times before giving up, so the UI can show a name and role-based navigation. */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user,      setUser]      = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error,     setError]     = useState<string | null>(null);
+  const [user,       setUser]       = useState<AuthUser | null>(null);
+  const [isLoading,  setIsLoading]  = useState(true);
+  const [error,      setError]      = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
-  /* Restore session from localStorage */
   useEffect(() => {
-    const stored = localStorage.getItem(SESSION_KEY);
-    if (stored && localStorage.getItem(TOKEN_KEY)) {
-      try { setUser(JSON.parse(stored)); } catch {}
-    }
-    setIsLoading(false);
-  }, []);
-
-  const startSession = (data: { access_token: string; user: { id: number; full_name: string; email: string; role: string; must_change_password?: boolean } }) => {
-    const u = data.user;
-    const role: UserRole = u.role === 'Design Lead' || u.role === 'Client' ? u.role : 'Designer';
-    const authUser: AuthUser = {
-      id:       String(u.id),
-      name:     u.full_name,
-      email:    u.email,
-      role,
-      initials: u.full_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
-      color:    role === 'Design Lead' ? '#003F8A' : role === 'Client' ? '#f97316' : '#8B5CF6',
-      mustChangePassword: !!u.must_change_password,
-    };
-    localStorage.setItem(TOKEN_KEY, data.access_token);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
-    setUser(authUser);
-  };
-
-  const login = async (email: string, password: string) => {
+    let cancelled = false;
+    setIsLoading(true);
     setError(null);
-    try {
-      const form = new URLSearchParams();
-      form.append('username', email.trim());
-      form.append('password', password);
 
-      let res: Response;
-      try {
-        res = await fetch(`${API_BASE}/api/auth/token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: form.toString(),
-          signal: AbortSignal.timeout(60000),
+    const fetchMe = (attempt: number): void => {
+      apiJson<{ id: number; full_name: string; email: string; role: string }>('/api/auth/me')
+        .then(u => {
+          if (cancelled) return;
+          const role: UserRole = u.role === 'Design Lead' || u.role === 'Client' ? u.role : 'Designer';
+          setUser({
+            id:       String(u.id),
+            name:     u.full_name,
+            email:    u.email,
+            role,
+            initials: u.full_name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
+            color:    role === 'Design Lead' ? '#003F8A' : role === 'Client' ? '#f97316' : '#8B5CF6',
+          });
+          setIsLoading(false);
+        })
+        .catch((e: unknown) => {
+          if (cancelled) return;
+          if (attempt < RETRY_DELAYS_MS.length) {
+            setTimeout(() => { if (!cancelled) fetchMe(attempt + 1); }, RETRY_DELAYS_MS[attempt]);
+            return;
+          }
+          setError(e instanceof Error ? e.message : 'Could not load the workspace. Please try again.');
+          setIsLoading(false);
         });
-      } catch {
-        throw new Error('Cannot reach the server. It may be waking up (free hosting can take about a minute), or the backend may be down.');
-      }
+    };
+    fetchMe(0);
 
-      if (res.status === 401) throw new Error('Invalid email or password.');
-      if (res.status === 429) throw new Error('Too many sign-in attempts. Try again in 15 minutes.');
-      if (!res.ok) throw new Error('Sign-in failed. Please try again.');
-
-      startSession(await res.json());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Sign-in failed.');
-      throw e;
-    }
-  };
-
-  const changePassword = async (currentPassword: string, newPassword: string) => {
-    const data = await apiJson<Parameters<typeof startSession>[0]>('/api/auth/change-password', {
-      method: 'POST',
-      json: { current_password: currentPassword, new_password: newPassword },
-    });
-    startSession(data); // the old token is revoked by the server; this swaps in the new one
-  };
-
-  const logout = useCallback(() => {
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(TOKEN_KEY);
-    setUser(null);
-    setError(null);
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener('auth:expired', logout);
-    return () => window.removeEventListener('auth:expired', logout);
-  }, [logout]);
+    return () => { cancelled = true; };
+  }, [retryToken]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, changePassword, error }}>
+    <AuthContext.Provider value={{ user, isLoading, error, retry: () => setRetryToken(t => t + 1) }}>
       {children}
     </AuthContext.Provider>
   );

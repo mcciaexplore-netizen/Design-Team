@@ -279,9 +279,10 @@ function App() {
 
 /** The admin app: no login. Every visitor is resolved to the same shared staff identity by the backend. */
 function AppContent() {
-  const { isLoading } = useAuth();
+  const { isLoading, error, retry } = useAuth();
 
   if (isLoading) return <FullScreenLoading text="Loading MCCIA Studio…" />;
+  if (error) return <FullScreenLoading text={error} retry={retry} />;
 
   return (
     <TicketsProvider>
@@ -290,12 +291,17 @@ function AppContent() {
   );
 }
 
-function FullScreenLoading({ text }: { text: string }) {
+function FullScreenLoading({ text, retry }: { text: string; retry?: () => void }) {
   return (
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#003F8A' }}>
-      <div style={{ textAlign: 'center', color: 'white' }}>
-        <div className="app-spinner" role="status" aria-label="Loading" />
-        <p style={{ fontSize: '0.9rem', fontFamily: 'var(--font-body)', opacity: 0.7, marginTop: 14 }}>{text}</p>
+      <div style={{ textAlign: 'center', color: 'white', maxWidth: 360, padding: '0 1.5rem' }}>
+        {!retry && <div className="app-spinner" role="status" aria-label="Loading" />}
+        <p role={retry ? 'alert' : undefined} style={{ fontSize: '0.9rem', fontFamily: 'var(--font-body)', opacity: 0.85, marginTop: retry ? 0 : 14 }}>{text}</p>
+        {retry && (
+          <button type="button" onClick={retry} className="btn-primary" style={{ marginTop: 16 }}>
+            Try again
+          </button>
+        )}
       </div>
     </div>
   );
